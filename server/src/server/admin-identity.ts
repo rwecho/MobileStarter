@@ -8,6 +8,8 @@ import { ApiError } from './http';
 
 export type { AdminProfile };
 
+export type AdminSession = Readonly<{ admin: AdminProfile; appId: string }>;
+
 export const ADMIN_SESSION_TTL_MS = 7 * 86400_000;
 export const ADMIN_COOKIE = 'ms_admin_session';
 
@@ -63,28 +65,35 @@ export async function verifyAdminCredentials(
   return valid ? toProfile(admin) : null;
 }
 
-export function createSession(adminId: string): { token: string; expiresAt: string } {
+export function createSession(adminId: string, appId: string): { token: string; expiresAt: string } {
   const token = createSessionToken();
   const id = createId();
   const createdAt = nowIso();
   const expiresAt = new Date(Date.now() + ADMIN_SESSION_TTL_MS).toISOString();
   database.prepare(`
-    INSERT INTO admin_sessions(id, admin_id, token_hash, created_at, expires_at)
-    VALUES (?, ?, ?, ?, ?)
-  `).run(id, adminId, hashToken(token), createdAt, expiresAt);
+    INSERT INTO admin_sessions(id, admin_id, token_hash, app_id, created_at, expires_at)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `).run(id, adminId, hashToken(token), appId, createdAt, expiresAt);
   return { token, expiresAt };
 }
 
-export function getAdminByToken(token: string): AdminProfile | null {
+export function getAdminByToken(token: string): AdminSession | null {
   const row = database.prepare(`
-    SELECT u.id AS id, u.username AS username, u.email AS email, u.created_at AS createdAt
+    SELECT u.id AS id, u.username AS username, u.email AS email,
+      u.created_at AS createdAt, s.app_id AS appId
     FROM admin_users u JOIN admin_sessions s ON s.admin_id = u.id
     WHERE s.token_hash = ? AND s.revoked_at IS NULL AND s.expires_at > ?
-  `).get(hashToken(token), nowIso()) as AdminProfile | undefined;
-  if (!row) return null;
-  // Rebuild as a plain object: node:sqlite rows have a null prototype, which Next's
-  // RSC serializer rejects when passed to client components.
-  return { id: row.id, username: row.username, email: row.email, createdAt: row.createdAt };
+  `).get(hashToken(token), nowIso()) as {
+    id: string; username: string; email: string; createdAt: string; appId: string;
+  } | undefined;
+  // Rebuild as plain objects: node:sqlite rows have a null prototype, which Next's
+  // RSC serializer rejects when passed to client components. An empty app_id means
+  // a pre-app-binding session — treat it as unauthenticated so the admin re-logs in.
+  if (!row || !row.appId) return null;
+  return {
+    admin: { id: row.id, username: row.username, email: row.email, createdAt: row.createdAt },
+    appId: row.appId,
+  };
 }
 
 export function revokeSession(token: string): void {
@@ -93,7 +102,7 @@ export function revokeSession(token: string): void {
   ).run(nowIso(), hashToken(token));
 }
 
-export function getAdminFromRequest(request: NextRequest): AdminProfile | null {
+export function getAdminFromRequest(request: NextRequest): AdminSession | null {
   const token = request.cookies.get(ADMIN_COOKIE)?.value;
   if (!token) return null;
   return getAdminByToken(token);

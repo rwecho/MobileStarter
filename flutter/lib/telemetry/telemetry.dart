@@ -38,10 +38,28 @@ final class Telemetry {
     'MOBILEUI_API_URL',
     defaultValue: 'http://localhost:3210',
   );
-  static const _appId = String.fromEnvironment(
-    'MOBILEUI_APP_ID',
-    defaultValue: 'mobileui-demo',
-  );
+  // app_id（租户）必须通过 --dart-define=MOBILEUI_APP_ID 显式配置，未配置即报错，
+  // 避免混入不可预测的 app_id；启动期统一校验见 main()。
+  static const _appIdValue = String.fromEnvironment('MOBILEUI_APP_ID');
+  static String get _appId {
+    if (_appIdValue.isEmpty) {
+      throw StateError(
+        'MOBILEUI_APP_ID 未配置：请使用 --dart-define=MOBILEUI_APP_ID=<app-id> 启动，不能为空。',
+      );
+    }
+    return _appIdValue;
+  }
+
+  // environment（development/staging/production 等）同样必须显式配置，未配置即报错。
+  static const _appEnvironmentValue = String.fromEnvironment('MOBILEUI_APP_ENVIRONMENT');
+  static String get _appEnvironment {
+    if (_appEnvironmentValue.isEmpty) {
+      throw StateError(
+        'MOBILEUI_APP_ENVIRONMENT 未配置：请使用 --dart-define=MOBILEUI_APP_ENVIRONMENT=<env> 启动，不能为空。',
+      );
+    }
+    return _appEnvironmentValue;
+  }
 
   final _queue = <Map<String, Object?>>[];
   final _firebaseQueue = <Map<String, Object?>>[];
@@ -163,6 +181,7 @@ final class Telemetry {
             headers: {
               'content-type': 'application/json',
               'x-app-id': _appId,
+              'x-app-environment': _appEnvironment,
               'x-platform': 'flutter',
               'x-app-version': '1.0.0',
             },
@@ -246,7 +265,7 @@ final class Telemetry {
   }
 
   static String _id(String prefix) =>
-      '$prefix-${DateTime.now().microsecondsSinceEpoch}-${Random().nextInt(1 << 32)}';
+      '$prefix-${DateTime.now().microsecondsSinceEpoch}-${Random().nextInt(0x3FFFFFFF)}';
 }
 
 final telemetry = Telemetry();

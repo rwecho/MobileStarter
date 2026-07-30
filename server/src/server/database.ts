@@ -19,6 +19,7 @@ database.exec('PRAGMA foreign_keys = ON');
 initializeCoreSchema(database);
 initializeProductSchema(database);
 ensureUserColumns();
+ensureAdminSessionAppId();
 
 const insertConfig = database.prepare(`
   INSERT OR IGNORE INTO runtime_config(app_id, version, document, updated_at)
@@ -98,6 +99,15 @@ async function seedAdmin(username: string, email: string, password: string) {
     INSERT INTO admin_users(id, username, email, password_hash, created_at, updated_at)
     VALUES (?, ?, ?, ?, ?, ?)
   `).run(id, username, email, passwordHash, createdAt, createdAt);
+}
+
+function ensureAdminSessionAppId() {
+  const columns = database.prepare('PRAGMA table_info(admin_sessions)').all() as Array<{
+    name: string;
+  }>;
+  if (!columns.some((column) => column.name === 'app_id')) {
+    database.exec("ALTER TABLE admin_sessions ADD COLUMN app_id TEXT NOT NULL DEFAULT ''");
+  }
 }
 
 function ensureUserColumns() {

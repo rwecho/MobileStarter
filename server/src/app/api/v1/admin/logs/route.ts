@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
-import { authorizeAdmin, readAdminScope } from '@/server/admin-auth';
+import { adminContext } from '@/server/admin-auth';
 import { handleError, ok } from '@/server/http';
 import { listLogs } from '@/server/telemetry-repository';
 
@@ -14,8 +14,7 @@ const querySchema = z.object({
 
 export function GET(request: NextRequest) {
   try {
-    authorizeAdmin(request);
-    const scope = readAdminScope(request);
+    const { scope } = adminContext(request);
     const filters = querySchema.parse(
       Object.fromEntries(request.nextUrl.searchParams),
     );

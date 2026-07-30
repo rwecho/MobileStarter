@@ -74,6 +74,7 @@ export function initializeCoreSchema(database: DatabaseSync) {
     );
     CREATE TABLE IF NOT EXISTS admin_sessions (
       id TEXT PRIMARY KEY, admin_id TEXT NOT NULL, token_hash TEXT NOT NULL UNIQUE,
+      app_id TEXT NOT NULL DEFAULT '',
       created_at TEXT NOT NULL, expires_at TEXT NOT NULL, revoked_at TEXT,
       FOREIGN KEY(admin_id) REFERENCES admin_users(id) ON DELETE CASCADE
     );

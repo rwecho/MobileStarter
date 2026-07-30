@@ -15,14 +15,36 @@ export type AppSummary = Readonly<{
 }>;
 
 export function listApps(): AppSummary[] {
-  const apps = database.prepare(`
+  return distinctAppIds().map((appId) => summarize({ appId }));
+}
+
+export function listAppIds(): string[] {
+  return distinctAppIds();
+}
+
+export function appExists(appId: string): boolean {
+  return Boolean(
+    database
+      .prepare(`
+        SELECT 1 FROM (
+          SELECT app_id FROM runtime_configs WHERE app_id = ?
+          UNION SELECT app_id FROM users WHERE app_id = ?
+          UNION SELECT app_id FROM telemetry_events WHERE app_id = ?
+        ) LIMIT 1
+      `)
+      .get(appId, appId, appId),
+  );
+}
+
+function distinctAppIds(): string[] {
+  const rows = database.prepare(`
     SELECT DISTINCT app_id AS appId FROM (
       SELECT app_id FROM runtime_configs
       UNION SELECT app_id FROM users
       UNION SELECT app_id FROM telemetry_events
     ) ORDER BY appId
   `).all() as { appId: string }[];
-  return apps.map(summarize);
+  return rows.map((row) => row.appId);
 }
 
 function summarize(row: { appId: string }): AppSummary {

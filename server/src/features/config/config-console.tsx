@@ -2,8 +2,8 @@
 
 import * as React from 'react';
 import { toast } from 'sonner';
-import { History, RotateCcw, Save, Send } from 'lucide-react';
-import { RuntimeConfig } from '@/domain/config';
+import { RotateCcw, Save, Send } from 'lucide-react';
+import type { RuntimeConfig } from '@/domain/config';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,37 +14,40 @@ import { Label } from '@/components/ui/label';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from '@/components/ui/table';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { adminFetch } from '@/lib/admin-fetch';
 import { formatDateTime } from '@/lib/format';
 import { useTenant } from '@/features/tenant/tenant-context';
 import { PageHeader } from '@/features/console/page-header';
+import {
+  AuthSection, BasicSection, BrandSection, FeaturesSection, SplashSection, TelemetrySection,
+} from './sections-simple';
+import {
+  EntitlementsSection, LegalSection, PlansSection, SettingsPolicySection, SupportSection, TiersSection,
+} from './sections-collections';
+import { AuditTable, RevisionTable, type AuditEntry, type Revision } from './config-history';
 
 type Envelope = Readonly<{ published: RuntimeConfig; draft: RuntimeConfig | null }>;
-type Revision = Readonly<{ version: number; action: string; actor: string; createdAt: string }>;
-type AuditEntry = Readonly<{
-  id: string; action: string; actor: string;
-  fromVersion: number | null; toVersion: number; createdAt: string;
-}>;
-
+type Tab = 'ui' | 'json' | 'revisions' | 'audit';
 type Phase = 'idle' | 'loading' | 'busy' | 'error';
 
 export function ConfigConsole() {
   const { appId, environment, ready } = useTenant();
   const scope = React.useMemo(() => ({ appId, environment }), [appId, environment]);
 
-  const [doc, setDoc] = React.useState('');
+  const [doc, setDoc] = React.useState<RuntimeConfig | null>(null);
+  const [jsonText, setJsonText] = React.useState('');
+  const [jsonError, setJsonError] = React.useState<string | null>(null);
+  const [tab, setTab] = React.useState<Tab>('ui');
   const [phase, setPhase] = React.useState<Phase>('idle');
   const [message, setMessage] = React.useState('读取当前租户的运行时配置。');
   const [hasDraft, setHasDraft] = React.useState(false);
   const [revisions, setRevisions] = React.useState<readonly Revision[]>([]);
   const [audit, setAudit] = React.useState<readonly AuditEntry[]>([]);
   const [confirm, setConfirm] = React.useState<null | 'publish'>(null);
-  const [rollbackVersion, setRollbackVersion] = React.useState<string>('');
+  const [rollbackVersion, setRollbackVersion] = React.useState('');
 
   const loadAll = React.useCallback(async () => {
     setPhase('loading');
@@ -56,7 +59,10 @@ export function ConfigConsole() {
           scope,
         ),
       ]);
-      setDoc(JSON.stringify(envelope.draft ?? envelope.published, null, 2));
+      const current = envelope.draft ?? envelope.published;
+      setDoc(current);
+      setJsonText(JSON.stringify(current, null, 2));
+      setJsonError(null);
       setHasDraft(Boolean(envelope.draft));
       setRevisions(history.revisions);
       setAudit(history.audit);
@@ -73,14 +79,38 @@ export function ConfigConsole() {
     if (ready) void loadAll();
   }, [loadAll, ready]);
 
+  const update = (patch: Partial<RuntimeConfig>) => setDoc((prev) => (prev ? { ...prev, ...patch } : prev));
+
+  const applyJson = () => {
+    try {
+      const parsed = JSON.parse(jsonText) as RuntimeConfig;
+      setDoc(parsed);
+      setJsonError(null);
+      toast.success('JSON 已应用到表单');
+      return true;
+    } catch (error) {
+      setJsonError(error instanceof Error ? error.message : 'JSON 解析失败');
+      return false;
+    }
+  };
+
+  const onTabChange = (value: string) => {
+    const next = value as Tab;
+    if (tab === 'json' && next !== 'json') {
+      if (!applyJson()) {
+        toast.error('JSON 解析失败，请先修正再切换标签');
+        return;
+      }
+    }
+    if (next === 'json' && doc) setJsonText(JSON.stringify(doc, null, 2));
+    setTab(next);
+  };
+
   const saveDraft = async () => {
+    if (!doc) return;
     setPhase('busy');
     try {
-      const parsed = JSON.parse(doc) as RuntimeConfig;
-      await adminFetch('/api/v1/admin/config', scope, {
-        method: 'PUT',
-        body: JSON.stringify(parsed),
-      });
+      await adminFetch('/api/v1/admin/config', scope, { method: 'PUT', body: JSON.stringify(doc) });
       toast.success('草稿已保存', { description: '客户端配置尚未改变，需发布后生效。' });
       await loadAll();
     } catch (error) {
@@ -123,61 +153,72 @@ export function ConfigConsole() {
 
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader title="多租户配置" description={`运行时配置草稿、发布与回滚 · ${appId} · ${environment}`}>
-        <Badge variant={hasDraft ? 'warning' : 'secondary'}>
-          {hasDraft ? '有未发布草稿' : '无草稿'}
-        </Badge>
+      <PageHeader title="多租户配置" description={`运行时配置可视化与 JSON 双编辑 · ${appId} · ${environment}`}>
+        <Badge variant={hasDraft ? 'warning' : 'secondary'}>{hasDraft ? '有未发布草稿' : '无草稿'}</Badge>
       </PageHeader>
 
       <Card>
         <CardHeader className="border-b">
           <CardTitle>配置文档</CardTitle>
-          <CardDescription>编辑 JSON 草稿，校验通过后保存并发布到当前环境。</CardDescription>
+          <CardDescription>可视化表单与 JSON 代码双向同步；保存为草稿后发布到当前环境。</CardDescription>
           <CardAction>
-            <Button variant="outline" size="sm" onClick={() => void loadAll()} disabled={busy}>
-              读取
-            </Button>
+            <Button variant="outline" size="sm" onClick={() => void loadAll()} disabled={busy}>读取</Button>
           </CardAction>
         </CardHeader>
         <CardContent className="flex flex-col gap-4 pt-6">
-          <Tabs defaultValue="edit">
+          <Tabs value={tab} onValueChange={onTabChange}>
             <TabsList>
-              <TabsTrigger value="edit">编辑</TabsTrigger>
+              <TabsTrigger value="ui">可视化</TabsTrigger>
+              <TabsTrigger value="json">JSON</TabsTrigger>
               <TabsTrigger value="revisions">版本历史</TabsTrigger>
               <TabsTrigger value="audit">审计日志</TabsTrigger>
             </TabsList>
-            <TabsContent value="edit" className="mt-4 flex flex-col gap-3">
+
+            <TabsContent value="ui" className="mt-4">
+              {phase === 'loading' || !doc ? (
+                <Skeleton className="h-96 w-full" />
+              ) : (
+                <div className="flex flex-col gap-6">
+                  <BasicSection schemaVersion={doc.schemaVersion} version={doc.version} cacheTtl={doc.cacheTtlSeconds} onCacheTtl={(v) => update({ cacheTtlSeconds: v })} />
+                  <BrandSection brand={doc.brand} onChange={(brand) => update({ brand })} />
+                  <SplashSection splash={doc.splash} onChange={(splash) => update({ splash })} />
+                  <TelemetrySection telemetry={doc.telemetry} onChange={(telemetry) => update({ telemetry: telemetry as RuntimeConfig['telemetry'] })} />
+                  <FeaturesSection features={doc.features} onChange={(features) => update({ features })} />
+                  <AuthSection providers={doc.auth.providers} onChange={(providers) => update({ auth: { ...doc.auth, providers: providers as RuntimeConfig['auth']['providers'] } })} />
+                  <EntitlementsSection entitlements={doc.entitlements} onChange={(entitlements) => update({ entitlements })} />
+                  <TiersSection tiers={doc.tiers} onChange={(tiers) => update({ tiers })} entitlementKeys={doc.entitlements.map((e) => e.key)} />
+                  <PlansSection plans={doc.plans} onChange={(plans) => update({ plans: plans as RuntimeConfig['plans'] })} tierIds={doc.tiers.map((t) => t.id)} />
+                  <SupportSection support={doc.support} onChange={(support) => update({ support: support as RuntimeConfig['support'] })} />
+                  <LegalSection legal={doc.legal} onChange={(legal) => update({ legal: legal as RuntimeConfig['legal'] })} />
+                  <SettingsPolicySection policy={doc.settingsPolicy} onChange={(settingsPolicy) => update({ settingsPolicy: settingsPolicy as RuntimeConfig['settingsPolicy'] })} />
+                </div>
+              )}
+            </TabsContent>
+
+            <TabsContent value="json" className="mt-4 flex flex-col gap-3">
               <Textarea
-                value={doc}
-                onChange={(event) => setDoc(event.target.value)}
+                value={jsonText}
+                onChange={(event) => setJsonText(event.target.value)}
                 spellCheck={false}
-                className="min-h-[420px] font-mono text-xs"
+                className="min-h-[460px] font-mono text-xs"
               />
-              <div className="flex flex-wrap gap-2">
-                <Button onClick={saveDraft} disabled={busy} className="gap-2">
-                  <Save className="size-4" /> 保存草稿
-                </Button>
-                <Button onClick={() => setConfirm('publish')} disabled={busy || !hasDraft} className="gap-2">
-                  <Send className="size-4" /> 发布
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => setRollbackVersion(revisions[0]?.version.toString() ?? '')}
-                  disabled={busy || revisions.length === 0}
-                  className="gap-2"
-                >
-                  <RotateCcw className="size-4" /> 回滚
-                </Button>
+              {jsonError ? <p className="text-destructive text-sm">{jsonError}</p> : null}
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={applyJson}>应用到表单</Button>
+                <p className="text-muted-foreground text-xs">切换到「可视化」标签时会自动校验并应用 JSON。</p>
               </div>
-              <p className="text-muted-foreground text-sm" role="status">{message}</p>
             </TabsContent>
-            <TabsContent value="revisions" className="mt-4">
-              <RevisionTable revisions={revisions} />
-            </TabsContent>
-            <TabsContent value="audit" className="mt-4">
-              <AuditTable audit={audit} />
-            </TabsContent>
+
+            <TabsContent value="revisions" className="mt-4"><RevisionTable revisions={revisions} /></TabsContent>
+            <TabsContent value="audit" className="mt-4"><AuditTable audit={audit} /></TabsContent>
           </Tabs>
+
+          <div className="flex flex-wrap items-center gap-2 border-t pt-4">
+            <Button onClick={saveDraft} disabled={busy || !doc} className="gap-2"><Save className="size-4" /> 保存草稿</Button>
+            <Button onClick={() => setConfirm('publish')} disabled={busy || !hasDraft} className="gap-2"><Send className="size-4" /> 发布</Button>
+            <Button variant="outline" onClick={() => setRollbackVersion(revisions[0]?.version.toString() ?? '')} disabled={busy || revisions.length === 0} className="gap-2"><RotateCcw className="size-4" /> 回滚</Button>
+            <p className="text-muted-foreground ml-auto text-sm" role="status">{message}</p>
+          </div>
         </CardContent>
       </Card>
 
@@ -185,13 +226,11 @@ export function ConfigConsole() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>发布配置草稿？</DialogTitle>
-            <DialogDescription>发布后客户端将在刷新策略触发后获取新版本，此操作会生成新的配置版本。</DialogDescription>
+            <DialogDescription>发布后客户端将在刷新策略触发后获取新版本，并生成新的配置版本。</DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <DialogClose asChild><Button variant="outline">取消</Button></DialogClose>
-            <DialogClose asChild>
-              <Button onClick={publish}>确认发布</Button>
-            </DialogClose>
+            <DialogClose asChild><Button onClick={publish}>确认发布</Button></DialogClose>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -217,76 +256,12 @@ export function ConfigConsole() {
           </div>
           <DialogFooter>
             <DialogClose asChild><Button variant="outline">取消</Button></DialogClose>
-            <DialogClose asChild>
-              <Button variant="destructive" onClick={rollback} disabled={!rollbackVersion}>
-                确认回滚
-              </Button>
-            </DialogClose>
+            <DialogClose asChild><Button variant="destructive" onClick={rollback} disabled={!rollbackVersion}>确认回滚</Button></DialogClose>
           </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
   );
-}
-
-function RevisionTable({ revisions }: Readonly<{ revisions: readonly Revision[] }>) {
-  if (!revisions.length) return <EmptyRow text="暂无版本记录" />;
-  return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>版本</TableHead>
-          <TableHead>操作</TableHead>
-          <TableHead>操作者</TableHead>
-          <TableHead>时间</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {revisions.map((revision) => (
-          <TableRow key={revision.version}>
-            <TableCell className="font-mono">v{revision.version}</TableCell>
-            <TableCell>
-              <Badge variant="outline" className="gap-1"><History className="size-3" />{revision.action}</Badge>
-            </TableCell>
-            <TableCell>{revision.actor}</TableCell>
-            <TableCell className="text-muted-foreground">{formatDateTime(revision.createdAt)}</TableCell>
-          </TableRow>
-        ))}
-      </TableBody>
-    </Table>
-  );
-}
-
-function AuditTable({ audit }: Readonly<{ audit: readonly AuditEntry[] }>) {
-  if (!audit.length) return <EmptyRow text="暂无审计记录" />;
-  return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>操作</TableHead>
-          <TableHead>操作者</TableHead>
-          <TableHead>版本变更</TableHead>
-          <TableHead>时间</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {audit.map((entry) => (
-          <TableRow key={entry.id}>
-            <TableCell><Badge variant="outline">{entry.action}</Badge></TableCell>
-            <TableCell>{entry.actor}</TableCell>
-            <TableCell className="font-mono text-xs">
-              {entry.fromVersion ?? '—'} → v{entry.toVersion}
-            </TableCell>
-            <TableCell className="text-muted-foreground">{formatDateTime(entry.createdAt)}</TableCell>
-          </TableRow>
-        ))}
-      </TableBody>
-    </Table>
-  );
-}
-
-function EmptyRow({ text }: Readonly<{ text: string }>) {
-  return <p className="text-muted-foreground py-6 text-center text-sm">{text}</p>;
 }
 
 function errorMessage(error: unknown) {

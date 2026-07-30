@@ -81,7 +81,10 @@ export function getAdminByToken(token: string): AdminProfile | null {
     FROM admin_users u JOIN admin_sessions s ON s.admin_id = u.id
     WHERE s.token_hash = ? AND s.revoked_at IS NULL AND s.expires_at > ?
   `).get(hashToken(token), nowIso()) as AdminProfile | undefined;
-  return row ?? null;
+  if (!row) return null;
+  // Rebuild as a plain object: node:sqlite rows have a null prototype, which Next's
+  // RSC serializer rejects when passed to client components.
+  return { id: row.id, username: row.username, email: row.email, createdAt: row.createdAt };
 }
 
 export function revokeSession(token: string): void {

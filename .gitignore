@@ -19,6 +19,8 @@ flutter/.dart_tool/
 flutter/build/
 flutter/.flutter-plugins
 flutter/.flutter-plugins-dependencies
+flutter/android/.kotlin/
+flutter/android/**/build/
 flutter/android/app/google-services.json
 flutter/ios/Runner/GoogleService-Info.plist
 flutter/lib/firebase_options.dart

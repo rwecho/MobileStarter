@@ -9,6 +9,7 @@ react-native/expo-web.log
 react-native/expo-web.err.log
 react-native/expo-screenshots.log
 react-native/expo-screenshots.err.log
+react-native/*.log
 react-native/google-services.json
 react-native/GoogleService-Info.plist
 react-native/package-lock.incomplete-*.json

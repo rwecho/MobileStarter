@@ -29,5 +29,6 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: react-native/package-lock.json
-      - run: npm ci
+      # Expo 53 pins AsyncStorage 2.x while Firebase declares a newer optional peer.
+      - run: npm ci --legacy-peer-deps
       - run: npm run typecheck

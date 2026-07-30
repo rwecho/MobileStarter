@@ -1,0 +1,51 @@
+# React Native / Expo
+react-native/node_modules/
+react-native/node_modules*/
+react-native/dist/
+react-native/dist-final/
+react-native/dist-*/
+react-native/.expo/
+react-native/expo-web.log
+react-native/expo-web.err.log
+react-native/expo-screenshots.log
+react-native/expo-screenshots.err.log
+react-native/google-services.json
+react-native/GoogleService-Info.plist
+react-native/package-lock.incomplete-*.json
+
+# Flutter
+flutter/.dart_tool/
+flutter/build/
+flutter/.flutter-plugins
+flutter/.flutter-plugins-dependencies
+flutter/android/app/google-services.json
+flutter/ios/Runner/GoogleService-Info.plist
+flutter/lib/firebase_options.dart
+
+# HarmonyOS
+arkts/oh_modules/
+arkts/build/
+arkts/**/build/
+arkts/.hvigor/
+
+# Next.js / local runtime data
+server/node_modules/
+server/.next/
+server/out/
+server/tsconfig.tsbuildinfo
+server/.env
+server/.env.local
+server/.env.*.local
+server/data/
+server/*.log
+
+# Generated release evidence
+release/logs/
+release/screenshots/
+release/*.zip
+
+# IDE and OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

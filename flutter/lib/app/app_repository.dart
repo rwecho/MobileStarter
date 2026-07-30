@@ -1,0 +1,290 @@
+import 'dart:convert';
+
+import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
+
+import 'runtime_models.dart';
+
+final class ApiException implements Exception {
+  const ApiException(this.code, this.message, this.status);
+  final String code;
+  final String message;
+  final int status;
+  @override
+  String toString() => message;
+}
+
+final class BootstrapResult {
+  const BootstrapResult({
+    required this.config,
+    required this.user,
+    required this.authProviders,
+    required this.authProviderPolicy,
+  });
+  final RuntimeConfig config;
+  final AppUser? user;
+  final Map<String, bool> authProviders;
+  final Map<String, bool> authProviderPolicy;
+}
+
+final class AuthResult {
+  const AuthResult({required this.token, required this.user});
+  final String token;
+  final AppUser user;
+}
+
+final class AppRepository {
+  AppRepository({http.Client? client}) : _client = client ?? http.Client();
+
+  static const _apiBase = String.fromEnvironment(
+    'MOBILEUI_API_URL',
+    defaultValue: 'http://localhost:3210',
+  );
+  static const _appId = String.fromEnvironment(
+    'MOBILEUI_APP_ID',
+    defaultValue: 'mobileui',
+  );
+  static const _tokenKey = 'mobileui.sessionToken';
+  static const _bootstrapKey = 'mobileui.bootstrap.public';
+
+  final http.Client _client;
+  String _token = '';
+
+  Future<BootstrapResult> bootstrap() async {
+    _token = await SharedPreferencesAsync().getString(_tokenKey) ?? '';
+    try {
+      final data = await _request('/api/v1/bootstrap');
+      await _cacheBootstrap(data);
+      return _parseBootstrap(data);
+    } catch (_) {
+      final cached = await SharedPreferencesAsync().getString(_bootstrapKey);
+      if (cached == null) rethrow;
+      return _parseBootstrap(JsonMap.from(jsonDecode(cached) as Map));
+    }
+  }
+
+  BootstrapResult _parseBootstrap(JsonMap data) {
+    return BootstrapResult(
+      config: RuntimeConfig.fromJson(JsonMap.from(data['config']! as Map)),
+      user: data['user'] == null
+          ? null
+          : AppUser.fromJson(JsonMap.from(data['user']! as Map)),
+      authProviders: Map<String, bool>.from(data['authProviders']! as Map),
+      authProviderPolicy: Map<String, bool>.from(
+        data['authProviderPolicy']! as Map,
+      ),
+    );
+  }
+
+  Future<void> _cacheBootstrap(JsonMap data) {
+    final publicData = <String, Object?>{
+      'config': data['config'],
+      'user': null,
+      'authProviders': data['authProviders'],
+      'authProviderPolicy': data['authProviderPolicy'],
+    };
+    return SharedPreferencesAsync().setString(
+      _bootstrapKey,
+      jsonEncode(publicData),
+    );
+  }
+
+  Future<AuthResult> signIn(String identifier, String password) =>
+      _authenticate('/api/v1/auth/sign-in', {
+        'identifier': identifier,
+        'password': password,
+        'deviceName': 'Flutter · MobileUI',
+      });
+
+  Future<AuthResult> signUp(String email, String password, String username) =>
+      _authenticate('/api/v1/auth/sign-up', {
+        'email': email,
+        'password': password,
+        'username': username,
+        'deviceName': 'Flutter · MobileUI',
+      });
+
+  Future<void> requestPhoneCode(String phone) => _request(
+    '/api/v1/auth/phone/request',
+    method: 'POST',
+    body: {'phone': phone},
+  );
+
+  Future<AuthResult> verifyPhoneCode(String phone, String code) =>
+      _authenticate('/api/v1/auth/phone/verify', {
+        'phone': phone,
+        'code': code,
+        'deviceName': 'Flutter · MobileUI',
+      });
+
+  Future<void> requestPasswordReset(String email) => _request(
+    '/api/v1/auth/password/forgot',
+    method: 'POST',
+    body: {'email': email},
+  );
+
+  Future<String> verifyPasswordReset(String email, String code) async {
+    final data = await _request(
+      '/api/v1/auth/password/verify',
+      method: 'POST',
+      body: {'email': email, 'code': code},
+    );
+    return data['resetToken']! as String;
+  }
+
+  Future<void> resetPassword(String token, String password) => _request(
+    '/api/v1/auth/password/reset',
+    method: 'POST',
+    body: {'resetToken': token, 'newPassword': password},
+  );
+
+  Future<AppUser> updateProfile(
+    String displayName,
+    String bio,
+    String? avatarUrl,
+  ) async {
+    final data = await _request(
+      '/api/v1/me/profile',
+      method: 'PATCH',
+      body: {'displayName': displayName, 'bio': bio, 'avatarUrl': avatarUrl},
+    );
+    return AppUser.fromJson(data);
+  }
+
+  Future<JsonMap> saveSettings(JsonMap patch) =>
+      _request('/api/v1/me/settings', method: 'PUT', body: patch);
+
+  Future<List<SessionView>> sessions() =>
+      _list('/api/v1/me/sessions', SessionView.fromJson);
+
+  Future<void> revokeSession(String id) =>
+      _request('/api/v1/me/sessions/$id', method: 'DELETE');
+
+  Future<List<NotificationView>> notifications() =>
+      _list('/api/v1/notifications', NotificationView.fromJson);
+
+  Future<void> markNotificationsRead() =>
+      _request('/api/v1/notifications', method: 'PATCH');
+
+  Future<void> markNotificationRead(String id) =>
+      _request('/api/v1/notifications/$id', method: 'PATCH');
+
+  Future<void> deleteNotification(String id) =>
+      _request('/api/v1/notifications/$id', method: 'DELETE');
+
+  Future<List<OrderView>> orders() =>
+      _list('/api/v1/orders', OrderView.fromJson);
+
+  Future<UsageSummary> usage() async =>
+      UsageSummary.fromJson(await _request('/api/v1/me/usage'));
+
+  Future<List<CouponView>> coupons() =>
+      _list('/api/v1/me/coupons', CouponView.fromJson);
+
+  Future<ReferralView> referral() async =>
+      ReferralView.fromJson(await _request('/api/v1/me/referral'));
+
+  Future<OrderView> purchase(String planId) async {
+    final data = await _request(
+      '/api/v1/orders',
+      method: 'POST',
+      body: {'planId': planId},
+      idempotencyKey: 'flutter-${DateTime.now().microsecondsSinceEpoch}',
+    );
+    return OrderView.fromJson(data);
+  }
+
+  Future<void> changePassword(String current, String next) => _request(
+    '/api/v1/me/change-password',
+    method: 'POST',
+    body: {'currentPassword': current, 'newPassword': next},
+  );
+
+  Future<void> deleteAccount(String password) => _request(
+    '/api/v1/me/deletion',
+    method: 'DELETE',
+    body: {'password': password, 'confirmation': 'DELETE'},
+  );
+
+  Future<void> signOut() async {
+    try {
+      await _request('/api/v1/auth/sign-out', method: 'POST');
+    } finally {
+      _token = '';
+      await SharedPreferencesAsync().remove(_tokenKey);
+    }
+  }
+
+  Future<AuthResult> _authenticate(String path, JsonMap body) async {
+    final data = await _request(path, method: 'POST', body: body);
+    final result = AuthResult(
+      token: data['token']! as String,
+      user: AppUser.fromJson(JsonMap.from(data['user']! as Map)),
+    );
+    _token = result.token;
+    await SharedPreferencesAsync().setString(_tokenKey, result.token);
+    return result;
+  }
+
+  Future<List<T>> _list<T>(String path, T Function(JsonMap) decode) async {
+    final data = await _requestRaw(path);
+    return (data as List)
+        .map((value) => decode(JsonMap.from(value as Map)))
+        .toList(growable: false);
+  }
+
+  Future<JsonMap> _request(
+    String path, {
+    String method = 'GET',
+    JsonMap? body,
+    String? idempotencyKey,
+  }) async => JsonMap.from(
+    await _requestRaw(
+          path,
+          method: method,
+          body: body,
+          idempotencyKey: idempotencyKey,
+        )
+        as Map,
+  );
+
+  Future<Object?> _requestRaw(
+    String path, {
+    String method = 'GET',
+    JsonMap? body,
+    String? idempotencyKey,
+  }) async {
+    final request = http.Request(method, Uri.parse('$_apiBase$path'));
+    request.headers.addAll(_headers(idempotencyKey));
+    if (body != null) request.body = jsonEncode(body);
+    final streamed = await _client
+        .send(request)
+        .timeout(const Duration(seconds: 10));
+    final response = await http.Response.fromStream(streamed);
+    final decoded = jsonDecode(response.body) as Map<String, Object?>;
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      final error = JsonMap.from(decoded['error']! as Map);
+      throw ApiException(
+        error['code']! as String,
+        error['message']! as String,
+        response.statusCode,
+      );
+    }
+    return decoded['data'];
+  }
+
+  Map<String, String> _headers(String? idempotencyKey) {
+    final headers = <String, String>{
+      'content-type': 'application/json',
+      'x-app-id': _appId,
+      'x-platform': kIsWeb ? 'web' : defaultTargetPlatform.name,
+      'x-app-version': '1.0.0',
+    };
+    if (_token.isNotEmpty) headers['authorization'] = 'Bearer $_token';
+    if (idempotencyKey != null) headers['idempotency-key'] = idempotencyKey;
+    return headers;
+  }
+
+  void dispose() => _client.close();
+}

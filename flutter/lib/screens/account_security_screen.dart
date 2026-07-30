@@ -1,0 +1,87 @@
+import 'package:flutter/material.dart';
+
+import '../app/app_scope.dart';
+import '../design_system/app_icon.dart';
+import '../design_system/components.dart';
+import '../design_system/feedback.dart';
+import '../navigation/app_route.dart';
+import '../theme/app_tokens.dart';
+
+class AccountSecurityScreen extends StatefulWidget {
+  const AccountSecurityScreen({super.key});
+
+  @override
+  State<AccountSecurityScreen> createState() => _AccountSecurityScreenState();
+}
+
+class _AccountSecurityScreenState extends State<AccountSecurityScreen> {
+  final current = TextEditingController();
+  final next = TextEditingController();
+
+  @override
+  Widget build(BuildContext context) {
+    final controller = AppScope.of(context);
+    return AppPage(
+      title: '账户与安全',
+      child: ListView(
+        padding: const EdgeInsets.all(AppSpacing.x4),
+        children: [
+          AppCard(
+            child: Column(
+              children: [
+                AppListTile(
+                  label: '登录邮箱',
+                  value: controller.user?.email ?? '未登录',
+                ),
+                const AppListTile(label: '身份绑定', value: '邮箱密码'),
+              ],
+            ),
+          ),
+          const SizedBox(height: AppSpacing.x4),
+          TextField(
+            controller: current,
+            obscureText: true,
+            decoration: const InputDecoration(labelText: '当前密码'),
+          ),
+          const SizedBox(height: AppSpacing.x3),
+          TextField(
+            controller: next,
+            obscureText: true,
+            decoration: const InputDecoration(labelText: '至少 8 位新密码'),
+          ),
+          const SizedBox(height: AppSpacing.x4),
+          AppButton(
+            label: controller.busy ? '修改中…' : '修改密码',
+            icon: AppIconName.lock,
+            onPressed: controller.busy || controller.user == null
+                ? null
+                : _submit,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _submit() async {
+    final controller = AppScope.of(context);
+    if (next.text.length < 8) {
+      showAppToast(context, '新密码至少需要 8 位', error: true);
+      return;
+    }
+    final changed = await controller.changePassword(current.text, next.text);
+    if (!mounted) return;
+    if (!changed) {
+      showAppToast(context, controller.consumeError() ?? '修改失败', error: true);
+      return;
+    }
+    showAppToast(context, '密码已修改，请重新登录');
+    controller.replaceAll(AppRoute.signIn);
+  }
+
+  @override
+  void dispose() {
+    current.dispose();
+    next.dispose();
+    super.dispose();
+  }
+}

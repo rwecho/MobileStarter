@@ -1,0 +1,13 @@
+services:
+  server:
+    image: ghcr.io/rwecho/mobilestarter-server:latest
+    restart: unless-stopped
+    ports:
+      - "3210:3210"
+    env_file:
+      - .env.local
+    volumes:
+      - mobilestarter-data:/app/data
+
+volumes:
+  mobilestarter-data:

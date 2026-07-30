@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { authorizeAdmin } from '@/app/api/v1/admin/config/route';
+import { authorizeAdmin } from '@/server/admin-auth';
 import { getClientContext } from '@/server/client-context';
 import { handleError, ok } from '@/server/http';
 import { enqueueNotification } from '@/server/notification-jobs';

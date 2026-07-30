@@ -55,6 +55,14 @@ export const embeddedConfig: RuntimeConfig = {
       { id: 'password', enabled: true, platforms: ['ios', 'android', 'harmonyos', 'web'] },
       { id: 'phone', enabled: true, platforms: ['ios', 'android', 'harmonyos', 'web'] },
     ],
+    passwordPolicy: {
+      minLength: 8,
+      maxLength: 72,
+      requireUppercase: false,
+      requireLowercase: true,
+      requireDigit: true,
+      requireSymbol: false,
+    },
   },
   legal: [
     {

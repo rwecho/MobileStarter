@@ -17,6 +17,9 @@ import { LogoPage, OnboardingPage, PromoPage } from './LaunchPages'
 import { MembershipPage, ProfilePage } from './ProfilePages'
 import { SettingDetailPage, SettingsPage } from './SettingsPages'
 import { SettingsUtilityPage } from './SettingsUtilityPage'
+import {
+  NewSupportTicketPage, ProductFeedbackPage, SupportHomePage, SupportTicketPage
+} from './SupportPages'
 
 @Entry
 @Component
@@ -120,8 +123,16 @@ struct SettingsHost {
     } else if (this.store.route === AppRoute.About) {
       AboutPage({ store: this.store })
     } else if (this.store.route === AppRoute.Storage ||
-      this.store.route === AppRoute.Permissions || this.store.route === AppRoute.HelpFeedback) {
+      this.store.route === AppRoute.Permissions) {
       SettingsUtilityPage({ store: this.store, route: this.store.route })
+    } else if (this.store.route === AppRoute.HelpFeedback) {
+      SupportHomePage({ store: this.store })
+    } else if (this.store.route === AppRoute.SupportTicket) {
+      SupportTicketPage({ store: this.store })
+    } else if (this.store.route === AppRoute.NewSupportTicket) {
+      NewSupportTicketPage({ store: this.store })
+    } else if (this.store.route === AppRoute.ProductFeedback) {
+      ProductFeedbackPage({ store: this.store })
     } else if (this.store.route === AppRoute.StateGallery) {
       StateGalleryPage({ store: this.store })
     } else {

@@ -58,5 +58,27 @@ function createStyles(palette: ThemeColors) {
     color: palette.text,
     fontSize: 16,
   },
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderRadius: radii.small,
+    borderWidth: 2,
+    borderColor: palette.border,
+    backgroundColor: palette.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkboxMark: {
+    width: 10,
+    height: 6,
+    borderLeftWidth: 2,
+    borderBottomWidth: 2,
+    borderColor: palette.surface,
+    transform: [{ rotate: '-45deg' }, { translateY: -2 }],
+  },
+  checkboxChecked: {
+    backgroundColor: palette.brand,
+    borderColor: palette.brand,
+  },
   });
 }

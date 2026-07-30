@@ -35,6 +35,15 @@ export type BillingPlan = Readonly<{
   provider: 'mock' | 'apple' | 'google' | 'wechat' | 'alipay';
 }>;
 
+export type PasswordPolicy = Readonly<{
+  minLength: number;
+  maxLength: number;
+  requireUppercase: boolean;
+  requireLowercase: boolean;
+  requireDigit: boolean;
+  requireSymbol: boolean;
+}>;
+
 export type SupportConfig = Readonly<{
   enabled: boolean;
   market: string;
@@ -79,6 +88,7 @@ export type RuntimeConfig = Readonly<{
       platforms: readonly ('ios' | 'android' | 'harmonyos' | 'web')[];
       clientIds?: Readonly<Partial<Record<'ios' | 'android' | 'harmonyos' | 'web', string>>>;
     }>>;
+    passwordPolicy: PasswordPolicy;
   }>;
   legal: ReadonlyArray<Readonly<{
     type: 'privacy' | 'terms' | 'subscription';
@@ -179,6 +189,14 @@ export const defaultConfig: RuntimeConfig = {
       { id: 'github', enabled: true, platforms: ['ios', 'android', 'harmonyos', 'web'] },
       { id: 'wechat', enabled: false, platforms: ['ios', 'android', 'harmonyos'] },
     ],
+    passwordPolicy: {
+      minLength: 8,
+      maxLength: 72,
+      requireUppercase: false,
+      requireLowercase: true,
+      requireDigit: true,
+      requireSymbol: false,
+    },
   },
   legal: [
     {

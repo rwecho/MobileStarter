@@ -48,6 +48,26 @@ export interface SettingPolicy {
   mutability: string
 }
 
+export interface SupportCategory {
+  id: string
+  label: string
+}
+
+export interface HelpArticle {
+  id: string
+  locale: string
+  title: string
+  body: string
+}
+
+export interface SupportConfig {
+  enabled: boolean
+  market: string
+  dataRegion: string
+  categories: SupportCategory[]
+  help: HelpArticle[]
+}
+
 export interface RuntimeConfig {
   schemaVersion: number
   version: number
@@ -59,6 +79,7 @@ export interface RuntimeConfig {
   features: Record<string, boolean>
   tiers: MembershipTier[]
   plans: BillingPlan[]
+  support: SupportConfig
 }
 
 export interface UsageScreen {
@@ -119,6 +140,45 @@ export interface NotificationView {
   createdAt: string
 }
 
+export interface SupportTicket {
+  id: string
+  category: string
+  severity: string
+  subject: string
+  status: string
+  locale: string
+  market: string
+  dataRegion: string
+  queueId: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface SupportMessage {
+  id: string
+  authorType: string
+  body: string
+  createdAt: string
+}
+
+export interface SupportTicketDetail extends SupportTicket {
+  messages: SupportMessage[]
+}
+
+export interface ProductFeedback {
+  id: string
+  category: string
+  title: string
+  body: string
+  rating: number | null
+  status: string
+  market: string
+  dataRegion: string
+  queueId: string
+  createdAt: string
+  updatedAt: string
+}
+
 export interface AppUser {
   id: string
   email: string
@@ -128,6 +188,8 @@ export interface AppUser {
   avatarUrl: string | null
   tierId: string
   settings: Record<string, string | number | boolean>
+  emailVerified: boolean
+  consentVersion: string | null
   createdAt: string
 }
 
@@ -136,12 +198,14 @@ export interface BootstrapPayload {
   user: AppUser | null
   authProviders: Record<string, boolean>
   authProviderPolicy: Record<string, boolean>
+  authProviderConfig: Record<string, Object>
   serverTime: string
   apiVersion: string
 }
 
 export interface AuthPayload {
   token: string
+  refreshToken: string
   user: AppUser
 }
 
@@ -171,6 +235,7 @@ export interface SignUpInput {
   password: string
   deviceName: string
   username: string
+  consentVersion: string
 }
 
 export interface DeleteAccountInput {
@@ -192,4 +257,11 @@ export interface FeedbackInput {
   title: string
   body: string
   rating: number
+}
+
+export interface CreateTicketInput {
+  category: string
+  severity: string
+  subject: string
+  message: string
 }

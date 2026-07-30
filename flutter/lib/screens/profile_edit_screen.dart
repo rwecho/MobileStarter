@@ -1,4 +1,7 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../app/app_scope.dart';
 import '../design_system/app_icon.dart';
@@ -65,10 +68,36 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
             maxLines: 3,
           ),
           const SizedBox(height: AppSpacing.x3),
-          TextField(
-            controller: avatarUrl,
-            decoration: const InputDecoration(labelText: '头像 URL'),
-            keyboardType: TextInputType.url,
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 32,
+                backgroundColor: Theme.of(context).colorScheme.surface,
+                backgroundImage: _avatarImage,
+                child: _avatarImage == null
+                    ? const Icon(Icons.person, size: 32)
+                    : null,
+              ),
+              const SizedBox(width: AppSpacing.x3),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    AppButton(
+                      label: '选择头像',
+                      icon: AppIconName.user,
+                      onPressed: _pickAvatar,
+                    ),
+                    const SizedBox(height: AppSpacing.x2),
+                    TextField(
+                      controller: avatarUrl,
+                      decoration: const InputDecoration(labelText: '头像 URL'),
+                      keyboardType: TextInputType.url,
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: AppSpacing.x4),
           AppButton(
@@ -79,6 +108,38 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
         ],
       ),
     );
+  }
+
+  ImageProvider? get _avatarImage {
+    final value = avatarUrl.text.trim();
+    if (value.isEmpty) return null;
+    if (value.startsWith('data:')) {
+      final comma = value.indexOf(',');
+      if (comma <= 0) return null;
+      try {
+        return MemoryImage(base64Decode(value.substring(comma + 1)));
+      } catch (_) {
+        return null;
+      }
+    }
+    return NetworkImage(value);
+  }
+
+  Future<void> _pickAvatar() async {
+    final picker = ImagePicker();
+    final selection = await picker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 512,
+      maxHeight: 512,
+      imageQuality: 78,
+    );
+    if (selection == null || !mounted) return;
+    // image_picker has already resized/compressed to JPEG; wrap as a data URL
+    // and persist via updateProfile (no separate upload endpoint, like RN).
+    final bytes = await selection.readAsBytes();
+    setState(() {
+      avatarUrl.text = 'data:image/jpeg;base64,${base64Encode(bytes)}';
+    });
   }
 
   Future<void> _save() async {

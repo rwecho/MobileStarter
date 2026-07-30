@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { getClientContext } from '@/server/client-context';
 import { rollbackConfig } from '@/server/config-control';
 import { handleError, ok } from '@/server/http';
-import { authorizeAdmin } from '../route';
+import { authorizeAdmin } from '@/server/admin-auth';
 
 const inputSchema = z.object({ version: z.number().int().positive() });
 

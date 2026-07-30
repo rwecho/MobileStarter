@@ -1,8 +1,8 @@
 import React, {
   createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState,
 } from 'react';
-import { apiClient, ApiClientError } from '../data/apiClient';
-import { readCachedConfig, saveCachedConfig } from '../data/storage';
+import { apiClient, ApiClientError, registerSessionExpiredHandler } from '../data/apiClient';
+import { clearAuthStorage, readCachedConfig, saveCachedConfig } from '../data/storage';
 import { embeddedConfig } from '../config/embeddedConfig';
 import {
   AppUser,
@@ -51,6 +51,7 @@ type AppContextValue = Readonly<{
   requestPhoneCode: (phone: string) => Promise<boolean>;
   verifyPhoneCode: (phone: string, code: string) => Promise<boolean>;
   signOut: () => Promise<void>;
+  signOutAll: () => Promise<void>;
   updateProfile: DataActions['updateProfile'];
   saveSettings: (patch: UserSettings) => Promise<boolean>;
   changePassword: (currentPassword: string, newPassword: string) => Promise<boolean>;
@@ -153,6 +154,14 @@ export function AppProvider({ children }: Readonly<{ children: ReactNode }>) {
     onSignedOut: () => navigation.replace('home'),
     showToast: feedback.showToast,
   });
+  useEffect(() => {
+    registerSessionExpiredHandler(() => {
+      setUser(null);
+      void clearAuthStorage();
+      navigation.replace('auth.signIn');
+    });
+    return () => registerSessionExpiredHandler(null);
+  }, [navigation]);
   const dataActions = useDataActions(run, setUser, user);
   const value = useMemo<AppContextValue>(() => ({
     ...navigation,

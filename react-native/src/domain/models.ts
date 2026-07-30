@@ -9,7 +9,24 @@ export type AppUser = Readonly<{
   avatarUrl: string | null;
   tierId: string;
   settings: UserSettings;
+  emailVerified: boolean;
+  consentVersion: string | null;
   createdAt: string;
+}>;
+
+export type AuthSession = Readonly<{
+  token: string;
+  refreshToken: string;
+  user: AppUser;
+}>;
+
+export type PasswordPolicy = Readonly<{
+  minLength: number;
+  maxLength: number;
+  requireUppercase: boolean;
+  requireLowercase: boolean;
+  requireDigit: boolean;
+  requireSymbol: boolean;
 }>;
 
 export type MembershipTier = Readonly<{
@@ -66,6 +83,7 @@ export type RuntimeConfig = Readonly<{
       platforms: readonly string[];
       clientIds?: Readonly<Record<string, string | undefined>>;
     }>>;
+    passwordPolicy: PasswordPolicy;
   }>;
   legal: ReadonlyArray<Readonly<{
     type: 'privacy' | 'terms' | 'subscription';

@@ -32,7 +32,9 @@ function requiresAuthentication(route: AppRoute): boolean {
     route === AppRoute.Invite || route === AppRoute.Coupons ||
     route === AppRoute.Checkout || route === AppRoute.Orders ||
     route === AppRoute.AccountSecurity || route === AppRoute.Devices ||
-    route === AppRoute.DeleteAccount || route === AppRoute.NotificationCenter
+    route === AppRoute.DeleteAccount || route === AppRoute.NotificationCenter ||
+    route === AppRoute.SupportTicket || route === AppRoute.NewSupportTicket ||
+    route === AppRoute.ProductFeedback
 }
 
 function featureAllows(route: AppRoute, features: Record<string, boolean>): boolean {

@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -21,16 +22,23 @@ final class BootstrapResult {
     required this.user,
     required this.authProviders,
     required this.authProviderPolicy,
+    required this.authProviderConfig,
   });
   final RuntimeConfig config;
   final AppUser? user;
   final Map<String, bool> authProviders;
   final Map<String, bool> authProviderPolicy;
+  final Map<String, Object?> authProviderConfig;
 }
 
 final class AuthResult {
-  const AuthResult({required this.token, required this.user});
+  const AuthResult({
+    required this.token,
+    required this.refreshToken,
+    required this.user,
+  });
   final String token;
+  final String refreshToken;
   final AppUser user;
 }
 
@@ -46,13 +54,20 @@ final class AppRepository {
     defaultValue: 'mobileui',
   );
   static const _tokenKey = 'mobileui.sessionToken';
+  static const _refreshTokenKey = 'mobileui.sessionRefreshToken';
   static const _bootstrapKey = 'mobileui.bootstrap.public';
 
   final http.Client _client;
+  final FlutterSecureStorage _secure = FlutterSecureStorage();
   String _token = '';
+  String _acceptLanguage = 'zh-CN';
+  Future<bool>? _refreshInFlight;
+  // Set by the controller so an unrecoverable session expiry clears the user and
+  // returns to the sign-in guard instead of looping on failing requests.
+  void Function()? onSessionExpired;
 
   Future<BootstrapResult> bootstrap() async {
-    _token = await SharedPreferencesAsync().getString(_tokenKey) ?? '';
+    _token = await _secure.read(key: _tokenKey) ?? '';
     try {
       final data = await _request('/api/v1/bootstrap');
       await _cacheBootstrap(data);
@@ -74,6 +89,9 @@ final class AppRepository {
       authProviderPolicy: Map<String, bool>.from(
         data['authProviderPolicy']! as Map,
       ),
+      authProviderConfig: data['authProviderConfig'] == null
+          ? const {}
+          : Map<String, Object?>.from(data['authProviderConfig']! as Map),
     );
   }
 
@@ -97,13 +115,33 @@ final class AppRepository {
         'deviceName': 'Flutter · MobileUI',
       });
 
-  Future<AuthResult> signUp(String email, String password, String username) =>
+  Future<AuthResult> signUp(
+    String email,
+    String password,
+    String username,
+    String consentVersion,
+  ) =>
       _authenticate('/api/v1/auth/sign-up', {
         'email': email,
         'password': password,
         'username': username,
+        'consentVersion': consentVersion,
         'deviceName': 'Flutter · MobileUI',
       });
+
+  Future<bool> verifyEmail(String email, String code) async {
+    await _request('/api/v1/auth/verify-email', method: 'POST', body: {
+      'email': email,
+      'code': code,
+    });
+    return true;
+  }
+
+  Future<void> resendEmailVerification(String email) => _request(
+    '/api/v1/auth/verify-email/resend',
+    method: 'POST',
+    body: {'email': email},
+  );
 
   Future<void> requestPhoneCode(String phone) => _request(
     '/api/v1/auth/phone/request',
@@ -117,6 +155,12 @@ final class AppRepository {
         'code': code,
         'deviceName': 'Flutter · MobileUI',
       });
+
+  Future<AuthResult> socialSignIn(Map<String, Object?> payload) {
+    final body = Map<String, Object?>.from(payload);
+    body['deviceName'] = kIsWeb ? 'web · MobileUI' : 'Flutter · MobileUI';
+    return _authenticate('/api/v1/auth/social', body);
+  }
 
   Future<void> requestPasswordReset(String email) => _request(
     '/api/v1/auth/password/forgot',
@@ -211,19 +255,34 @@ final class AppRepository {
     try {
       await _request('/api/v1/auth/sign-out', method: 'POST');
     } finally {
-      _token = '';
-      await SharedPreferencesAsync().remove(_tokenKey);
+      await _clearSession();
     }
+  }
+
+  Future<void> signOutAll() async {
+    try {
+      await _request('/api/v1/auth/sign-out-all', method: 'POST');
+    } finally {
+      await _clearSession();
+    }
+  }
+
+  Future<void> _clearSession() async {
+    _token = '';
+    await _secure.delete(key: _tokenKey);
+    await _secure.delete(key: _refreshTokenKey);
   }
 
   Future<AuthResult> _authenticate(String path, JsonMap body) async {
     final data = await _request(path, method: 'POST', body: body);
     final result = AuthResult(
       token: data['token']! as String,
+      refreshToken: data['refreshToken']! as String,
       user: AppUser.fromJson(JsonMap.from(data['user']! as Map)),
     );
     _token = result.token;
-    await SharedPreferencesAsync().setString(_tokenKey, result.token);
+    await _secure.write(key: _tokenKey, value: result.token);
+    await _secure.write(key: _refreshTokenKey, value: result.refreshToken);
     return result;
   }
 
@@ -254,6 +313,7 @@ final class AppRepository {
     String method = 'GET',
     JsonMap? body,
     String? idempotencyKey,
+    bool retried = false,
   }) async {
     final request = http.Request(method, Uri.parse('$_apiBase$path'));
     request.headers.addAll(_headers(idempotencyKey));
@@ -262,8 +322,18 @@ final class AppRepository {
         .send(request)
         .timeout(const Duration(seconds: 10));
     final response = await http.Response.fromStream(streamed);
+    if (response.statusCode == 401 && !retried && await _refreshSession()) {
+      return _requestRaw(
+        path,
+        method: method,
+        body: body,
+        idempotencyKey: idempotencyKey,
+        retried: true,
+      );
+    }
     final decoded = jsonDecode(response.body) as Map<String, Object?>;
     if (response.statusCode < 200 || response.statusCode >= 300) {
+      if (response.statusCode == 401 && !retried) onSessionExpired?.call();
       final error = JsonMap.from(decoded['error']! as Map);
       throw ApiException(
         error['code']! as String,
@@ -274,9 +344,40 @@ final class AppRepository {
     return decoded['data'];
   }
 
+  Future<bool> _refreshSession() {
+    _refreshInFlight ??= _performRefresh();
+    return _refreshInFlight!.whenComplete(() => _refreshInFlight = null);
+  }
+
+  Future<bool> _performRefresh() async {
+    final refreshToken = await _secure.read(key: _refreshTokenKey) ?? '';
+    if (refreshToken.isEmpty) return false;
+    try {
+      final request = http.Request('POST', Uri.parse('$_apiBase/api/v1/auth/refresh'));
+      request.headers.addAll(_headers(null));
+      request.body = jsonEncode({'refreshToken': refreshToken});
+      final streamed = await _client
+          .send(request)
+          .timeout(const Duration(seconds: 10));
+      final response = await http.Response.fromStream(streamed);
+      if (response.statusCode < 200 || response.statusCode >= 300) return false;
+      final decoded = jsonDecode(response.body) as Map<String, Object?>;
+      final data = JsonMap.from(decoded['data']! as Map);
+      final token = data['token']! as String;
+      final refresh = data['refreshToken']! as String;
+      _token = token;
+      await _secure.write(key: _tokenKey, value: token);
+      await _secure.write(key: _refreshTokenKey, value: refresh);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
   Map<String, String> _headers(String? idempotencyKey) {
     final headers = <String, String>{
       'content-type': 'application/json',
+      'accept-language': _acceptLanguage,
       'x-app-id': _appId,
       'x-platform': kIsWeb ? 'web' : defaultTargetPlatform.name,
       'x-app-version': '1.0.0',
@@ -284,6 +385,10 @@ final class AppRepository {
     if (_token.isNotEmpty) headers['authorization'] = 'Bearer $_token';
     if (idempotencyKey != null) headers['idempotency-key'] = idempotencyKey;
     return headers;
+  }
+
+  void setLocale(String locale) {
+    _acceptLanguage = locale;
   }
 
   void dispose() => _client.close();

@@ -1,6 +1,7 @@
 import { Platform } from 'react-native';
 import {
   AppUser,
+  AuthSession,
   BootstrapPayload,
   CouponView,
   HelpArticle,
@@ -16,12 +17,24 @@ import {
   UserSettings,
   UsageSummary,
 } from '../domain/models';
-import { readAnonymousId, readSessionToken } from './storage';
+import {
+  readAnonymousId,
+  readRefreshToken,
+  readSessionToken,
+  saveRefreshToken,
+  saveSessionToken,
+} from './storage';
 
 type Envelope<T> = Readonly<{ data: T }>;
-type ErrorEnvelope = Readonly<{
-  error: Readonly<{ code: string; message: string; retryable: boolean; traceId: string }>;
+type ErrorPayload = Readonly<{
+  code: string;
+  message: string;
+  retryable: boolean;
+  traceId: string;
+  retryAfterSeconds?: number;
+  fieldErrors?: Readonly<Record<string, readonly string[]>>;
 }>;
+type ErrorEnvelope = Readonly<{ error: ErrorPayload }>;
 
 const apiBase = process.env.EXPO_PUBLIC_API_URL
   ?? (Platform.OS === 'android' ? 'http://10.0.2.2:3210' : 'http://localhost:3210');
@@ -32,6 +45,8 @@ export class ApiClientError extends Error {
     message: string,
     readonly status: number,
     readonly retryable: boolean,
+    readonly retryAfterSeconds?: number,
+    readonly fieldErrors?: Readonly<Record<string, readonly string[]>>,
   ) {
     super(message);
   }
@@ -44,13 +59,21 @@ export const apiClient = {
     password,
     deviceName: `${Platform.OS} · MobileUI`,
   }),
-  signUp: (email: string, password: string, username: string) =>
+  signUp: (email: string, password: string, username: string, consentVersion: string) =>
     requestAuth('/api/v1/auth/sign-up', {
       email,
       password,
       username,
+      consentVersion,
       deviceName: `${Platform.OS} · MobileUI`,
     }),
+  verifyEmail: (email: string, code: string) => request<{ verified: boolean }>(
+    '/api/v1/auth/verify-email', jsonOptions('POST', { email, code }),
+  ),
+  resendEmailVerification: (email: string) => request<{
+    accepted: boolean;
+    resendAfterSeconds: number;
+  }>('/api/v1/auth/verify-email/resend', jsonOptions('POST', { email })),
   socialSignIn: (input: {
     provider: 'apple' | 'google' | 'github';
     idToken?: string;
@@ -63,6 +86,7 @@ export const apiClient = {
     deviceName: `${Platform.OS} · MobileUI`,
   }),
   signOut: () => request<{ signedOut: boolean }>('/api/v1/auth/sign-out', { method: 'POST' }),
+  signOutAll: () => request<{ signedOut: boolean }>('/api/v1/auth/sign-out-all', { method: 'POST' }),
   requestPhoneCode: (phone: string) => request<{
     accepted: boolean;
     resendAfterSeconds: number;
@@ -166,10 +190,27 @@ async function requestAuth(
   path: string,
   body: Readonly<Record<string, string | undefined>>,
 ) {
-  return request<{ token: string; user: AppUser }>(path, jsonOptions('POST', body));
+  return request<AuthSession>(path, jsonOptions('POST', body));
+}
+
+let refreshInFlight: Promise<boolean> | null = null;
+let sessionExpiredHandler: (() => void) | null = null;
+
+// AppStore registers this so that an unrecoverable session expiry clears the
+// user and bounces to the sign-in guard, instead of looping on failing calls.
+export function registerSessionExpiredHandler(handler: (() => void) | null) {
+  sessionExpiredHandler = handler;
 }
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  return sendRequest<T>(path, options, false);
+}
+
+async function sendRequest<T>(
+  path: string,
+  options: RequestInit,
+  retried: boolean,
+): Promise<T> {
   const [token, installationId] = await Promise.all([
     readSessionToken(),
     readAnonymousId(),
@@ -188,16 +229,58 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   } catch {
     throw serviceUnavailableError();
   }
+  if (response.status === 401 && !retried && await refreshSession()) {
+    return sendRequest<T>(path, options, true);
+  }
   const body = await parseResponse<T>(response);
   if (!response.ok || 'error' in body) {
-    const error = 'error' in body ? body.error : {
+    const error: ErrorPayload = 'error' in body ? body.error : {
       code: 'HTTP_ERROR',
       message: response.status >= 500 ? '服务暂时不可用，请稍后重试' : '服务请求失败',
       retryable: response.status >= 500,
+      traceId: 'local',
     };
-    throw new ApiClientError(error.code, error.message, response.status, error.retryable);
+    if (response.status === 401 && !retried) sessionExpiredHandler?.();
+    throw new ApiClientError(
+      error.code,
+      error.message,
+      response.status,
+      error.retryable,
+      error.retryAfterSeconds,
+      error.fieldErrors,
+    );
   }
   return body.data;
+}
+
+async function refreshSession(): Promise<boolean> {
+  if (!refreshInFlight) refreshInFlight = performRefresh();
+  try {
+    return await refreshInFlight;
+  } finally {
+    refreshInFlight = null;
+  }
+}
+
+async function performRefresh(): Promise<boolean> {
+  const refreshToken = await readRefreshToken();
+  if (!refreshToken) return false;
+  try {
+    const response = await fetch(`${apiBase}/api/v1/auth/refresh`, {
+      method: 'POST',
+      headers: { ...clientHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refreshToken }),
+    });
+    if (!response.ok) return false;
+    const body = await response.json() as Envelope<AuthSession>;
+    const data = body?.data;
+    if (!data?.token || !data?.refreshToken) return false;
+    await saveSessionToken(data.token);
+    await saveRefreshToken(data.refreshToken);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 async function parseResponse<T>(response: Response): Promise<Envelope<T> | ErrorEnvelope> {

@@ -62,7 +62,7 @@ export function verifyPhoneCode(
       'UPDATE phone_auth_challenges SET used_at = ? WHERE id = ?',
     ).run(nowIso(), challenge.id);
   });
-  return createUserSession(userId, deviceName);
+  return createUserSession(userId, appId, deviceName);
 }
 
 function findOrCreatePhoneUser(appId: string, phone: string) {

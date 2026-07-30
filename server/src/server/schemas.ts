@@ -4,8 +4,31 @@ export const signUpSchema = z.object({
   email: z.email('邮箱格式不正确'),
   password: z.string().min(8, '密码至少 8 位').max(72),
   username: z.string().trim().min(2, '用户名至少 2 个字符').max(24),
+  consentVersion: z.string().trim().min(1, '请先同意用户协议与隐私政策'),
   deviceName: z.string().trim().min(1).max(80).default('MobileUI client'),
 });
+
+export const refreshSchema = z.object({
+  refreshToken: z.string().min(20).max(200),
+});
+
+export const verifyEmailSchema = z.object({
+  email: z.email(),
+  code: z.string().regex(/^\d{6}$/),
+});
+
+export const resendVerifyEmailSchema = z.object({
+  email: z.email(),
+});
+
+export const passwordPolicySchema = z.object({
+  minLength: z.number().int().min(4).max(128),
+  maxLength: z.number().int().min(8).max(256),
+  requireUppercase: z.boolean(),
+  requireLowercase: z.boolean(),
+  requireDigit: z.boolean(),
+  requireSymbol: z.boolean(),
+}).strict();
 
 export const signInSchema = z.object({
   identifier: z.string().trim().min(2, '请输入用户名、邮箱或手机号').max(254),
@@ -208,6 +231,7 @@ export const runtimeConfigSchema = z.object({
         web: z.string().min(3).max(200).optional(),
       }).optional(),
     })),
+    passwordPolicy: passwordPolicySchema,
   }),
   legal: z.array(z.object({
     type: z.enum(['privacy', 'terms', 'subscription']),

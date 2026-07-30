@@ -39,16 +39,25 @@ class _MobileUiAppState extends State<MobileUiApp> {
       controller: controller,
       child: SupportScope(
         controller: supportController,
-        child: MaterialApp(
-          debugShowCheckedModeBanner: false,
-          title: 'MobileStarter',
-          theme: AppTheme.light,
-          home: AnimatedBuilder(
-            animation: controller,
-            builder: (context, child) => AppRouter.screenFor(controller.route),
+        child: AnimatedBuilder(
+          animation: controller,
+          builder: (context, _) => MaterialApp(
+            debugShowCheckedModeBanner: false,
+            title: 'MobileStarter',
+            theme: AppTheme.light,
+            darkTheme: AppTheme.dark,
+            themeMode: _themeModeOf(controller),
+            home: AppRouter.screenFor(controller.route),
           ),
         ),
       ),
     );
+  }
+
+  static ThemeMode _themeModeOf(AppController controller) {
+    final value = controller.user?.settings['theme'];
+    if (value == 'dark') return ThemeMode.dark;
+    if (value == 'light') return ThemeMode.light;
+    return ThemeMode.system;
   }
 }

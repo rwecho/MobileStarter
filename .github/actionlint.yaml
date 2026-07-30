@@ -1,0 +1,6 @@
+# actionlint config — declares custom self-hosted runner labels so the linter
+# recognizes them. `harmonyos` is the label for the self-hosted DevEco runner
+# used by arkts-publish.yml.
+self-hosted-runner:
+  labels:
+    - harmonyos

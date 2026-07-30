@@ -1,4 +1,5 @@
 import http from '@ohos.net.http'
+import { TelemetryBatch, TelemetryValue } from '../telemetry/Telemetry'
 import {
   ApiEnvelope,
   ApiErrorBody,
@@ -6,8 +7,10 @@ import {
   AuthPayload,
   BootstrapPayload,
   CouponView,
+  CreateTicketInput,
   DeleteAccountInput,
   FeedbackInput,
+  HelpArticle,
   PhoneCodeInput,
   PhoneVerifyInput,
   ReferralView,
@@ -16,6 +19,9 @@ import {
   SignUpInput,
   OrderView,
   NotificationView,
+  SupportTicket,
+  SupportTicketDetail,
+  SupportMessage,
   UsageSummary
 } from '../domain/Models'
 
@@ -37,14 +43,32 @@ export class ApiFailure extends Error {
 
 export class ApiClient {
   private token: string = ''
+  private refreshToken: string = ''
   private installationId: string = ''
+  private language: string = 'zh-CN'
+  private refreshInFlight: Promise<boolean> | null = null
+  private sessionExpiredCallback: (() => void) | null = null
 
   setToken(token: string): void {
     this.token = token
   }
 
+  setRefreshToken(token: string): void {
+    this.refreshToken = token
+  }
+
   setInstallationId(value: string): void {
     this.installationId = value
+  }
+
+  setLanguage(value: string): void {
+    this.language = value
+  }
+
+  // Set by AppStore so an unrecoverable session expiry clears the user and
+  // returns to the sign-in guard instead of looping on failing requests.
+  setSessionExpiredCallback(callback: (() => void) | null): void {
+    this.sessionExpiredCallback = callback
   }
 
   bootstrap(): Promise<BootstrapPayload> {
@@ -56,19 +80,44 @@ export class ApiClient {
     return this.request<AuthPayload>('/api/v1/auth/sign-in', http.RequestMethod.POST, input)
   }
 
-  signUp(email: string, password: string, username: string): Promise<AuthPayload> {
+  signUp(email: string, password: string, username: string, consentVersion: string):
+    Promise<AuthPayload> {
     const input: SignUpInput = {
       email,
       password,
       username,
+      consentVersion,
       deviceName: 'HarmonyOS · MobileUI'
     }
     return this.request<AuthPayload>('/api/v1/auth/sign-up', http.RequestMethod.POST, input)
   }
 
+  verifyEmail(email: string, code: string): Promise<boolean> {
+    return this.request<Record<string, boolean>>(
+      '/api/v1/auth/verify-email',
+      http.RequestMethod.POST,
+      { email, code }
+    ).then(result => result['verified'] === true)
+  }
+
+  resendEmailVerification(email: string): Promise<boolean> {
+    return this.request<Record<string, boolean>>(
+      '/api/v1/auth/verify-email/resend',
+      http.RequestMethod.POST,
+      { email }
+    ).then(result => result['accepted'] === true)
+  }
+
   signOut(): Promise<boolean> {
     return this.request<Record<string, boolean>>(
       '/api/v1/auth/sign-out',
+      http.RequestMethod.POST
+    ).then(result => result['signedOut'] === true)
+  }
+
+  signOutAll(): Promise<boolean> {
+    return this.request<Record<string, boolean>>(
+      '/api/v1/auth/sign-out-all',
       http.RequestMethod.POST
     ).then(result => result['signedOut'] === true)
   }
@@ -92,6 +141,26 @@ export class ApiClient {
       '/api/v1/auth/phone/verify',
       http.RequestMethod.POST,
       input
+    )
+  }
+
+  socialSignIn(
+    provider: string,
+    idToken: string,
+    authorizationCode: string,
+    redirectUri: string,
+    codeVerifier: string
+  ): Promise<AuthPayload> {
+    const body: Record<string, string | number | boolean> = {
+      provider,
+      deviceName: 'HarmonyOS · MobileUI'
+    }
+    if (idToken.length > 0) body['idToken'] = idToken
+    if (authorizationCode.length > 0) body['authorizationCode'] = authorizationCode
+    if (redirectUri.length > 0) body['redirectUri'] = redirectUri
+    if (codeVerifier.length > 0) body['codeVerifier'] = codeVerifier
+    return this.request<AuthPayload>(
+      '/api/v1/auth/social', http.RequestMethod.POST, body
     )
   }
 
@@ -176,13 +245,46 @@ export class ApiClient {
     ).then(result => result['deleted'] === true)
   }
 
-  submitFeedback(title: string, body: string): Promise<boolean> {
-    const input: FeedbackInput = { category: 'suggestion', title, body, rating: 5 }
+  submitFeedback(
+    title: string,
+    body: string,
+    category: string = 'suggestion',
+    rating: number = 5
+  ): Promise<boolean> {
+    const input: FeedbackInput = { category, title, body, rating }
     return this.request<Record<string, string | number>>(
       '/api/v1/support/feedback',
       http.RequestMethod.POST,
       input
     ).then(result => String(result['id'] ?? '').length > 0)
+  }
+
+  help(): Promise<HelpArticle[]> {
+    return this.request<HelpArticle[]>('/api/v1/support/help', http.RequestMethod.GET)
+  }
+
+  tickets(): Promise<SupportTicket[]> {
+    return this.request<SupportTicket[]>('/api/v1/support/tickets', http.RequestMethod.GET)
+  }
+
+  ticket(id: string): Promise<SupportTicketDetail> {
+    return this.request<SupportTicketDetail>(
+      `/api/v1/support/tickets/${id}`, http.RequestMethod.GET
+    )
+  }
+
+  createTicket(input: CreateTicketInput): Promise<SupportTicket> {
+    return this.request<SupportTicket>(
+      '/api/v1/support/tickets', http.RequestMethod.POST, input
+    )
+  }
+
+  reply(ticketId: string, message: string): Promise<SupportMessage> {
+    return this.request<SupportMessage>(
+      `/api/v1/support/tickets/${ticketId}/messages`,
+      http.RequestMethod.POST,
+      { message }
+    )
   }
 
   usage(): Promise<UsageSummary> {
@@ -206,12 +308,53 @@ export class ApiClient {
     ).then(result => result['deleted'] === true)
   }
 
+  // Telemetry is fire-and-forget and must NOT participate in the 401 refresh /
+  // session-expiry loop, so it uses its own request instead of this.request.
+  async telemetry(batch: TelemetryBatch): Promise<boolean> {
+    const payload = JSON.stringify({
+      anonymousId: batch.anonymousId,
+      sessionId: batch.sessionId,
+      events: batch.events.map(event => ({
+        eventId: event.eventId,
+        name: event.name,
+        screenId: event.screenId,
+        occurredAt: event.occurredAt,
+        configVersion: event.configVersion,
+        properties: this.toRecord(event.properties)
+      }))
+    })
+    const client = http.createHttp()
+    try {
+      const response = await client.request(`${API_BASE}/api/v1/telemetry/events`, {
+        method: http.RequestMethod.POST,
+        header: this.headers(),
+        extraData: payload,
+        expectDataType: http.HttpDataType.STRING,
+        connectTimeout: 5000,
+        readTimeout: 5000
+      })
+      return response.responseCode >= 200 && response.responseCode < 300
+    } catch (error) {
+      return false
+    } finally {
+      client.destroy()
+    }
+  }
+
+  // Map does not survive JSON.stringify, so flatten it to a plain record first.
+  private toRecord(map: Map<string, TelemetryValue>): Record<string, TelemetryValue> {
+    const record: Record<string, TelemetryValue> = {}
+    map.forEach((value, key) => { record[key] = value })
+    return record
+  }
+
   private async request<T>(
     path: string,
     method: http.RequestMethod,
     body?: Record<string, string | number | boolean> |
       SignInInput | SignUpInput | DeleteAccountInput
-      | PhoneCodeInput | PhoneVerifyInput | FeedbackInput
+      | PhoneCodeInput | PhoneVerifyInput | FeedbackInput | CreateTicketInput,
+    retried: boolean = false
   ): Promise<T> {
     const client = http.createHttp()
     try {
@@ -224,7 +367,13 @@ export class ApiClient {
         readTimeout: 5000
       })
       const text = String(response.result)
+      if (response.responseCode === 401 && !retried && await this.refreshSession()) {
+        return this.request<T>(path, method, body, true)
+      }
       if (response.responseCode < 200 || response.responseCode >= 300) {
+        if (response.responseCode === 401 && !retried) {
+          this.sessionExpiredCallback?.()
+        }
         const failure = JSON.parse(text) as ApiErrorBody
         throw new ApiFailure(
           failure.error.code,
@@ -239,10 +388,48 @@ export class ApiClient {
     }
   }
 
+  private async refreshSession(): Promise<boolean> {
+    if (this.refreshInFlight === null) {
+      this.refreshInFlight = this.performRefresh()
+    }
+    const current = this.refreshInFlight
+    try {
+      return await current
+    } finally {
+      this.refreshInFlight = null
+    }
+  }
+
+  private async performRefresh(): Promise<boolean> {
+    if (this.refreshToken.length === 0) return false
+    const client = http.createHttp()
+    try {
+      const response = await client.request(`${API_BASE}/api/v1/auth/refresh`, {
+        method: http.RequestMethod.POST,
+        header: this.headers(),
+        extraData: JSON.stringify({ refreshToken: this.refreshToken }),
+        expectDataType: http.HttpDataType.STRING,
+        connectTimeout: 5000,
+        readTimeout: 5000
+      })
+      if (response.responseCode < 200 || response.responseCode >= 300) return false
+      const payload = JSON.parse(String(response.result)) as ApiEnvelope<AuthPayload>
+      const data = payload.data
+      if (!data.token || !data.refreshToken) return false
+      this.token = data.token
+      this.refreshToken = data.refreshToken
+      return true
+    } catch (error) {
+      return false
+    } finally {
+      client.destroy()
+    }
+  }
+
   private headers(): Record<string, string> {
     const values: Record<string, string> = {
       'content-type': 'application/json',
-      'accept-language': 'zh-CN',
+      'accept-language': this.language,
       'x-app-id': APP_ID,
       'x-platform': 'harmonyos',
       'x-app-version': '1.0.0'

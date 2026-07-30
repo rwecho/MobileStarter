@@ -7,6 +7,7 @@ type ApiErrorBody = Readonly<{
   traceId: string;
   retryable: boolean;
   fieldErrors?: Readonly<Record<string, readonly string[]>>;
+  retryAfterSeconds?: number;
 }>;
 
 export class ApiError extends Error {
@@ -15,6 +16,8 @@ export class ApiError extends Error {
     readonly code: string,
     message: string,
     readonly retryable = false,
+    readonly fieldErrors?: Readonly<Record<string, readonly string[]>>,
+    readonly retryAfterSeconds?: number,
   ) {
     super(message);
   }
@@ -44,6 +47,8 @@ export function handleError(error: unknown) {
         message: error.message,
         traceId,
         retryable: error.retryable,
+        ...(error.fieldErrors ? { fieldErrors: error.fieldErrors } : {}),
+        ...(error.retryAfterSeconds ? { retryAfterSeconds: error.retryAfterSeconds } : {}),
       } satisfies ApiErrorBody,
     }, { status: error.status });
   }

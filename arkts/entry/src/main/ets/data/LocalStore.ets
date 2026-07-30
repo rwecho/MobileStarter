@@ -4,6 +4,7 @@ import { RuntimeConfig } from '../domain/Models'
 
 const STORE_NAME: string = 'mobileui.runtime'
 const TOKEN_KEY: string = 'sessionToken'
+const REFRESH_TOKEN_KEY: string = 'sessionRefreshToken'
 const CONFIG_KEY: string = 'runtimeConfig'
 const INSTALLATION_KEY: string = 'installationId'
 
@@ -20,6 +21,15 @@ export class LocalStore {
 
   saveToken(token: string): void {
     this.store?.putSync(TOKEN_KEY, token)
+    this.store?.flush()
+  }
+
+  readRefreshToken(): string {
+    return String(this.store?.getSync(REFRESH_TOKEN_KEY, '') ?? '')
+  }
+
+  saveRefreshToken(token: string): void {
+    this.store?.putSync(REFRESH_TOKEN_KEY, token)
     this.store?.flush()
   }
 

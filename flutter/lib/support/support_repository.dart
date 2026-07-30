@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -17,6 +18,10 @@ final class SupportRepository {
     defaultValue: 'mobileui',
   );
   static const _installationKey = 'mobileui.support.installationId';
+  // Mirrors AppRepository._tokenKey so support calls carry the same session
+  // token as the rest of the app (support tickets are user-scoped).
+  static const _sessionTokenKey = 'mobileui.sessionToken';
+  final FlutterSecureStorage _secure = FlutterSecureStorage();
   Future<String>? _installationFuture;
 
   Future<List<HelpArticle>> help() async {
@@ -90,6 +95,7 @@ final class SupportRepository {
     Map<String, Object?>? body,
   }) async {
     final installationId = await _installationId();
+    final token = await _secure.read(key: _sessionTokenKey) ?? '';
     final headers = {
       'content-type': 'application/json',
       'x-app-id': _appId,
@@ -97,6 +103,7 @@ final class SupportRepository {
       'x-app-version': '1.0.0',
       'x-installation-id': installationId,
       'accept-language': 'zh-CN',
+      if (token.isNotEmpty) 'authorization': 'Bearer $token',
     };
     final uri = Uri.parse('$_apiBase$path');
     final response = method == 'GET'

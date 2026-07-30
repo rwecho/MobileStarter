@@ -7,6 +7,8 @@ export type PublicUser = Readonly<{
   avatarUrl: string | null;
   tierId: string;
   settings: Readonly<Record<string, string | boolean | number>>;
+  emailVerified: boolean;
+  consentVersion: string | null;
   createdAt: string;
 }>;
 

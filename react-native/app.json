@@ -18,6 +18,10 @@
     ],
     "ios": {
       "usesAppleSignIn": true
+    },
+    "android": {
+      "package": "com.mobileui.mobilestarter",
+      "googleServicesFile": "./google-services.json"
     }
   }
 }

@@ -99,6 +99,8 @@ final class AppUser {
     required this.avatarUrl,
     required this.tierId,
     required this.settings,
+    required this.emailVerified,
+    required this.consentVersion,
   });
 
   factory AppUser.fromJson(JsonMap json) => AppUser(
@@ -110,6 +112,8 @@ final class AppUser {
     avatarUrl: json['avatarUrl'] as String?,
     tierId: json['tierId']! as String,
     settings: JsonMap.from(json['settings']! as Map),
+    emailVerified: json['emailVerified'] == true,
+    consentVersion: json['consentVersion'] as String?,
   );
 
   final String id;
@@ -120,6 +124,8 @@ final class AppUser {
   final String? avatarUrl;
   final String tierId;
   final JsonMap settings;
+  final bool emailVerified;
+  final String? consentVersion;
 
   AppUser copyWith({
     String? displayName,
@@ -135,6 +141,8 @@ final class AppUser {
     avatarUrl: avatarUrl ?? this.avatarUrl,
     tierId: tierId,
     settings: settings ?? this.settings,
+    emailVerified: emailVerified,
+    consentVersion: consentVersion,
   );
 }
 
@@ -214,17 +222,20 @@ final class NotificationView {
     required this.title,
     required this.body,
     required this.read,
+    this.route,
   });
   factory NotificationView.fromJson(JsonMap json) => NotificationView(
     id: json['id']! as String,
     title: json['title']! as String,
     body: json['body']! as String,
     read: json['readAt'] != null,
+    route: json['route'] as String?,
   );
   final String id;
   final String title;
   final String body;
   final bool read;
+  final String? route;
 }
 
 final class OrderView {

@@ -10,7 +10,63 @@
 - 破坏性操作必须验证取消、确认、执行中、成功和失败五个分支。
 - 每项证据记录代码链接、测试名称、截图/录屏、API trace 或数据库断言。
 
-## A. 基础与远端配置
+## 本轮实施进展（2026-07-30：账户安全与社交登录 · 服务端地基 + 三端核心接入）
+
+> 本节记录本轮新增的代码与证据。矩阵状态仍以「逐项证据」为准；下列各项的服务端证据
+> 已由自动化测试与 HTTP trace 落实，客户端证据按平台真实情况标注。`ACCEPTED` 仍需真机
+> 截图/录屏/API trace（本会话无可控真机/模拟器），故最高仅标到 `SELF_VERIFIED`。
+
+### 服务端（已验证：`typecheck` + `lint` + `build` + `npm test`（17 用例）+ `tests/smoke.mjs` HTTP trace 15 项全绿）
+
+| ID | 本轮状态 | 证据 |
+|---|---|---|
+| AUTH-03 密码策略 | SELF_VERIFIED | `config.ts` passwordPolicy 下发；`passwords.ts:validatePasswordAgainstPolicy`；`auth.ts` signUp/reset/change 集中校验；`tests/auth.test.ts` 单测 |
+| AUTH-04 协议同意 | SELF_VERIFIED（注册捕获+持久化+版本暴露） | `signUpSchema` 必填 `consentVersion`；`users.consent_version/consented_at`；`PublicUser.consentVersion`；`tests/auth.test.ts`。注：既有用户「重新同意路由守卫」为后续跨切面项 |
+| AUTH-07 限流/锁定 | SELF_VERIFIED | `sign-in-attempts.ts`；`auth.ts:signIn` 5 次锁定 + 冷却恢复；`smoke.mjs` 断言 `SIGN_IN_LOCKED` + `retryAfterSeconds` |
+| AUTH-08 邮箱验证 | SELF_VERIFIED | `email-verification.ts`；`/verify-email` 端点；`smoke.mjs` 断言正确码置位、错误/已用拒绝 |
+| AUTH-09 重发验证 | SELF_VERIFIED | `/verify-email/resend`；60s 冷却 + 日上限；`tests/auth.test.ts` |
+| AUTH-12 Token 刷新 | SELF_VERIFIED（服务端） | `/api/v1/auth/refresh`；access 30min；`smoke.mjs` 断言旋转成功 |
+| AUTH-13 Token 轮换/复用 | SELF_VERIFIED | `refresh.ts` 家族旋转 + 复用撤销；`smoke.mjs` 断言 `REFRESH_TOKEN_REUSED` 且家族整体失效 |
+| AUTH-14/15 退出/全退出 | SELF_VERIFIED | `revokeSession/revokeAllSessions` 同步撤销 refresh；改密/重置撤销全部；`smoke.mjs` sign-out-all 后 refresh 失效 |
+
+### 客户端（核心接入已完成；按平台验证程度不同）
+
+| 平台 | 已完成 | 验证状态 | 待补 |
+|---|---|---|---|
+| React Native | 401 单飞 refresh+轮换（`apiClient.ts`）、refresh 存储（`storage.ts`）、`signOutAll`、会话过期回登录（`AppStore.tsx`）、协议同意门+版本（`AuthScreens.tsx`）、`passwordPolicy`/`emailVerified`/`consentVersion` 模型 | `npm run typecheck` 通过 | 锁定倒计时 UX、邮箱验证步骤 UI、社交冷启动深链（expo 已用模块级 `maybeCompleteAuthSession`）、vitest 测试、真机 |
+| Flutter | 仓储 401 单飞 refresh+轮换、`flutter_secure_storage` 待加、`AuthResult.refreshToken`、`signOutAll`、`Unauthorized`→登录（`app_controller` `_handleSessionExpired`）、协议同意门（`auth_screens.dart` Checkbox）、`AppUser` 字段 | **未在本会话验证**（环境无 Flutter SDK） | `flutter analyze`/`flutter test`、原生社交（`sign_in_with_apple` 等）、邮箱验证 UI、widget 测试、真机 |
+| ArkTS | `ApiClient` 401 单飞 refresh+轮换、refresh 持久化（`LocalStore`）、`signOutAll`、会话过期回 SignIn（`AppStore.handleSessionExpired`）、协议同意 Checkbox（`AuthPage`）、模型字段 | **未在本会话验证**（环境无 DevEco/SDK） | ArkTSCheck/HAP 构建、GitHub web PKCE 社交回调、邮箱验证 UI、hypium 测试、真机 |
+
+### 不变项（本轮未改动的既有 IMPLEMENTED）
+AUTH-01/02/05/06/10/11/17：服务端原已实现，本轮补充了刷新令牌与会话过期原语，仍需补三端测试证据后才能从 IMPLEMENTED 推进到 SELF_VERIFIED/ACCEPTED。
+
+## 三端功能对齐轮（2026-07-30 续：以 React Native 为标准补齐 Flutter / ArkTS）
+
+> 以功能对照表为依据，按 RN 基准对齐两端。全部为**纯客户端改动，服务端零变更**
+> （复用 `/auth/social`、`/me/profile`、`/support/*`、`/telemetry/events`、`/notifications`）。
+> 验证：服务端 `npm test`（17）全绿、`react-native` `typecheck` 通过；
+> **Flutter / ArkTS 改动为 analyzer-unverified**（本机无 Flutter SDK / DevEco / 真机），
+> 严格镜像 RN 契约，原生依赖项需设备验证。
+
+| 平台 | 本轮已对齐 | 验证状态 | 待补（设备/SDK） |
+|---|---|---|---|
+| React Native | 基准（未改动） | `typecheck` 通过 | — |
+| Flutter | 深色主题+themeMode 运行时生效（`app_theme.dart`/`mobile_ui_app.dart`/组件读 colorScheme）；通知未读数+深链（`notifications_screen.dart`、`NotificationView.route`）；`SupportRepository` 鉴权头共享；头像 image_picker→512 base64（`profile_edit_screen.dart`）；`flutter_secure_storage` 令牌迁移（`app_repository.dart`/`support_repository.dart`）；社交登录三端（`auth/social_auth.dart`+按钮接线） | **未验证**（无 Flutter SDK） | `flutter analyze`/`flutter test`、真机社交/头像/深色 |
+| ArkTS | 遥测 sink 接线上报（`AppTelemetrySink`+`ApiClient.telemetry`+`AppStore.configureTelemetry`，修 Map→Object 序列化）；会员按 `config.tiers` 渲染；`signOutAll` UI 入口；通知未读数+深链（`navigateByName`）；反馈去硬编码（category/rating）；**完整工单系统**（`Models`/`ApiClient`/`RemoteDataStore`/`AppStore`/4 页面 `SupportPages.ets`/路由）；头像 photoAccessHelper+image→base64（`AvatarPicker.ets`）；社交 web OAuth 捕获（`SocialAuthSheet.ets`+`ApiClient.socialSignIn`+`authProviderConfig`） | **未验证**（无 DevEco/HAP） | ArkTSCheck/HAP、真机头像/社交（Apple 在 HarmonyOS 无原生 SDK，提示不支持） |
+
+**ArkTS 遥测修复说明**：原 `Telemetry.ets` 队列完备但 `configure()` 全工程未调用 → sink 恒 null、事件全丢；本轮在 `AppStore.initialize` 末尾接线，且 `telemetry()` 端点绕过 401 刷新/会话过期逻辑（遥测不应触发登录回弹）。Map properties 经 `toRecord` 转 plain object 再序列化（`JSON.stringify(Map)` 会丢字段）。
+
+**明确不在本轮（附理由）**：通知分页（需服务端游标）、推送 token 注册（需 FCM/APNs/HMS+真机）、数据导出（需服务端端点）、真实支付 SDK（三端一致 mock）、邮箱验证步骤 UI（三端死代码，待产品入口）、限流锁定倒计时 UX（三端一致缺失）、既有用户重新同意门（跨切面）、完整 i18n（仅接 `accept-language` 请求头，全 UI 文案翻译为独立大工程）、ArkTS 令牌 HUKS（preferences 已应用沙箱，视为达标）。
+
+**补齐续（2026-07-30，关闭对齐轮剩余 4 个差异项）**：
+- **ArkTS 深色主题运行时生效**——`AppColors` 改为可变 palette + `applyColorScheme(isDark)`，`AppStore.applyTheme()` 按 `settings.theme` 应用（初始化/保存时刷新；`system` 暂解析为浅色，读 OS 配色为 TODO）。
+- **两端 `accept-language` 请求头**——Flutter `AppRepository.setLocale` + controller `_syncLocale`；ArkTS `ApiClient.setLanguage` + `AppStore.applyLanguage`（按 `settings.language`）。
+- **Flutter 存储计量真实化**——`util/cache_size.dart` 量 bootstrap 缓存+遥测队列字节，替换硬编码 "124 MB"（ArkTS 已有 `configBytes()`）。
+- **两端权限页系统设置跳转**——Flutter `app_settings` 依赖 + `AppSettings.openAppSettings()`；ArkTS `context.startAbility` 打开设置（bundleName best-effort，设备验证）。
+
+
+
+
 
 | ID | 验收项 | 核心动作与预期 | 状态 |
 |---|---|---|---|

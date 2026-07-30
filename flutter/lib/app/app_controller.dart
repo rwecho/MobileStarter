@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import '../auth/social_auth.dart';
 import '../navigation/app_route.dart';
 import '../navigation/route_guard.dart';
 import '../state/async_state.dart';
@@ -8,7 +9,9 @@ import 'app_repository.dart';
 import 'runtime_models.dart';
 
 final class AppController extends ChangeNotifier {
-  AppController(this._repository);
+  AppController(this._repository) {
+    _repository.onSessionExpired = _handleSessionExpired;
+  }
 
   final AppRepository _repository;
   final List<AppRoute> _stack = <AppRoute>[AppRoute.logo];
@@ -17,6 +20,7 @@ final class AppController extends ChangeNotifier {
   AppUser? _user;
   Map<String, bool> authProviders = const {};
   Map<String, bool> authProviderPolicy = const {};
+  Map<String, Object?> authProviderConfig = const {};
   List<SessionView> sessions = const [];
   List<NotificationView> notifications = const [];
   List<OrderView> orders = const [];
@@ -42,6 +46,8 @@ final class AppController extends ChangeNotifier {
       _user = result.user;
       authProviders = result.authProviders;
       authProviderPolicy = result.authProviderPolicy;
+      authProviderConfig = result.authProviderConfig;
+      _syncLocale();
       _actionState = const Success<void>(null);
     } on ApiException catch (error) {
       _actionState = Failure(error.message);
@@ -85,14 +91,35 @@ final class AppController extends ChangeNotifier {
   Future<bool> signIn(String email, String password) =>
       _authenticate(() => _repository.signIn(email, password));
 
-  Future<bool> signUp(String email, String password, String username) =>
-      _authenticate(() => _repository.signUp(email, password, username));
+  Future<bool> signUp(
+    String email,
+    String password,
+    String username,
+    String consentVersion,
+  ) =>
+      _authenticate(() => _repository.signUp(email, password, username, consentVersion));
 
   Future<bool> requestPhoneCode(String phone) =>
       _perform(() => _repository.requestPhoneCode(phone));
 
   Future<bool> verifyPhoneCode(String phone, String code) =>
       _authenticate(() => _repository.verifyPhoneCode(phone, code));
+
+  Future<bool> socialSignIn(String provider) async {
+    final payload = await acquireSocialCredential(
+      provider,
+      githubClientId: _providerClientId('github'),
+      googleClientId: _providerClientId('google'),
+    );
+    if (payload == null) return false;
+    return _authenticate(() => _repository.socialSignIn(payload));
+  }
+
+  String? _providerClientId(String provider) {
+    final config = authProviderConfig[provider];
+    if (config is Map) return config['clientId'] as String?;
+    return null;
+  }
 
   Future<bool> requestPasswordReset(String email) async {
     final success = await _perform(
@@ -140,8 +167,14 @@ final class AppController extends ChangeNotifier {
     final result = await _capture(() => _repository.saveSettings(patch));
     if (result == null || _user == null) return false;
     _user = _user!.copyWith(settings: result);
+    _syncLocale();
     notifyListeners();
     return true;
+  }
+
+  void _syncLocale() {
+    final language = _user?.settings['language'];
+    _repository.setLocale(language == 'en-US' ? 'en-US' : 'zh-CN');
   }
 
   Future<bool> changePassword(String current, String next) async {
@@ -161,6 +194,16 @@ final class AppController extends ChangeNotifier {
   Future<void> signOut() async {
     await _perform(_repository.signOut);
     await _clearSession();
+  }
+
+  Future<void> signOutAll() async {
+    await _perform(_repository.signOutAll);
+    await _clearSession();
+  }
+
+  void _handleSessionExpired() {
+    _user = null;
+    replaceAll(AppRoute.signIn);
   }
 
   Future<bool> loadSessions() async {

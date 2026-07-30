@@ -39,3 +39,13 @@ enum AppRoute {
   notificationCenter,
   stateGallery,
 }
+
+// Resolves a notification deep-link route name back to the enum. External URLs
+// (containing "://") and unknown names are ignored, mirroring the RN guard.
+AppRoute? appRouteFromName(String? name) {
+  if (name == null || name.isEmpty || name.contains('://')) return null;
+  for (final route in AppRoute.values) {
+    if (route.name == name) return route;
+  }
+  return null;
+}

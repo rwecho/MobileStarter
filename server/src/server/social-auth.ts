@@ -3,8 +3,8 @@ import { database, nowIso } from './database';
 import { ApiError } from './http';
 import { createId } from './ids';
 import { createUserSession, getUserRow } from './auth';
-import { RuntimeConfig } from '@/domain/config';
-import { ClientPlatform } from './client-context';
+import type { RuntimeConfig } from '@/domain/config';
+import type { ClientPlatform } from './client-context';
 
 type Provider = 'apple' | 'google' | 'github';
 type SocialInput = Readonly<{
@@ -75,7 +75,7 @@ export async function socialSignIn(input: SocialInput, config: RuntimeConfig, pl
     input.provider,
     scopedSubject(input.appId, profile.subject),
   ) as { userId: string } | undefined;
-  if (identity) return createUserSession(identity.userId, input.deviceName);
+  if (identity) return createUserSession(identity.userId, input.appId, input.deviceName);
   const userId = findOrCreateUser(input.appId, profile);
   database.prepare(`
     INSERT INTO external_identities(
@@ -89,7 +89,7 @@ export async function socialSignIn(input: SocialInput, config: RuntimeConfig, pl
     profile.email,
     nowIso(),
   );
-  return createUserSession(userId, input.deviceName);
+  return createUserSession(userId, input.appId, input.deviceName);
 }
 
 function ensureConfigured(
@@ -219,9 +219,18 @@ function findOrCreateUser(appId: string, profile: SocialProfile) {
   const email = profile.email?.toLowerCase() ?? `external-${id}@invalid.local`;
   database.prepare(`
     INSERT INTO users(
-      id, app_id, email, password_hash, username, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?)
-  `).run(id, appId, email, `external$${createId()}`, profile.name, timestamp, timestamp);
+      id, app_id, email, password_hash, username, email_verified, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    id,
+    appId,
+    email,
+    `external$${createId()}`,
+    profile.name,
+    profile.emailVerified ? 1 : 0,
+    timestamp,
+    timestamp,
+  );
   return getUserRow(id).id;
 }
 

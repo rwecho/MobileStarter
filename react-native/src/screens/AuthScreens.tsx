@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { AppButton, PageHeader } from '../design-system/components';
 import { useApp } from '../state/AppStore';
 import { spacing } from '../theme/tokens';
@@ -36,8 +36,11 @@ export function AuthScreen({ mode }: Readonly<{ mode: AuthMode }>) {
   const [code, setCode] = useState('');
   const [phone, setPhone] = useState('+86');
   const [phoneCodeSent, setPhoneCodeSent] = useState(false);
+  const [agreed, setAgreed] = useState(false);
   const copy = authCopy[mode];
   const busy = accountBusy || recovery.busy;
+  const termsRevision = config.legal.find((document) => document.type === 'terms')?.revision
+    ?? 'unknown';
 
   const submit = async () => {
     if (mode === 'forgot') {
@@ -64,7 +67,11 @@ export function AuthScreen({ mode }: Readonly<{ mode: AuthMode }>) {
       return;
     }
     if (mode === 'signUp') {
-      await signUp({ email, password, username });
+      if (!agreed) {
+        showToast('请先阅读并同意用户协议与隐私政策', 'info');
+        return;
+      }
+      await signUp({ email, password, username, consentVersion: termsRevision });
     } else {
       await signIn({ email, password });
     }
@@ -145,7 +152,7 @@ export function AuthScreen({ mode }: Readonly<{ mode: AuthMode }>) {
           />
         ) : null}
         <AppButton
-          disabled={busy || !isValid({ mode, email, password, username, code, phone, phoneCodeSent })}
+          disabled={busy || !isValid({ mode, email, password, username, code, phone, phoneCodeSent }) || (mode === 'signUp' && !agreed)}
           label={busy ? '正在处理…' : mode === 'phone' && phoneCodeSent ? '验证并登录' : copy.action}
           onPress={() => void submit()}
         />
@@ -164,10 +171,27 @@ export function AuthScreen({ mode }: Readonly<{ mode: AuthMode }>) {
             />
           </>
         ) : null}
-        <Text style={styles.caption}>
-          继续即表示你同意
-          {config.legal.map((document) => document.title).join('与')}。
-        </Text>
+        {mode === 'signUp' ? (
+          <Pressable
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: agreed }}
+            accessibilityLabel="同意用户协议与隐私政策"
+            onPress={() => setAgreed((value) => !value)}
+            style={authStyles.consentRow}
+          >
+            <View style={[styles.checkbox, agreed && styles.checkboxChecked]}>
+              {agreed ? <View style={styles.checkboxMark} /> : null}
+            </View>
+            <Text style={styles.caption}>
+              我已阅读并同意{config.legal.map((document) => document.title).join('与')}
+            </Text>
+          </Pressable>
+        ) : (
+          <Text style={styles.caption}>
+            继续即表示你同意
+            {config.legal.map((document) => document.title).join('与')}。
+          </Text>
+        )}
       </ScrollView>
     </View>
   );
@@ -200,4 +224,5 @@ function isValid(input: AuthInput) {
 const authStyles = StyleSheet.create({
   content: { flexGrow: 1, justifyContent: 'center', padding: spacing.x6, gap: spacing.x4 },
   copy: { gap: spacing.x2, marginBottom: spacing.x3 },
+  consentRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.x2 },
 });

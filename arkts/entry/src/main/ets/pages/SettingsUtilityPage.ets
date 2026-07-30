@@ -1,3 +1,4 @@
+import common from '@ohos.app.ability.common'
 import { localStore } from '../data/LocalStore'
 import { AppRoute } from '../navigation/AppRoute'
 import { AppStore } from '../state/AppStore'
@@ -36,6 +37,8 @@ export struct SettingsUtilityPage {
           AppListRow({ store: this.store, label: '麦克风', value: '按需申请' })
           Text('权限只会在相关功能使用时请求，可在 HarmonyOS 系统设置中随时修改。')
             .fontColor(AppColors.textSecondary)
+          AppButton({ label: '打开系统设置', icon: AppIconName.Settings,
+            onTap: () => this.openSystemSettings() })
         }.padding(AppSpacing.x4).layoutWeight(1)
       } else {
         Column({ space: AppSpacing.x4 }) {
@@ -56,6 +59,17 @@ export struct SettingsUtilityPage {
     localStore.clearRuntimeCache()
     this.cacheBytes = 0
     this.store.showToast('运行时缓存已清理')
+  }
+
+  // Opens the HarmonyOS system settings app. The bundle name is best-effort
+  // and must be verified on a device; failures surface a toast instead of crashing.
+  private async openSystemSettings(): Promise<void> {
+    try {
+      const context = this.getUIContext().getHostContext() as common.UIAbilityContext
+      await context.startAbility({ bundleName: 'com.huawei.hmossettings' })
+    } catch (error) {
+      this.store.showToast('无法打开系统设置', true)
+    }
   }
 
   private async submit(): Promise<void> {

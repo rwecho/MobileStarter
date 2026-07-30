@@ -2,6 +2,7 @@ import { AppRoute } from '../navigation/AppRoute'
 import { AppStore } from '../state/AppStore'
 import { AppButton, PageHeader } from '../design_system/Components'
 import { AppColors, AppRadii, AppSpacing } from '../theme/AppTokens'
+import { SocialAuthSheet } from './SocialAuthSheet'
 
 export enum AuthMode {
   SignIn,
@@ -20,10 +21,13 @@ export struct AuthPage {
   @State password: string = ''
   @State username: string = ''
   @State phoneCodeSent: boolean = false
+  @State consentAgreed: boolean = false
+  @State socialProvider: string = ''
 
   build() {
-    Column() {
-      PageHeader({ store: this.store, title: this.title() })
+    Stack() {
+      Column() {
+        PageHeader({ store: this.store, title: this.title() })
       Column({ space: AppSpacing.x4 }) {
         Text(this.title())
           .fontSize(28)
@@ -60,6 +64,16 @@ export struct AuthPage {
             .backgroundColor(AppColors.surface)
             .borderRadius(AppRadii.control)
             .onChange(value => this.username = value)
+          Row({ space: AppSpacing.x2 }) {
+            Checkbox()
+              .select(this.consentAgreed)
+              .onChange((value: boolean) => { this.consentAgreed = value })
+            Text('我已阅读并同意用户协议与隐私政策')
+              .fontSize(12)
+              .fontColor(AppColors.textSecondary)
+              .layoutWeight(1)
+          }
+          .width('100%')
         }
         AppButton({
           label: this.store.busy ? '正在处理…' : this.action(),
@@ -69,7 +83,7 @@ export struct AuthPage {
           Text('其他登录方式')
             .fontSize(12)
             .fontColor(AppColors.textSecondary)
-          AuthProviderRow({ store: this.store })
+          AuthProviderRow({ store: this.store, onSocial: (provider) => this.beginSocial(provider) })
           Text('忘记密码')
             .fontColor(AppColors.brand)
             .onClick(() => this.store.navigate(AppRoute.ForgotPassword))
@@ -84,6 +98,22 @@ export struct AuthPage {
     }
     .width('100%')
     .height('100%')
+    if (this.socialProvider.length > 0) {
+      SocialAuthSheet({
+        store: this.store,
+        provider: this.socialProvider,
+        onDismiss: () => { this.socialProvider = '' }
+      })
+    }
+    }
+  }
+
+  private beginSocial(provider: string): void {
+    if (provider === 'apple') {
+      this.store.showToast('HarmonyOS 暂不支持 Apple 登录', true)
+      return
+    }
+    this.socialProvider = provider
   }
 
   private async submit(): Promise<void> {
@@ -121,7 +151,11 @@ export struct AuthPage {
         }
         return
       case AuthMode.SignUp:
-        if (!await this.store.signUp(this.email, this.password, this.username)) {
+        if (!this.consentAgreed) {
+          this.store.showToast('请先阅读并同意用户协议与隐私政策', true)
+          return
+        }
+        if (!await this.store.signUp(this.email, this.password, this.username, this.termsRevision())) {
           return
         }
         this.store.showToast('账号创建成功')
@@ -134,6 +168,14 @@ export struct AuthPage {
         this.store.showToast('登录成功')
         this.store.completeAuthentication()
     }
+  }
+
+  private termsRevision(): string {
+    const legal = this.store.config?.legal ?? []
+    for (let i = 0; i < legal.length; i++) {
+      if (legal[i].type === 'terms') return legal[i].revision
+    }
+    return legal.length > 0 ? legal[0].revision : 'unknown'
   }
 
   private title(): string {
@@ -162,23 +204,27 @@ export struct AuthPage {
 @Component
 struct AuthProviderRow {
   @ObjectLink store: AppStore
+  onSocial: (provider: string) => void = () => {}
 
   build() {
     Row({ space: AppSpacing.x5 }) {
       AuthProviderButton({
         label: 'Apple',
         icon: $r('app.media.apple'),
-        isEnabled: this.store.authProviders['apple'] === true
+        isEnabled: this.store.authProviders['apple'] === true,
+        onTap: () => this.onSocial('apple')
       })
       AuthProviderButton({
         label: 'Google',
         icon: $r('app.media.google'),
-        isEnabled: this.store.authProviders['google'] === true
+        isEnabled: this.store.authProviders['google'] === true,
+        onTap: () => this.onSocial('google')
       })
       AuthProviderButton({
         label: 'GitHub',
         icon: $r('app.media.github'),
-        isEnabled: this.store.authProviders['github'] === true
+        isEnabled: this.store.authProviders['github'] === true,
+        onTap: () => this.onSocial('github')
       })
       AuthProviderButton({
         label: '手机号',

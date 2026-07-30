@@ -1,12 +1,8 @@
-name: Server Image
+name: Server Publish
 
 on:
   push:
-    branches: [main]
     tags: ["v*"]
-    paths:
-      - "server/**"
-      - ".github/workflows/server-image.yml"
   workflow_dispatch:
 
 permissions:
@@ -14,7 +10,7 @@ permissions:
   packages: write
 
 concurrency:
-  group: server-image-${{ github.ref }}
+  group: server-publish-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:

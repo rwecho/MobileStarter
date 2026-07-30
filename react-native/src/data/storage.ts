@@ -4,6 +4,7 @@ import { Platform } from 'react-native';
 import { RuntimeConfig } from '../domain/models';
 
 const tokenKey = 'mobileui.session';
+const refreshTokenKey = 'mobileui.session.refresh';
 const configKey = 'mobileui.config.lastKnownGood';
 const anonymousKey = 'mobileui.telemetry.anonymousId';
 const telemetryQueueKey = 'mobileui.telemetry.queue';
@@ -22,6 +23,26 @@ export async function saveSessionToken(token: string | null) {
   }
   if (token) await SecureStore.setItemAsync(tokenKey, token);
   else await SecureStore.deleteItemAsync(tokenKey);
+}
+
+export async function readRefreshToken() {
+  if (Platform.OS === 'web') return window.localStorage.getItem(refreshTokenKey);
+  return SecureStore.getItemAsync(refreshTokenKey);
+}
+
+export async function saveRefreshToken(token: string | null) {
+  if (Platform.OS === 'web') {
+    if (token) window.localStorage.setItem(refreshTokenKey, token);
+    else window.localStorage.removeItem(refreshTokenKey);
+    return;
+  }
+  if (token) await SecureStore.setItemAsync(refreshTokenKey, token);
+  else await SecureStore.deleteItemAsync(refreshTokenKey);
+}
+
+export async function clearAuthStorage() {
+  await saveSessionToken(null);
+  await saveRefreshToken(null);
 }
 
 export async function readCachedConfig(): Promise<RuntimeConfig | null> {

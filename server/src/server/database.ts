@@ -2,7 +2,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { DatabaseSync } from 'node:sqlite';
-import { defaultConfig, RuntimeConfig } from '@/domain/config';
+import { defaultConfig } from '@/domain/config';
+import type { RuntimeConfig } from '@/domain/config';
 import { hashPassword } from './passwords';
 import { initializeCoreSchema } from './database-schema-core';
 import { initializeProductSchema } from './database-schema-product';
@@ -17,7 +18,7 @@ database.exec('PRAGMA busy_timeout = 10000');
 database.exec('PRAGMA foreign_keys = ON');
 initializeCoreSchema(database);
 initializeProductSchema(database);
-ensureProfileColumns();
+ensureUserColumns();
 
 const insertConfig = database.prepare(`
   INSERT OR IGNORE INTO runtime_config(app_id, version, document, updated_at)
@@ -37,6 +38,7 @@ database.prepare(`
 if (process.env.NODE_ENV !== 'production') {
   await ensureDevelopmentTestAccount();
 }
+await ensureBootstrapAdmin();
 
 export function nowIso() {
   return new Date().toISOString();
@@ -66,7 +68,39 @@ async function ensureDevelopmentTestAccount() {
   );
 }
 
-function ensureProfileColumns() {
+async function ensureBootstrapAdmin() {
+  const envUsername = process.env.MOBILEUI_BOOTSTRAP_ADMIN_USERNAME;
+  if (envUsername) {
+    const exists = database.prepare(
+      'SELECT 1 FROM admin_users WHERE username = ?',
+    ).get(envUsername);
+    if (!exists) {
+      const password = process.env.MOBILEUI_BOOTSTRAP_ADMIN_PASSWORD;
+      const email = process.env.MOBILEUI_BOOTSTRAP_ADMIN_EMAIL
+        ?? `${envUsername}@mobileui.local`;
+      if (password) await seedAdmin(envUsername, email, password);
+    }
+    return;
+  }
+  if (process.env.NODE_ENV !== 'production') {
+    const exists = database.prepare(
+      'SELECT 1 FROM admin_users WHERE username = ?',
+    ).get('admin');
+    if (!exists) await seedAdmin('admin', 'admin@mobileui.local', 'admin123');
+  }
+}
+
+async function seedAdmin(username: string, email: string, password: string) {
+  const id = randomUUID();
+  const createdAt = nowIso();
+  const passwordHash = await hashPassword(password);
+  database.prepare(`
+    INSERT INTO admin_users(id, username, email, password_hash, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `).run(id, username, email, passwordHash, createdAt, createdAt);
+}
+
+function ensureUserColumns() {
   const columns = database.prepare('PRAGMA table_info(users)').all() as Array<{
     name: string;
   }>;
@@ -76,6 +110,15 @@ function ensureProfileColumns() {
   }
   if (!names.has('bio')) {
     database.exec("ALTER TABLE users ADD COLUMN bio TEXT NOT NULL DEFAULT ''");
+  }
+  if (!names.has('email_verified')) {
+    database.exec('ALTER TABLE users ADD COLUMN email_verified INTEGER NOT NULL DEFAULT 0');
+  }
+  if (!names.has('consent_version')) {
+    database.exec('ALTER TABLE users ADD COLUMN consent_version TEXT');
+  }
+  if (!names.has('consented_at')) {
+    database.exec('ALTER TABLE users ADD COLUMN consented_at TEXT');
   }
   database.exec(`
     UPDATE users SET display_name = username

@@ -68,9 +68,39 @@ export function initializeCoreSchema(database: DatabaseSync) {
       recipient TEXT NOT NULL, template TEXT NOT NULL, payload TEXT NOT NULL,
       status TEXT NOT NULL, error_code TEXT, created_at TEXT NOT NULL, sent_at TEXT
     );
+    CREATE TABLE IF NOT EXISTS admin_users (
+      id TEXT PRIMARY KEY, username TEXT NOT NULL UNIQUE, email TEXT NOT NULL UNIQUE,
+      password_hash TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS admin_sessions (
+      id TEXT PRIMARY KEY, admin_id TEXT NOT NULL, token_hash TEXT NOT NULL UNIQUE,
+      created_at TEXT NOT NULL, expires_at TEXT NOT NULL, revoked_at TEXT,
+      FOREIGN KEY(admin_id) REFERENCES admin_users(id) ON DELETE CASCADE
+    );
+    CREATE TABLE IF NOT EXISTS refresh_tokens (
+      id TEXT PRIMARY KEY, app_id TEXT NOT NULL, user_id TEXT NOT NULL,
+      session_id TEXT NOT NULL, family_id TEXT NOT NULL, token_hash TEXT NOT NULL UNIQUE,
+      expires_at TEXT NOT NULL, revoked_at TEXT, replaced_by TEXT, created_at TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS email_verifications (
+      id TEXT PRIMARY KEY, app_id TEXT NOT NULL, user_id TEXT NOT NULL, email TEXT NOT NULL,
+      code_hash TEXT NOT NULL, attempts INTEGER NOT NULL DEFAULT 0, expires_at TEXT NOT NULL,
+      used_at TEXT, created_at TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS sign_in_attempts (
+      id TEXT PRIMARY KEY, app_id TEXT NOT NULL, identifier TEXT NOT NULL,
+      failed_count INTEGER NOT NULL DEFAULT 0, locked_until TEXT, last_attempt_at TEXT NOT NULL,
+      UNIQUE(app_id, identifier)
+    );
     CREATE INDEX IF NOT EXISTS idx_reset_challenge_lookup
       ON password_reset_challenges(app_id, email, created_at);
     CREATE INDEX IF NOT EXISTS idx_phone_challenge_lookup
       ON phone_auth_challenges(app_id, phone, created_at);
+    CREATE INDEX IF NOT EXISTS idx_refresh_family
+      ON refresh_tokens(app_id, family_id);
+    CREATE INDEX IF NOT EXISTS idx_refresh_session
+      ON refresh_tokens(session_id);
+    CREATE INDEX IF NOT EXISTS idx_email_verify_lookup
+      ON email_verifications(app_id, email, created_at);
   `);
 }

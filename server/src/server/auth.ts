@@ -1,9 +1,12 @@
-import { NextRequest } from 'next/server';
-import { PublicUser } from '@/domain/user';
-import { database, nowIso } from './database';
+import type { NextRequest } from 'next/server';
+import type { PublicUser } from '@/domain/user';
+import { database, getRuntimeConfig, nowIso } from './database';
 import { ApiError } from './http';
-import { createId, createSessionToken, hashToken } from './ids';
-import { hashPassword, verifyPassword } from './passwords';
+import { createId, hashToken } from './ids';
+import { hashPassword, validatePasswordAgainstPolicy, verifyPassword } from './passwords';
+import { issueSessionPair, revokeAllRefreshForUser, revokeRefreshForSession } from './session-tokens';
+import { assertSignInNotLocked, recordSignInFailure, recordSignInSuccess } from './sign-in-attempts';
+import { createEmailVerification } from './email-verification';
 
 type UserRow = {
   id: string;
@@ -16,6 +19,9 @@ type UserRow = {
   avatar_url: string | null;
   tier_id: string;
   settings: string;
+  email_verified: number;
+  consent_version: string | null;
+  consented_at: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -41,9 +47,17 @@ export async function signUp(input: {
   email: string;
   password: string;
   username: string;
+  consentVersion: string;
   deviceName: string;
 }) {
   const email = input.email.trim().toLowerCase();
+  const reasons = validatePasswordAgainstPolicy(
+    getRuntimeConfig(input.appId).auth.passwordPolicy,
+    input.password,
+  );
+  if (reasons.length) {
+    throw new ApiError(400, 'VALIDATION_ERROR', '密码不符合要求', false, { password: reasons });
+  }
   const emailExists = database.prepare(
     'SELECT 1 FROM users WHERE app_id = ? AND email = ?',
   ).get(input.appId, email);
@@ -58,11 +72,13 @@ export async function signUp(input: {
   const passwordHash = await hashPassword(input.password);
   database.prepare(`
     INSERT INTO users(
-      id, app_id, email, password_hash, username, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?)
-  `).run(id, input.appId, email, passwordHash, username, createdAt, createdAt);
+      id, app_id, email, password_hash, username, consent_version, consented_at,
+      created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(id, input.appId, email, passwordHash, username, input.consentVersion, createdAt, createdAt, createdAt);
   createWelcomeNotifications(id);
-  return createUserSession(id, input.deviceName);
+  await createEmailVerification(input.appId, id, email);
+  return createUserSession(id, input.appId, input.deviceName);
 }
 
 export async function signIn(input: {
@@ -73,12 +89,15 @@ export async function signIn(input: {
 }) {
   const identifier = input.identifier.trim();
   const normalized = identifier.toLowerCase();
+  assertSignInNotLocked(input.appId, identifier);
   const user = findUserByIdentifier(input.appId, identifier, normalized);
   const valid = user && await verifyPassword(user.password_hash, input.password);
   if (!user || !valid) {
+    recordSignInFailure(input.appId, identifier);
     throw new ApiError(401, 'INVALID_CREDENTIALS', '账号或密码不正确');
   }
-  return createUserSession(user.id, input.deviceName);
+  recordSignInSuccess(input.appId, identifier);
+  return createUserSession(user.id, input.appId, input.deviceName);
 }
 
 function findUserByIdentifier(appId: string, identifier: string, normalized: string) {
@@ -120,12 +139,14 @@ export function revokeSession(sessionId: string) {
   database.prepare(
     'UPDATE sessions SET revoked_at = ? WHERE id = ? AND revoked_at IS NULL',
   ).run(nowIso(), sessionId);
+  revokeRefreshForSession(sessionId);
 }
 
 export function revokeAllSessions(userId: string) {
   database.prepare(
     'UPDATE sessions SET revoked_at = ? WHERE user_id = ? AND revoked_at IS NULL',
   ).run(nowIso(), userId);
+  revokeAllRefreshForUser(userId);
 }
 
 export function toPublicUser(row: UserRow): PublicUser {
@@ -138,6 +159,8 @@ export function toPublicUser(row: UserRow): PublicUser {
     avatarUrl: row.avatar_url,
     tierId: row.tier_id,
     settings: JSON.parse(row.settings) as Record<string, string | boolean | number>,
+    emailVerified: row.email_verified === 1,
+    consentVersion: row.consent_version,
     createdAt: row.created_at,
   };
 }
@@ -150,25 +173,13 @@ export function getUserRow(userId: string) {
   return user;
 }
 
-export function createUserSession(userId: string, deviceName: string) {
-  const token = createSessionToken();
-  const sessionId = createId();
-  const createdAt = nowIso();
-  const expiresAt = new Date(Date.now() + 30 * 86400_000).toISOString();
-  database.prepare(`
-    INSERT INTO sessions(
-      id, user_id, token_hash, device_name, created_at, last_seen_at, expires_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?)
-  `).run(
-    sessionId,
-    userId,
-    hashToken(token),
-    deviceName || 'Unknown device',
-    createdAt,
-    createdAt,
-    expiresAt,
-  );
-  return { token, user: toPublicUser(getUserRow(userId)) };
+export function createUserSession(userId: string, appId: string, deviceName: string) {
+  const issued = issueSessionPair(userId, appId, deviceName, createId());
+  return {
+    token: issued.token,
+    refreshToken: issued.refreshToken,
+    user: toPublicUser(getUserRow(userId)),
+  };
 }
 
 function createWelcomeNotifications(userId: string) {

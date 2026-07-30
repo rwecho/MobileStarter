@@ -4,9 +4,28 @@ import '../app/app_scope.dart';
 import '../design_system/components.dart';
 import '../navigation/app_route.dart';
 import '../theme/app_tokens.dart';
+import '../util/cache_size.dart';
 
-class SettingsScreen extends StatelessWidget {
+class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
+
+  @override
+  State<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends State<SettingsScreen> {
+  String _cacheLabel = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCacheLabel();
+  }
+
+  Future<void> _loadCacheLabel() async {
+    final label = formatCacheSize(await measureCacheBytes());
+    if (mounted) setState(() => _cacheLabel = label);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -46,7 +65,7 @@ class SettingsScreen extends StatelessWidget {
             items: [
               ('隐私设置', AppRoute.privacy, null),
               ('权限管理', AppRoute.permissions, null),
-              ('存储与缓存', AppRoute.storage, '124 MB'),
+              ('存储与缓存', AppRoute.storage, _cacheLabel),
               ('帮助与反馈', AppRoute.helpFeedback, null),
               ('协议与政策', AppRoute.legal, null),
               ('关于与版本', AppRoute.about, '1.0.0'),

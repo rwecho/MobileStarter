@@ -1,0 +1,48 @@
+name: ArkTS Publish
+
+# HarmonyOS / ArkTS publish.
+#
+# Why self-hosted: GitHub Actions has NO hosted HarmonyOS runner, and the
+# community `harmonyos-dev/setup-harmonyos-sdk` action only mirrors the older
+# API 9 command-line tools (commandline-tools 2.0.0.2). It cannot build this
+# project's target — HarmonyOS NEXT, API 18 / `5.1.0(18)`. A real build
+# therefore needs a self-hosted runner with DevEco Studio + the HarmonyOS 5.1
+# SDK installed. Register such a runner with the label `harmonyos`, then trigger
+# via a `v*` tag push or the Actions "Run workflow" button.
+#
+# Setup notes for the runner:
+#   - DevEco Studio + HarmonyOS 5.1 SDK (API 18) installed.
+#   - `ohpm` and the hvigor toolchain (`hvigorw`) resolvable on PATH. DevEco
+#     projects normally commit a `hvigorw` wrapper; if one is missing, open the
+#     project once in DevEco Studio to generate it, or add DevEco's hvigor to PATH.
+#   - For a signed/installable `.app`, add Huawei AGC signing material and wire
+#     a signing config in `build-profile.json5`. This workflow uploads the
+#     unsigned `.hap` by default.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: [self-hosted, harmonyos]
+    defaults:
+      run:
+        working-directory: arkts
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore HarmonyOS dependencies
+        run: ohpm install
+      - name: Build HAP
+        run: hvigorw assembleHap --mode module -p product=default --no-daemon
+      - uses: actions/upload-artifact@v4
+        with:
+          name: arkts-hap
+          path: |
+            arkts/entry/build/**/outputs/**/*.hap
+            arkts/**/outputs/default/*.hap
+          if-no-files-found: error

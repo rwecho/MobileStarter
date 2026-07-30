@@ -66,9 +66,28 @@ HarmonyOS 完整构建仍需在安装了 DevEco Studio 和 HarmonyOS SDK 的环�
 
 ## 发布说明
 
-`Server Image` 工作流会把 Next.js standalone 镜像发布到
-`ghcr.io/rwecho/mobilestarter-server`。`server/compose.yml` 提供了带持久化数据卷的
-运行示例。
+仓库提供一组相互独立的 `*-publish` 工作流，在推送 `v*` 标签或手动触发
+（Actions → Run workflow）时产出可下载的构建产物（Actions artifacts）。
+
+| 工作流 | 产物 | 说明 |
+| --- | --- | --- |
+| `server-publish.yml` | Docker 镜像 | Next.js standalone 镜像，发布到 `ghcr.io/<owner>/mobilestarter-server`；`server/compose.yml` 提供带持久化数据卷的运行示例 |
+| `flutter-publish.yml` | Flutter release APK | 默认用 debug 签名；配置密钥后用正式 keystore 签名 |
+| `react-native-publish.yml` | React Native release APK | 本地 `expo prebuild` + Gradle 构建；默认 debug 签名 |
+| `arkts-publish.yml` | HarmonyOS `.hap` | 需自建带 DevEco Studio 的 self-hosted runner（标签 `harmonyos`），产出未签名 hap |
+
+### 签名密钥（可选）
+
+未配置时移动端产物使用 debug 签名（仍可安装测试）。如需正式签名，在仓库 Settings →
+Secrets 中添加：
+
+- Flutter：`FLUTTER_KEYSTORE`（keystore 的 base64）、`FLUTTER_STORE_PASSWORD`、
+  `FLUTTER_KEY_ALIAS`、`FLUTTER_KEY_PASSWORD`
+- React Native：`RN_KEYSTORE`（base64）、`RN_STORE_PASSWORD`、`RN_KEY_ALIAS`、
+  `RN_KEY_PASSWORD`；以及可选的 `RN_GOOGLE_SERVICES_JSON`（未提供时 CI 会生成占位文件
+  以保证 Firebase Gradle 插件可构建，运行时 Firebase 不生效）
+- ArkTS：上传未签名 `.hap`；如需可安装的正式包，在 `build-profile.json5` 配置华为 AGC
+  签名材料
 
 ## 工程规则
 

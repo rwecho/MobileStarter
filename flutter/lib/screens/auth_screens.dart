@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import '../app/app_controller.dart';
 import '../app/app_scope.dart';
 import '../design_system/components.dart';
 import '../design_system/feedback.dart';
@@ -21,6 +22,7 @@ class _AuthScreenState extends State<AuthScreen> {
   final passwordController = TextEditingController();
   final usernameController = TextEditingController();
   bool phoneCodeSent = false;
+  bool consentAgreed = false;
 
   @override
   void dispose() {
@@ -67,10 +69,15 @@ class _AuthScreenState extends State<AuthScreen> {
         if (success) controller.completeAuthentication();
         break;
       case AuthMode.signUp:
+        if (!consentAgreed) {
+          if (mounted) showAppToast(context, '请先阅读并同意用户协议与隐私政策');
+          return;
+        }
         success = await controller.signUp(
           emailController.text,
           passwordController.text,
           usernameController.text,
+          _termsRevision(controller),
         );
         if (success) controller.completeAuthentication();
         break;
@@ -111,6 +118,18 @@ class _AuthScreenState extends State<AuthScreen> {
               controller: usernameController,
               decoration: const InputDecoration(labelText: '用户名'),
             ),
+            const SizedBox(height: AppSpacing.x2),
+            CheckboxListTile(
+              value: consentAgreed,
+              onChanged: (value) => setState(() => consentAgreed = value ?? false),
+              controlAffinity: ListTileControlAffinity.leading,
+              contentPadding: EdgeInsets.zero,
+              dense: true,
+              title: Text(
+                '我已阅读并同意用户协议与隐私政策',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ),
           ],
           const SizedBox(height: AppSpacing.x3),
           if (widget.mode != AuthMode.forgot &&
@@ -150,6 +169,12 @@ class _AuthScreenState extends State<AuthScreen> {
         ],
       ),
     );
+  }
+
+  String _termsRevision(AppController controller) {
+    final legal = controller.config?.legal;
+    if (legal == null || legal.isEmpty) return 'unknown';
+    return legal.first.revision;
   }
 
   (String, String) _copyFor(AuthMode mode) {
@@ -195,19 +220,19 @@ class _ProviderRow extends StatelessWidget {
           asset: 'assets/icons/apple.svg',
           label: 'Apple',
           enabled: controller.authProviders['apple'] == true,
-          onPressed: null,
+          onPressed: () => _signInWith(controller, 'apple'),
         ),
         _ProviderButton(
           asset: 'assets/icons/google.svg',
           label: 'Google',
           enabled: controller.authProviders['google'] == true,
-          onPressed: null,
+          onPressed: () => _signInWith(controller, 'google'),
         ),
         _ProviderButton(
           asset: 'assets/icons/github.svg',
           label: 'GitHub',
           enabled: controller.authProviders['github'] == true,
-          onPressed: null,
+          onPressed: () => _signInWith(controller, 'github'),
         ),
         _ProviderButton(
           asset: 'assets/icons/phone.svg',
@@ -260,4 +285,9 @@ class _ProviderButton extends StatelessWidget {
       ),
     );
   }
+}
+
+Future<void> _signInWith(AppController controller, String provider) async {
+  final success = await controller.socialSignIn(provider);
+  if (success) controller.completeAuthentication();
 }

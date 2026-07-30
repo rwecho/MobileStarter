@@ -93,6 +93,9 @@ export async function resetPassword(appId: string, resetToken: string, password:
       'UPDATE sessions SET revoked_at = ? WHERE user_id = ? AND revoked_at IS NULL',
     ).run(timestamp, token.user_id);
     database.prepare(
+      'UPDATE refresh_tokens SET revoked_at = ? WHERE user_id = ? AND revoked_at IS NULL',
+    ).run(timestamp, token.user_id);
+    database.prepare(
       'UPDATE password_reset_tokens SET used_at = ? WHERE id = ?',
     ).run(timestamp, token.id);
   });

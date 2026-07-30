@@ -21,10 +21,12 @@ export struct NotificationPage {
         Text('暂无通知').fontColor(AppColors.textSecondary).layoutWeight(1)
       } else if (this.store.remote.notificationState.status === AsyncStatus.Success) {
         Row() {
-          Blank()
+          Text(`共 ${this.totalCount()} 条 · ${this.unreadCount()} 条未读`)
+            .fontColor(AppColors.textSecondary).fontSize(12).layoutWeight(1)
           Button('全部已读').backgroundColor(Color.Transparent).fontColor(AppColors.brand)
+            .enabled(this.unreadCount() > 0)
             .onClick(() => this.store.remote.markAllNotificationsRead())
-        }.padding({ right: AppSpacing.x4 }).width('100%')
+        }.padding({ left: AppSpacing.x4, right: AppSpacing.x4 }).width('100%')
         List({ space: AppSpacing.x3 }) {
           ForEach(this.store.remote.notificationState.data ?? [], (item: NotificationView) => {
             ListItem() {
@@ -44,6 +46,7 @@ export struct NotificationPage {
               .backgroundColor(AppColors.surface)
               .borderRadius(AppRadii.card)
             }
+            .onClick(() => this.open(item))
           })
         }.padding(AppSpacing.x4).layoutWeight(1)
       } else {
@@ -66,6 +69,21 @@ export struct NotificationPage {
     }).then(result => {
       if (result.index === 1) this.store.remote.deleteNotification(id)
     })
+  }
+
+  private totalCount(): number {
+    return this.store.remote.notificationState.data?.length ?? 0
+  }
+
+  private unreadCount(): number {
+    return this.store.remote.notificationState.data?.filter(item => item.readAt === null).length ?? 0
+  }
+
+  private async open(item: NotificationView): Promise<void> {
+    if (item.readAt === null) {
+      await this.store.remote.markNotificationRead(item.id)
+    }
+    this.store.navigateByName(item.route)
   }
 }
 

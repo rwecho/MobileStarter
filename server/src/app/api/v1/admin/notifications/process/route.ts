@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { authorizeAdmin } from '@/app/api/v1/admin/config/route';
+import { authorizeAdmin } from '@/server/admin-auth';
 import { handleError, ok } from '@/server/http';
 import { processNotificationJobs } from '@/server/notification-jobs';
 

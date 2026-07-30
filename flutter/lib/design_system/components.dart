@@ -76,12 +76,14 @@ class AppButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = destructive ? AppColors.error : AppColors.brand;
+    final scheme = Theme.of(context).colorScheme;
+    final color = destructive ? scheme.error : scheme.primary;
     return FilledButton(
       onPressed: onPressed,
       style: FilledButton.styleFrom(
         minimumSize: const Size.fromHeight(52),
         backgroundColor: color,
+        foregroundColor: scheme.onPrimary,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppRadii.control),
         ),
@@ -90,7 +92,7 @@ class AppButton extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           if (icon != null) ...[
-            AppIcon(icon!, color: AppColors.surface, size: 20),
+            AppIcon(icon!, color: scheme.onPrimary, size: 20),
             const SizedBox(width: AppSpacing.x2),
           ],
           Text(label),
@@ -106,10 +108,11 @@ class AppCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: AppColors.surface,
-        border: Border.all(color: AppColors.border),
+        color: scheme.surface,
+        border: Border.all(color: scheme.outline),
         borderRadius: BorderRadius.circular(AppRadii.card),
       ),
       child: child,
@@ -133,20 +136,15 @@ class AppListTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final muted = Theme.of(context).colorScheme.onSurfaceVariant;
     return ListTile(
       minTileHeight: 56,
-      leading: icon == null
-          ? null
-          : AppIcon(icon!, color: AppColors.secondaryText, size: 20),
+      leading: icon == null ? null : AppIcon(icon!, color: muted, size: 20),
       title: Text(label),
       subtitle: value == null ? null : Text(value!),
       trailing: route == null
           ? null
-          : const AppIcon(
-              AppIconName.chevronRight,
-              color: AppColors.secondaryText,
-              size: 18,
-            ),
+          : AppIcon(AppIconName.chevronRight, color: muted, size: 18),
       onTap: route == null ? null : () => AppScope.of(context).navigate(route!),
     );
   }

@@ -34,7 +34,10 @@ export enum AppRoute {
   About,
   DeleteAccount,
   NotificationCenter,
-  StateGallery
+  StateGallery,
+  SupportTicket,
+  NewSupportTicket,
+  ProductFeedback
 }
 
 export function routeTitle(route: AppRoute): string {
@@ -61,6 +64,9 @@ export function routeTitle(route: AppRoute): string {
     case AppRoute.About: return '关于与版本'
     case AppRoute.NotificationCenter: return '通知中心'
     case AppRoute.StateGallery: return '状态库'
+    case AppRoute.SupportTicket: return '工单详情'
+    case AppRoute.NewSupportTicket: return '联系客服'
+    case AppRoute.ProductFeedback: return '产品反馈'
     default: return '功能页面'
   }
 }

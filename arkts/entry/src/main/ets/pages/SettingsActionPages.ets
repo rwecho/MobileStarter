@@ -1,9 +1,11 @@
+import common from '@ohos.app.ability.common'
 import { AppRoute } from '../navigation/AppRoute'
 import { AppStore } from '../state/AppStore'
 import { AppButton, AppListRow, PageHeader } from '../design_system/Components'
-import { AppIconName } from '../design_system/AppIcon'
+import { AppIcon, AppIconName } from '../design_system/AppIcon'
 import { AppColors, AppRadii, AppSpacing } from '../theme/AppTokens'
 import { LegalDocument } from '../domain/Models'
+import { pickAvatarDataUrl } from '../media/AvatarPicker'
 
 @Component
 export struct AccountSecurityPage {
@@ -23,6 +25,9 @@ export struct AccountSecurityPage {
           changed: value => this.newPassword = value })
         AppButton({ label: this.store.busy ? '修改中…' : '修改密码',
           icon: AppIconName.Lock, onTap: () => this.submit() })
+        AppButton({ label: '退出全部设备',
+          destructive: true,
+          onTap: () => this.confirmSignOutAll() })
       }.padding(AppSpacing.x4).layoutWeight(1)
     }.width('100%').height('100%')
   }
@@ -35,6 +40,22 @@ export struct AccountSecurityPage {
     if (await this.store.changePassword(this.currentPassword, this.newPassword)) {
       this.store.replaceAll(AppRoute.SignIn)
     }
+  }
+
+  private confirmSignOutAll(): void {
+    this.getUIContext().getPromptAction().showDialog({
+      title: '退出全部设备？',
+      message: '所有设备上的登录会话将立即失效，需重新登录。',
+      buttons: [
+        { text: '取消', color: '#667085' },
+        { text: '退出全部', color: '#D24B4B' }
+      ]
+    }).then(async result => {
+      if (result.index === 1) {
+        await this.store.signOutAll()
+        this.store.replaceAll(AppRoute.SignIn)
+      }
+    })
   }
 }
 
@@ -171,6 +192,27 @@ export struct ProfileEditPage {
     Column() {
       PageHeader({ store: this.store, title: '个人资料' })
       Column({ space: AppSpacing.x4 }) {
+        Row({ space: AppSpacing.x3 }) {
+          if (this.avatarUrl.length > 0) {
+            Image(this.avatarUrl)
+              .width(64).height(64).borderRadius(32)
+              .backgroundColor(AppColors.surfaceMuted)
+          } else {
+            Column() {
+              AppIcon({ name: AppIconName.User, iconSize: 28, color: AppColors.textSecondary })
+            }
+            .width(64).height(64).borderRadius(32)
+            .backgroundColor(AppColors.surfaceMuted)
+            .justifyContent(FlexAlign.Center)
+          }
+          Column({ space: AppSpacing.x2 }) {
+            AppButton({ label: '选择头像', icon: AppIconName.User,
+              onTap: () => this.pickAvatar() })
+            TextInput({ placeholder: '或粘贴头像 URL', text: this.avatarUrl })
+              .height(48).backgroundColor(AppColors.surface).borderRadius(AppRadii.control)
+              .onChange(value => this.avatarUrl = value)
+          }.layoutWeight(1)
+        }.width('100%')
         AppListRow({ store: this.store, label: '用户名（不可修改）',
           value: `@${this.store.user?.username ?? ''}` })
         TextInput({ placeholder: '显示名称', text: this.displayName })
@@ -179,13 +221,18 @@ export struct ProfileEditPage {
         TextInput({ placeholder: '个人简介', text: this.bio })
           .height(72).backgroundColor(AppColors.surface).borderRadius(AppRadii.control)
           .onChange(value => this.bio = value)
-        TextInput({ placeholder: '头像 HTTPS 地址', text: this.avatarUrl })
-          .height(52).backgroundColor(AppColors.surface).borderRadius(AppRadii.control)
-          .onChange(value => this.avatarUrl = value)
         AppButton({ label: this.store.busy ? '保存中…' : '保存资料',
           icon: AppIconName.Check,
           onTap: () => this.store.updateProfile(this.displayName, this.bio, this.avatarUrl) })
       }.padding(AppSpacing.x4).layoutWeight(1)
     }.width('100%').height('100%')
+  }
+
+  private async pickAvatar(): Promise<void> {
+    const context = this.getUIContext().getHostContext() as common.UIAbilityContext
+    const dataUrl = await pickAvatarDataUrl(context)
+    if (dataUrl !== null) {
+      this.avatarUrl = dataUrl
+    }
   }
 }

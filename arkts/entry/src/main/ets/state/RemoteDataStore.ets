@@ -1,7 +1,7 @@
 import { apiClient, ApiFailure } from '../data/ApiClient'
 import {
-  CouponView, NotificationView, OrderView, ReferralView,
-  SessionView, UsageSummary
+  CouponView, HelpArticle, NotificationView, OrderView, ReferralView,
+  SessionView, SupportMessage, SupportTicket, SupportTicketDetail, UsageSummary
 } from '../domain/Models'
 import { AsyncState, AsyncStatus } from './AsyncState'
 
@@ -14,6 +14,10 @@ export class RemoteDataStore {
   orderState: AsyncState<OrderView[]> = new AsyncState<OrderView[]>(AsyncStatus.Idle)
   notificationState: AsyncState<NotificationView[]> =
     new AsyncState<NotificationView[]>(AsyncStatus.Idle)
+  helpState: AsyncState<HelpArticle[]> = new AsyncState<HelpArticle[]>(AsyncStatus.Idle)
+  ticketListState: AsyncState<SupportTicket[]> = new AsyncState<SupportTicket[]>(AsyncStatus.Idle)
+  ticketDetailState: AsyncState<SupportTicketDetail> =
+    new AsyncState<SupportTicketDetail>(AsyncStatus.Idle)
 
   async loadUsage(): Promise<void> {
     this.usageState = new AsyncState<UsageSummary>(AsyncStatus.Loading)
@@ -91,6 +95,48 @@ export class RemoteDataStore {
 
   async deleteNotification(id: string): Promise<void> {
     if (await apiClient.deleteNotification(id)) await this.loadNotifications()
+  }
+
+  async loadHome(): Promise<void> {
+    this.helpState = new AsyncState<HelpArticle[]>(AsyncStatus.Loading)
+    this.ticketListState = new AsyncState<SupportTicket[]>(AsyncStatus.Loading)
+    try {
+      const help = await apiClient.help()
+      const tickets = await apiClient.tickets()
+      this.helpState = help.length === 0
+        ? new AsyncState<HelpArticle[]>(AsyncStatus.Empty)
+        : new AsyncState<HelpArticle[]>(AsyncStatus.Success, help)
+      this.ticketListState = tickets.length === 0
+        ? new AsyncState<SupportTicket[]>(AsyncStatus.Empty)
+        : new AsyncState<SupportTicket[]>(AsyncStatus.Success, tickets)
+    } catch (error) {
+      this.helpState = this.failure<HelpArticle[]>(error)
+      this.ticketListState = this.failure<SupportTicket[]>(error)
+    }
+  }
+
+  async openTicket(id: string): Promise<void> {
+    this.ticketDetailState = new AsyncState<SupportTicketDetail>(AsyncStatus.Loading)
+    try {
+      this.ticketDetailState = new AsyncState<SupportTicketDetail>(
+        AsyncStatus.Success, await apiClient.ticket(id))
+    } catch (error) {
+      this.ticketDetailState = this.failure<SupportTicketDetail>(error)
+    }
+  }
+
+  // Optimistically appends a freshly sent message to the open ticket detail.
+  appendReply(message: SupportMessage): void {
+    const detail = this.ticketDetailState.data
+    if (detail === undefined) return
+    const updated: SupportTicketDetail = {
+      id: detail.id, category: detail.category, severity: detail.severity,
+      subject: detail.subject, status: detail.status, locale: detail.locale,
+      market: detail.market, dataRegion: detail.dataRegion, queueId: detail.queueId,
+      createdAt: detail.createdAt, updatedAt: message.createdAt,
+      messages: [...detail.messages, message]
+    }
+    this.ticketDetailState = new AsyncState<SupportTicketDetail>(AsyncStatus.Success, updated)
   }
 
   private failure<T>(error: Error): AsyncState<T> {

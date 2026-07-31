@@ -39,7 +39,21 @@ jobs:
           printf '%s' "$FLUTTER_KEYSTORE" | base64 -d > android/app/keystore.jks
           printf 'storeFile=keystore.jks\nstorePassword=%s\nkeyAlias=%s\nkeyPassword=%s\n' \
             "$STORE_PASSWORD" "$KEY_ALIAS" "$KEY_PASSWORD" > android/key.properties
-      - run: flutter build apk --release
+      - name: Build release APK
+        # 发布身份（必填）：app_id（租户）与 environment 通过 --dart-define 注入，
+        # 未配置则构建出的 App 启动即崩。取值优先 GitHub Variables，其次 Secrets；
+        # environment 发布默认 production。
+        env:
+          APP_ID: ${{ vars.APP_ID || secrets.APP_ID }}
+          APP_ENVIRONMENT: ${{ vars.APP_ENVIRONMENT || secrets.APP_ENVIRONMENT || 'production' }}
+        run: |
+          if [ -z "$APP_ID" ]; then
+            echo "::error::APP_ID 未配置：请在仓库 Variables 或 Secrets 中设置 APP_ID 后再发布，不能为空。"
+            exit 1
+          fi
+          flutter build apk --release \
+            --dart-define=MOBILEUI_APP_ID="$APP_ID" \
+            --dart-define=MOBILEUI_APP_ENVIRONMENT="$APP_ENVIRONMENT"
       - uses: actions/upload-artifact@v4
         with:
           name: flutter-apk

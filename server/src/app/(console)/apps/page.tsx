@@ -24,7 +24,7 @@ export default function AppsPage() {
     <div className="flex flex-col gap-6">
       <PageHeader
         title="应用管理"
-        description="已注册的应用与多环境，点击卡片可切换当前租户。"
+        description={`当前登录绑定的应用与环境：${appId}。`}
       />
       <ResourceView resource={apps}>
         {(data) => (

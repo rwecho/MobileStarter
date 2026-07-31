@@ -310,10 +310,23 @@ function jsonOptions(method: string, body: unknown): RequestInit {
   };
 }
 
+// 每个 App 必须通过 EXPO_PUBLIC_APP_ID 声明自己的 app_id（租户）。
+// 未配置时启动即抛错，避免混入不可预测的 app_id。
+const APP_ID = process.env.EXPO_PUBLIC_APP_ID?.trim();
+if (!APP_ID) {
+  throw new Error('EXPO_PUBLIC_APP_ID 未配置：请在 .env 中设置该 App 的 app_id 后再启动。');
+}
+
+// environment（development/staging/production 等）也必须显式配置，未配置即启动报错。
+const APP_ENVIRONMENT = process.env.EXPO_PUBLIC_APP_ENVIRONMENT?.trim();
+if (!APP_ENVIRONMENT) {
+  throw new Error('EXPO_PUBLIC_APP_ENVIRONMENT 未配置：请在 .env 中设置该 App 的 environment 后再启动。');
+}
+
 function clientHeaders() {
   return {
-    'X-App-Id': process.env.EXPO_PUBLIC_APP_ID ?? 'mobileui',
-    'X-App-Environment': process.env.EXPO_PUBLIC_APP_ENVIRONMENT ?? 'development',
+    'X-App-Id': APP_ID,
+    'X-App-Environment': APP_ENVIRONMENT,
     'X-Platform': Platform.OS,
     'X-App-Version': '1.0.0',
     'Accept-Language': 'zh-CN',

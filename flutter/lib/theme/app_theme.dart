@@ -43,6 +43,19 @@ abstract final class AppTheme {
             onSurface: text,
             onSurfaceVariant: secondaryText,
             outline: border,
+            // Fill missing roles — was defaulting to M2 #03DAC6 teal.
+            secondary: secondaryText,
+            onSecondary: background,
+            secondaryContainer: surfaceMuted,
+            onSecondaryContainer: text,
+            tertiary: AppColors.warning,
+            onTertiary: surface,
+            tertiaryContainer: border,
+            onTertiaryContainer: text,
+            errorContainer: const Color(0xFF3D1A1A),
+            onErrorContainer: error,
+            surfaceContainerHighest: surfaceMuted,
+            outlineVariant: const Color(0xFF3A3E46),
           )
         : ColorScheme.light(
             primary: AppColors.brand,
@@ -51,6 +64,19 @@ abstract final class AppTheme {
             onSurface: text,
             onSurfaceVariant: secondaryText,
             outline: border,
+            // Fill missing roles — was defaulting to M2 #03DAC6 teal.
+            secondary: secondaryText,
+            onSecondary: surface,
+            secondaryContainer: surfaceMuted,
+            onSecondaryContainer: text,
+            tertiary: AppColors.warning,
+            onTertiary: surface,
+            tertiaryContainer: AppColors.brandSoft,
+            onTertiaryContainer: AppColors.brand,
+            errorContainer: const Color(0xFFFDE8E8),
+            onErrorContainer: error,
+            surfaceContainerHighest: surfaceMuted,
+            outlineVariant: const Color(0xFFEEF0F2),
           );
     return ThemeData(
       useMaterial3: true,
@@ -58,6 +84,10 @@ abstract final class AppTheme {
       scaffoldBackgroundColor: background,
       colorScheme: colorScheme,
       dividerColor: border,
+      navigationBarTheme: NavigationBarThemeData(
+        indicatorColor: AppColors.brandSoft,
+        backgroundColor: surface,
+      ),
       textTheme: TextTheme(
         headlineMedium: TextStyle(
           color: text,

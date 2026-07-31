@@ -37,6 +37,22 @@ jobs:
       - uses: actions/checkout@v4
       - name: Restore HarmonyOS dependencies
         run: ohpm install
+      - name: Inject app identity
+        # 发布身份（必填）：ArkTS 无构建期 define 机制，故在构建前把 app_id /
+        # environment 常量写入 ApiClient.ets。未配置则启动即崩。
+        # 取值优先 GitHub Variables，其次 Secrets；environment 发布默认 production。
+        env:
+          APP_ID: ${{ vars.APP_ID || secrets.APP_ID }}
+          APP_ENVIRONMENT: ${{ vars.APP_ENVIRONMENT || secrets.APP_ENVIRONMENT || 'production' }}
+        run: |
+          if [ -z "$APP_ID" ]; then
+            echo "::error::APP_ID 未配置：请在仓库 Variables 或 Secrets 中设置 APP_ID 后再发布，不能为空。"
+            exit 1
+          fi
+          file=entry/src/main/ets/data/ApiClient.ets
+          sed -i "s|^const APP_ID: string = ''$|const APP_ID: string = '$APP_ID'|" "$file"
+          sed -i "s|^const APP_ENVIRONMENT: string = ''$|const APP_ENVIRONMENT: string = '$APP_ENVIRONMENT'|" "$file"
+          grep -n "APP_ID\|APP_ENVIRONMENT" "$file"
       - name: Build HAP
         run: hvigorw assembleHap --mode module -p product=default --no-daemon
       - uses: actions/upload-artifact@v4

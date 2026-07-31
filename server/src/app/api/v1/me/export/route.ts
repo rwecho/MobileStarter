@@ -1,12 +1,12 @@
 import { NextRequest } from 'next/server';
-import { adminContext } from '@/server/admin-auth';
+import { requireAuth } from '@/server/auth';
+import { exportAccountData } from '@/server/account-export';
 import { handleError, ok } from '@/server/http';
-import { getOnlineStats } from '@/server/session-repository';
 
 export function GET(request: NextRequest) {
   try {
-    const { scope } = adminContext(request);
-    return ok(getOnlineStats(scope));
+    const { user } = requireAuth(request);
+    return ok(exportAccountData(user.id));
   } catch (error) {
     return handleError(error);
   }

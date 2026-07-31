@@ -4,9 +4,9 @@ import { ApiError, handleError, ok } from '@/server/http';
 
 export function GET(request: NextRequest) {
   try {
-    const admin = getAdminFromRequest(request);
-    if (!admin) throw new ApiError(401, 'UNAUTHENTICATED', '未登录');
-    return ok(admin);
+    const session = getAdminFromRequest(request);
+    if (!session) throw new ApiError(401, 'UNAUTHENTICATED', '未登录');
+    return ok({ ...session.admin, appId: session.appId });
   } catch (error) {
     return handleError(error);
   }

@@ -26,7 +26,10 @@ import {
 } from '../domain/Models'
 
 const API_BASE: string = 'http://192.168.20.110:3210'
+// 必须填写本 App 的 app_id（租户），不能为空；未填写时启动即抛错。
 const APP_ID: string = 'mobileui'
+// 必须填写本 App 的 environment（development/staging/production 等），不能为空；未填写时启动即抛错。
+const APP_ENVIRONMENT: string = 'development'
 
 interface SocialSignInInput {
   provider: string
@@ -66,6 +69,15 @@ export class ApiClient {
   private language: string = 'zh-CN'
   private refreshInFlight: Promise<boolean> | null = null
   private sessionExpiredCallback: (() => void) | null = null
+
+  constructor() {
+    if (APP_ID.length === 0) {
+      throw new Error('APP_ID 未配置：请在 ApiClient.ets 顶部填写本 App 的 app_id（租户）后再启动。')
+    }
+    if (APP_ENVIRONMENT.length === 0) {
+      throw new Error('APP_ENVIRONMENT 未配置：请在 ApiClient.ets 顶部填写本 App 的 environment 后再启动。')
+    }
+  }
 
   setToken(token: string): void {
     this.token = token
@@ -450,6 +462,7 @@ export class ApiClient {
       'content-type': 'application/json',
       'accept-language': this.language,
       'x-app-id': APP_ID,
+      'x-app-environment': APP_ENVIRONMENT,
       'x-platform': 'harmonyos',
       'x-app-version': '1.0.0'
     }

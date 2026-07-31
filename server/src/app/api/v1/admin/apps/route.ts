@@ -5,8 +5,8 @@ import { listApps } from '@/server/tenant-repository';
 
 export function GET(request: NextRequest) {
   try {
-    authorizeAdmin(request);
-    return ok({ apps: listApps() });
+    const { appId } = authorizeAdmin(request);
+    return ok({ apps: listApps().filter((app) => app.appId === appId) });
   } catch (error) {
     return handleError(error);
   }

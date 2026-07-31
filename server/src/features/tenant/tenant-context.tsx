@@ -2,19 +2,13 @@
 
 import * as React from 'react';
 
-export type TenantScope = Readonly<{
-  appId: string;
-  environment: string;
-}>;
+export type TenantScope = Readonly<{ appId: string; environment: string }>;
 
 export const ENVIRONMENTS = ['development', 'staging', 'production'] as const;
 export type Environment = (typeof ENVIRONMENTS)[number];
 
-const STORAGE_KEY = 'mobileui.console.tenant';
-const DEFAULT_SCOPE: TenantScope = {
-  appId: 'mobileui',
-  environment: 'development',
-};
+const STORAGE_KEY = 'mobileui.console.environment';
+const DEFAULT_ENVIRONMENT = 'development';
 
 type TenantContextValue = TenantScope & {
   ready: boolean;
@@ -23,36 +17,45 @@ type TenantContextValue = TenantScope & {
 
 const TenantContext = React.createContext<TenantContextValue | null>(null);
 
-export function TenantProvider({ children }: Readonly<{ children: React.ReactNode }>) {
-  const [scope, setScopeState] = React.useState<TenantScope>(DEFAULT_SCOPE);
+/**
+ * The app_id is fixed by the server from the login session and cannot be
+ * switched from the UI; only the environment (release lane) is selectable.
+ */
+export function TenantProvider({
+  appId,
+  children,
+}: Readonly<{ appId: string; children: React.ReactNode }>) {
+  const [environment, setEnvironment] = React.useState<string>(DEFAULT_ENVIRONMENT);
   const [ready, setReady] = React.useState(false);
 
   React.useEffect(() => {
+    /* eslint-disable react-hooks/set-state-in-effect -- one-time hydration from external localStorage */
     try {
-      const raw = window.localStorage.getItem(STORAGE_KEY);
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- hydrate tenant from external localStorage
-      if (raw) setScopeState({ ...DEFAULT_SCOPE, ...JSON.parse(raw) as Partial<TenantScope> });
+      const stored = window.localStorage.getItem(STORAGE_KEY);
+      if (stored && (ENVIRONMENTS as readonly string[]).includes(stored)) {
+        setEnvironment(stored);
+      }
     } catch {
       /* ignore malformed storage */
     }
     setReady(true);
+    /* eslint-enable react-hooks/set-state-in-effect */
   }, []);
 
   const setScope = React.useCallback((patch: Partial<TenantScope>) => {
-    setScopeState((prev) => {
-      const next = { ...prev, ...patch };
+    if (patch.environment !== undefined) {
+      setEnvironment(patch.environment);
       try {
-        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+        window.localStorage.setItem(STORAGE_KEY, patch.environment);
       } catch {
         /* storage unavailable, keep in-memory */
       }
-      return next;
-    });
+    }
   }, []);
 
   const value = React.useMemo<TenantContextValue>(
-    () => ({ ...scope, ready, setScope }),
-    [scope, ready, setScope],
+    () => ({ appId, environment, ready, setScope }),
+    [appId, environment, ready, setScope],
   );
 
   return <TenantContext.Provider value={value}>{children}</TenantContext.Provider>;

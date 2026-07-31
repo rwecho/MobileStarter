@@ -22,6 +22,11 @@ jobs:
       # placeholder is generated so the Firebase Gradle plugin builds; Firebase is
       # inert at runtime without a real file.
       RN_GOOGLE_SERVICES_JSON: ${{ secrets.RN_GOOGLE_SERVICES_JSON }}
+      # 发布身份（必填）：app_id（租户）与 environment。Expo 在构建期把
+      # EXPO_PUBLIC_* 内联进产物，未配置则构建出的 App 启动即崩。
+      # 取值优先 GitHub Variables，其次 Secrets；environment 发布默认 production。
+      EXPO_PUBLIC_APP_ID: ${{ vars.APP_ID || secrets.APP_ID }}
+      EXPO_PUBLIC_APP_ENVIRONMENT: ${{ vars.APP_ENVIRONMENT || secrets.APP_ENVIRONMENT || 'production' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -34,6 +39,13 @@ jobs:
           distribution: temurin
           java-version: "17"
       - run: npm ci --legacy-peer-deps
+      - name: Verify app identity
+        run: |
+          if [ -z "$EXPO_PUBLIC_APP_ID" ]; then
+            echo "::error::APP_ID 未配置：请在仓库 Variables 或 Secrets 中设置 APP_ID 后再发布，不能为空。"
+            exit 1
+          fi
+          echo "Publishing app_id=$EXPO_PUBLIC_APP_ID environment=$EXPO_PUBLIC_APP_ENVIRONMENT"
       - name: Provide google-services.json
         # Written to the project root BEFORE prebuild: the @react-native-firebase
         # config plugin copies it into android/app/ during prebuild, and errors if

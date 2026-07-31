@@ -11,12 +11,12 @@ export default async function ConsoleLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   const store = await cookies();
   const token = store.get(ADMIN_COOKIE)?.value;
-  const admin = token ? getAdminByToken(token) : null;
-  if (!admin) redirect('/login');
+  const session = token ? getAdminByToken(token) : null;
+  if (!session) redirect('/login');
 
   return (
-    <TenantProvider>
-      <AppShell admin={admin}>{children}</AppShell>
+    <TenantProvider appId={session.appId}>
+      <AppShell admin={session.admin}>{children}</AppShell>
     </TenantProvider>
   );
 }

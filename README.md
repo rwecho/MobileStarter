@@ -18,6 +18,33 @@ MobileStarter 是一套可继承、可换肤、可替换业务模块的跨端移
 - Toast、确认弹窗、危险操作、离线与错误恢复体验
 - SVG 图标体系，无 Emoji 或图标字体回退
 
+## 应用身份：app_id 与 environment（必填，无默认值）
+
+每个客户端 App 必须显式声明自己的 **`app_id`（租户）** 与 **`environment`
+（development / staging / production）**。**两者都没有默认值，未配置则启动即报错退出**，
+避免不可预测的 app_id 混入。服务端按这两个值隔离数据：注册、遥测、配置、消息等都绑定到
+客户端声明的 `app_id`；`environment` 主要决定运行时配置发布的目标链路（dev/staging/prod）。
+
+| 平台 | app_id | environment |
+| --- | --- | --- |
+| React Native | `EXPO_PUBLIC_APP_ID`（`react-native/.env`） | `EXPO_PUBLIC_APP_ENVIRONMENT` |
+| Flutter | `--dart-define=MOBILEUI_APP_ID=...` | `--dart-define=MOBILEUI_APP_ENVIRONMENT=...` |
+| ArkTS | `arkts/.../data/ApiClient.ets` 的 `APP_ID` 常量 | 同文件 `APP_ENVIRONMENT` 常量 |
+
+```bash
+# React Native：react-native/.env
+EXPO_PUBLIC_APP_ID=mobileui
+EXPO_PUBLIC_APP_ENVIRONMENT=development
+
+# Flutter
+flutter run --dart-define=MOBILEUI_APP_ID=mobileui --dart-define=MOBILEUI_APP_ENVIRONMENT=development
+```
+
+服务端是**多租户**的：`app_id` 来自每个请求的 `x-app-id` 头（由客户端声明），不是服务端启动
+配置。请求缺 `x-app-id` / `x-app-environment` 会被拒绝（`400 APP_ID_REQUIRED` /
+`ENVIRONMENT_REQUIRED`）。运营控制台登录时也需选择一个 `app_id`，登录后会话即绑定到该 app，
+只能查看这一个 app 的数据。
+
 ## 本地运行
 
 ### Next.js 后端
@@ -34,6 +61,8 @@ npm run dev
 
 ### React Native
 
+先在 `react-native/.env` 配置 `EXPO_PUBLIC_APP_ID` 与 `EXPO_PUBLIC_APP_ENVIRONMENT`（必填）：
+
 ```bash
 cd react-native
 npm ci
@@ -47,12 +76,13 @@ npm run web
 cd flutter
 flutter pub get
 flutter analyze
-flutter run
+flutter run --dart-define=MOBILEUI_APP_ID=mobileui --dart-define=MOBILEUI_APP_ENVIRONMENT=development
 ```
 
 ### ArkTS
 
-使用 DevEco Studio 打开 `arkts/`，完成 Hvigor sync 后运行
+先在 `arkts/entry/src/main/ets/data/ApiClient.ets` 顶部填写 `APP_ID` 与 `APP_ENVIRONMENT`
+常量（必填），再用 DevEco Studio 打开 `arkts/`，完成 Hvigor sync 后运行
 `entry/src/main/ets/pages/Index.ets`。
 
 ## 验证
@@ -75,6 +105,18 @@ HarmonyOS 完整构建仍需在安装了 DevEco Studio 和 HarmonyOS SDK 的环�
 | `flutter-publish.yml` | Flutter release APK | 默认用 debug 签名；配置密钥后用正式 keystore 签名 |
 | `react-native-publish.yml` | React Native release APK | 本地 `expo prebuild` + Gradle 构建；默认 debug 签名 |
 | `arkts-publish.yml` | HarmonyOS `.hap` | 需自建带 DevEco Studio 的 self-hosted runner（标签 `harmonyos`），产出未签名 hap |
+
+### 应用身份（发布必填）
+
+三端 publish 工作流会注入 `app_id` / `environment`，否则构建出的 App 启动即崩。在仓库
+Settings → Secrets and variables → Actions 中添加：
+
+- `APP_ID`（**必填**）= 该 App 的租户 id，如 `mobileui`。优先取 GitHub Variables，其次 Secrets。
+- `APP_ENVIRONMENT`（可选）= 发布环境，未设置时默认 `production`。
+
+React Native 经 `EXPO_PUBLIC_*` 注入，Flutter 经 `--dart-define` 注入，ArkTS 在构建前写入
+`ApiClient.ets` 的常量。`APP_ID` 缺失时三个 publish 工作流都会 `::error::` 中断。
+`server-publish` 无需配置（服务端多租户，身份由客户端按请求声明）。
 
 ### 签名密钥（可选）
 

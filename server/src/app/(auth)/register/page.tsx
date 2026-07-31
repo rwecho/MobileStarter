@@ -19,19 +19,36 @@ import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { AdminProfile } from '@/lib/api-types';
 
-type Status = Readonly<{ loaded: boolean; adminExists: boolean; admin: AdminProfile | null }>;
+type Status = Readonly<{
+  loaded: boolean;
+  adminExists: boolean;
+  admin: AdminProfile | null;
+  appIds: readonly string[];
+}>;
 
 export default function RegisterPage() {
   const router = useRouter();
-  const [status, setStatus] = React.useState<Status>({ loaded: false, adminExists: false, admin: null });
-  const [form, setForm] = React.useState({ username: '', email: '', password: '' });
+  const [status, setStatus] = React.useState<Status>({
+    loaded: false,
+    adminExists: false,
+    admin: null,
+    appIds: [],
+  });
+  const [form, setForm] = React.useState({ username: '', email: '', password: '', appId: '' });
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     fetch('/api/v1/admin/auth/status')
       .then((response) => response.json())
-      .then((body) => setStatus({ loaded: true, adminExists: body.data.adminExists, admin: body.data.admin }));
+      .then((body) =>
+        setStatus({
+          loaded: true,
+          adminExists: body.data.adminExists,
+          admin: body.data.admin,
+          appIds: body.data.appIds ?? [],
+        }),
+      );
   }, []);
 
   const update = (key: keyof typeof form) => (event: React.ChangeEvent<HTMLInputElement>) =>
@@ -55,7 +72,7 @@ export default function RegisterPage() {
         router.refresh();
       } else {
         toast.success('新管理员已创建', { description: body.data.profile.username });
-        setForm({ username: '', email: '', password: '' });
+        setForm((prev) => ({ ...prev, username: '', email: '', password: '' }));
       }
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : '注册失败');
@@ -65,7 +82,7 @@ export default function RegisterPage() {
   };
 
   if (!status.loaded) {
-    return <Skeleton className="h-80 w-full" />;
+    return <Skeleton className="h-96 w-full" />;
   }
 
   if (status.adminExists && !status.admin) {
@@ -92,11 +109,29 @@ export default function RegisterPage() {
           {bootstrap ? '创建首个管理员' : '邀请新管理员'}
         </CardTitle>
         <CardDescription>
-          {bootstrap ? '首个管理员创建后将自动登录并进入控制台。' : `以 ${status.admin?.username} 身份创建新管理员。`}
+          {bootstrap
+            ? '首个管理员创建后将自动登录并进入控制台。'
+            : `以 ${status.admin?.username} 身份创建新管理员。`}
         </CardDescription>
       </CardHeader>
       <form onSubmit={submit}>
         <CardContent className="flex flex-col gap-3">
+          {bootstrap ? (
+            <div className="grid gap-1.5">
+              <Label htmlFor="appId">App ID（租户）</Label>
+              <Input
+                id="appId"
+                list="app-id-options"
+                value={form.appId}
+                onChange={update('appId')}
+                placeholder="如 mobileui"
+                autoComplete="off"
+              />
+              <datalist id="app-id-options">
+                {status.appIds.map((id) => <option key={id} value={id} />)}
+              </datalist>
+            </div>
+          ) : null}
           <Field id="username" label="用户名" value={form.username} onChange={update('username')} autoComplete="username" />
           <Field id="email" label="邮箱" type="email" value={form.email} onChange={update('email')} autoComplete="email" />
           <Field id="password" label="密码" type="password" value={form.password} onChange={update('password')} autoComplete="new-password" />

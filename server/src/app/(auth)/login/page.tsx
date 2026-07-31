@@ -19,13 +19,18 @@ export default function LoginPage() {
   const router = useRouter();
   const [identifier, setIdentifier] = React.useState('');
   const [password, setPassword] = React.useState('');
+  const [appId, setAppId] = React.useState('');
+  const [appIds, setAppIds] = React.useState<readonly string[]>([]);
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
-    fetch('/api/v1/admin/auth/me').then((response) => {
-      if (response.ok) router.replace('/');
-    });
+    fetch('/api/v1/admin/auth/status')
+      .then((response) => response.json())
+      .then((body) => {
+        setAppIds(body.data?.appIds ?? []);
+        if (body.data?.admin) router.replace('/');
+      });
   }, [router]);
 
   const submit = async (event: React.FormEvent) => {
@@ -36,7 +41,7 @@ export default function LoginPage() {
       const response = await fetch('/api/v1/admin/auth/login', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ identifier, password }),
+        body: JSON.stringify({ identifier, password, appId }),
       });
       const body = await response.json();
       if (!response.ok || body.error) {
@@ -55,10 +60,24 @@ export default function LoginPage() {
     <Card>
       <CardHeader>
         <CardTitle>登录控制台</CardTitle>
-        <CardDescription>使用管理员账号登录。开发环境默认 admin / admin123。</CardDescription>
+        <CardDescription>选择要管理的 app_id，使用管理员账号登录；登录后仅能查看该 app 的数据。</CardDescription>
       </CardHeader>
       <form onSubmit={submit}>
         <CardContent className="flex flex-col gap-3">
+          <div className="grid gap-1.5">
+            <Label htmlFor="appId">App ID（租户）</Label>
+            <Input
+              id="appId"
+              list="app-id-options"
+              value={appId}
+              onChange={(event) => setAppId(event.target.value)}
+              placeholder="如 mobileui"
+              autoComplete="off"
+            />
+            <datalist id="app-id-options">
+              {appIds.map((id) => <option key={id} value={id} />)}
+            </datalist>
+          </div>
           <div className="grid gap-1.5">
             <Label htmlFor="identifier">账号</Label>
             <Input

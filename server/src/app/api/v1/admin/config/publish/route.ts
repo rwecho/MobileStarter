@@ -1,14 +1,12 @@
 import { NextRequest } from 'next/server';
-import { getClientContext } from '@/server/client-context';
+import { adminContext } from '@/server/admin-auth';
 import { publishDraft } from '@/server/config-control';
 import { handleError, ok } from '@/server/http';
-import { authorizeAdmin } from '@/server/admin-auth';
 
-export function POST(request: NextRequest) {
+export async function POST(request: NextRequest) {
   try {
-    authorizeAdmin(request);
-    const client = getClientContext(request);
-    const config = publishDraft(client, request.headers.get('x-admin-actor') ?? 'admin');
+    const { scope } = adminContext(request);
+    const config = publishDraft(scope, request.headers.get('x-admin-actor') ?? 'admin');
     return ok(config);
   } catch (error) {
     return handleError(error);

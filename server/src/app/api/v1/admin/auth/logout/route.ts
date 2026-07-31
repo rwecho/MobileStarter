@@ -6,7 +6,7 @@ import { handleError, ok } from '@/server/http';
 export async function POST(request: NextRequest) {
   try {
     const token = request.cookies.get(ADMIN_COOKIE)?.value;
-    if (token) revokeSession(token);
+    if (token) await revokeSession(token);
     await clearAdminCookie();
     return ok({ loggedOut: true });
   } catch (error) {

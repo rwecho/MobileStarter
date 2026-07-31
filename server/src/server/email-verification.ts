@@ -12,7 +12,7 @@ export async function createEmailVerification(appId: string, userId: string, ema
     .padStart(6, '0');
   const createdAt = nowIso();
   const expiresAt = new Date(Date.now() + codeMinutes * 60_000).toISOString();
-  database.prepare(`
+  await database.prepare(`
     INSERT INTO email_verifications(
       id, app_id, user_id, email, code_hash, expires_at, created_at
     ) VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -23,18 +23,18 @@ export async function createEmailVerification(appId: string, userId: string, ema
 
 export async function requestEmailVerificationResend(appId: string, rawEmail: string) {
   const email = rawEmail.trim().toLowerCase();
-  const user = database.prepare(
+  const user = await database.prepare(
     'SELECT id FROM users WHERE app_id = ? AND email = ?',
   ).get(appId, email) as { id: string } | undefined;
   if (!user) return genericResult();
-  const latest = database.prepare(`
+  const latest = await database.prepare(`
     SELECT created_at FROM email_verifications
     WHERE app_id = ? AND email = ? ORDER BY created_at DESC LIMIT 1
   `).get(appId, email) as { created_at: string } | undefined;
   if (latest && Date.now() - Date.parse(latest.created_at) < resendCooldownMs) {
     return genericResult();
   }
-  const recentCount = database.prepare(`
+  const recentCount = await database.prepare(`
     SELECT COUNT(*) AS count FROM email_verifications
     WHERE app_id = ? AND email = ? AND created_at > ?
   `).get(appId, email, new Date(Date.now() - 86_400_000).toISOString()) as { count: number };
@@ -43,9 +43,9 @@ export async function requestEmailVerificationResend(appId: string, rawEmail: st
   return genericResult();
 }
 
-export function verifyEmail(appId: string, rawEmail: string, code: string) {
+export async function verifyEmail(appId: string, rawEmail: string, code: string) {
   const email = rawEmail.trim().toLowerCase();
-  const challenge = database.prepare(`
+  const challenge = await database.prepare(`
     SELECT * FROM email_verifications
     WHERE app_id = ? AND email = ? AND used_at IS NULL
     ORDER BY created_at DESC LIMIT 1
@@ -57,16 +57,16 @@ export function verifyEmail(appId: string, rawEmail: string, code: string) {
     throw new ApiError(429, 'EMAIL_CODE_LOCKED', '尝试次数过多，请重新获取验证码');
   }
   if (challenge.code_hash !== codeHash(appId, email, code)) {
-    database.prepare(
+    await database.prepare(
       'UPDATE email_verifications SET attempts = attempts + 1 WHERE id = ?',
     ).run(challenge.id);
     throw new ApiError(400, 'EMAIL_CODE_INVALID', '验证码无效或已过期');
   }
-  runTransaction(() => {
-    database.prepare(
+  await runTransaction(async () => {
+    await database.prepare(
       'UPDATE email_verifications SET used_at = ? WHERE id = ?',
     ).run(nowIso(), challenge.id);
-    database.prepare(
+    await database.prepare(
       'UPDATE users SET email_verified = 1, updated_at = ? WHERE id = ?',
     ).run(nowIso(), challenge.user_id);
   });
@@ -76,7 +76,7 @@ export function verifyEmail(appId: string, rawEmail: string, code: string) {
 async function deliverVerificationCode(appId: string, email: string, code: string) {
   const messageId = createId();
   const payload = JSON.stringify({ code, expiresInMinutes: codeMinutes });
-  database.prepare(`
+  await database.prepare(`
     INSERT INTO outbound_messages(
       id, app_id, channel, recipient, template, payload, status, created_at
     ) VALUES (?, ?, 'email', ?, 'email_verification_code', ?, 'pending', ?)
@@ -94,11 +94,11 @@ async function deliverVerificationCode(appId: string, email: string, code: strin
       signal: AbortSignal.timeout(8000),
     });
     if (!response.ok) throw new Error(`HTTP_${response.status}`);
-    database.prepare(
+    await database.prepare(
       'UPDATE outbound_messages SET status = ?, sent_at = ? WHERE id = ?',
     ).run('sent', nowIso(), messageId);
   } catch {
-    database.prepare(
+    await database.prepare(
       'UPDATE outbound_messages SET status = ?, error_code = ? WHERE id = ?',
     ).run('failed', 'DELIVERY_FAILED', messageId);
   }

@@ -1,6 +1,7 @@
 import { AppRoute } from '../navigation/AppRoute'
 import { AppStore } from '../state/AppStore'
 import { AsyncStatus } from '../state/AsyncState'
+import { RemoteDataStore } from '../state/RemoteDataStore'
 import { HelpArticle, SupportCategory, SupportMessage, SupportTicket } from '../domain/Models'
 import { AppButton, AppListRow, PageHeader } from '../design_system/Components'
 import { AppColors, AppRadii, AppSpacing } from '../theme/AppTokens'
@@ -42,9 +43,10 @@ function authorLabel(authorType: string): string {
 @Component
 export struct SupportHomePage {
   @ObjectLink store: AppStore
+  @ObjectLink remote: RemoteDataStore
 
   aboutToAppear(): void {
-    this.store.remote.loadHome()
+    this.remote.loadHome()
   }
 
   build() {
@@ -60,12 +62,12 @@ export struct SupportHomePage {
 
           Column({ space: AppSpacing.x2 }) {
             Text('我的工单').fontSize(13).fontColor(AppColors.textSecondary).width('100%')
-            if (this.store.remote.ticketListState.status === AsyncStatus.Loading) {
+            if (this.remote.ticketListState.status === AsyncStatus.Loading) {
               LoadingProgress().width(32).height(32)
-            } else if (this.store.remote.ticketListState.status === AsyncStatus.Empty) {
+            } else if (this.remote.ticketListState.status === AsyncStatus.Empty) {
               Text('暂无工单').fontColor(AppColors.textSecondary)
-            } else if (this.store.remote.ticketListState.status === AsyncStatus.Success) {
-              ForEach(this.store.remote.ticketListState.data ?? [], (ticket: SupportTicket) => {
+            } else if (this.remote.ticketListState.status === AsyncStatus.Success) {
+              ForEach(this.remote.ticketListState.data ?? [], (ticket: SupportTicket) => {
                 Row() {
                   Column({ space: AppSpacing.x1 }) {
                     Text(ticket.subject).fontSize(16).fontColor(AppColors.text)
@@ -76,20 +78,20 @@ export struct SupportHomePage {
                 .width('100%').padding(AppSpacing.x4)
                 .backgroundColor(AppColors.surface).borderRadius(AppRadii.card)
                 .onClick(() => {
-                  this.store.remote.openTicket(ticket.id)
+                  this.remote.openTicket(ticket.id)
                     .then(() => this.store.navigate(AppRoute.SupportTicket))
                 })
               }, (ticket: SupportTicket) => ticket.id)
             } else {
-              Text(this.store.remote.ticketListState.message ?? '加载失败')
+              Text(this.remote.ticketListState.message ?? '加载失败')
                 .fontColor(AppColors.textSecondary)
             }
           }.width('100%')
 
           Column({ space: AppSpacing.x2 }) {
             Text('常见问题').fontSize(13).fontColor(AppColors.textSecondary).width('100%')
-            if (this.store.remote.helpState.status === AsyncStatus.Success) {
-              ForEach(this.store.remote.helpState.data ?? [], (article: HelpArticle) => {
+            if (this.remote.helpState.status === AsyncStatus.Success) {
+              ForEach(this.remote.helpState.data ?? [], (article: HelpArticle) => {
                 Column({ space: AppSpacing.x1 }) {
                   Text(article.title).fontSize(15).fontWeight(FontWeight.Bold).fontColor(AppColors.text)
                   Text(article.body).fontSize(13).fontColor(AppColors.textSecondary)
@@ -97,8 +99,14 @@ export struct SupportHomePage {
                 .alignItems(HorizontalAlign.Start).width('100%').padding(AppSpacing.x4)
                 .backgroundColor(AppColors.surface).borderRadius(AppRadii.card)
               }, (article: HelpArticle) => article.id)
-            } else if (this.store.remote.helpState.status === AsyncStatus.Empty) {
+            } else if (this.remote.helpState.status === AsyncStatus.Empty) {
               Text('暂无帮助文章').fontColor(AppColors.textSecondary)
+            } else if (this.remote.helpState.status === AsyncStatus.Loading) {
+              LoadingProgress().width(32).height(32)
+            } else {
+              Text(this.remote.helpState.message ?? '帮助内容加载失败')
+                .fontColor(AppColors.textSecondary)
+              AppButton({ label: '重试', onTap: () => this.remote.loadHome() })
             }
           }.width('100%')
         }.padding(AppSpacing.x4)
@@ -110,15 +118,16 @@ export struct SupportHomePage {
 @Component
 export struct SupportTicketPage {
   @ObjectLink store: AppStore
+  @ObjectLink remote: RemoteDataStore
   @State reply: string = ''
 
   build() {
     Column() {
       PageHeader({ store: this.store, title: '工单详情' })
-      if (this.store.remote.ticketDetailState.status === AsyncStatus.Loading) {
+      if (this.remote.ticketDetailState.status === AsyncStatus.Loading) {
         LoadingProgress().width(40).height(40).layoutWeight(1)
-      } else if (this.store.remote.ticketDetailState.status === AsyncStatus.Success &&
-        this.store.remote.ticketDetailState.data !== undefined) {
+      } else if (this.remote.ticketDetailState.status === AsyncStatus.Success &&
+        this.remote.ticketDetailState.data !== undefined) {
         Column() {
           Scroll() {
             Column({ space: AppSpacing.x3 }) {
@@ -143,14 +152,14 @@ export struct SupportTicketPage {
               .onChange(value => this.reply = value)
             Button('发送')
               .height(48)
-              .backgroundColor(AppColors.brand).fontColor(AppColors.surface)
+              .backgroundColor(AppColors.brand).fontColor(AppColors.onBrand)
               .borderRadius(AppRadii.control)
               .onClick(() => this.send())
           }.width('100%').padding(AppSpacing.x4)
         }.width('100%').layoutWeight(1)
       } else {
         Column({ space: AppSpacing.x4 }) {
-          Text(this.store.remote.ticketDetailState.message ?? '加载失败')
+          Text(this.remote.ticketDetailState.message ?? '加载失败')
           AppButton({ label: '重试', onTap: () => this.store.back() })
         }.padding(AppSpacing.x6).justifyContent(FlexAlign.Center).layoutWeight(1)
       }
@@ -158,7 +167,7 @@ export struct SupportTicketPage {
   }
 
   private detail() {
-    return this.store.remote.ticketDetailState.data
+    return this.remote.ticketDetailState.data
   }
 
   private async send(): Promise<void> {

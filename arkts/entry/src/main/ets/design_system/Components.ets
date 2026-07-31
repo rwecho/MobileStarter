@@ -2,6 +2,7 @@
 import { AppStore } from '../state/AppStore'
 import { AppColors, AppRadii, AppSpacing } from '../theme/AppTokens'
 import { AppIcon, AppIconName } from './AppIcon'
+import { appString, AppString } from '../localization/AppStrings'
 
 @Component
 export struct AppIconButton {
@@ -34,11 +35,11 @@ export struct AppButton {
         if (this.icon !== undefined) {
           AppIcon({
             name: this.icon,
-            color: AppColors.surface,
+            color: AppColors.onBrand,
             iconSize: 20
           })
         }
-        Text(this.label).fontColor(AppColors.surface).fontWeight(FontWeight.Bold)
+        Text(this.label).fontColor(AppColors.onBrand).fontWeight(FontWeight.Bold)
       }
     }
     .width('100%')
@@ -58,7 +59,7 @@ export struct PageHeader {
     Row() {
       if (this.store.canGoBack) {
         AppIconButton({
-          label: '返回',
+          label: appString(AppString.Back, this.store.language),
           icon: AppIconName.ArrowLeft,
           onTap: () => this.store.back()
         })

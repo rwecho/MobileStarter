@@ -1,4 +1,5 @@
 import common from '@ohos.app.ability.common'
+import { ConfigurationConstant } from '@kit.AbilityKit'
 import { apiClient, ApiFailure } from '../data/ApiClient'
 import { localStore } from '../data/LocalStore'
 import { AppUser, AuthPayload, RuntimeConfig } from '../domain/Models'
@@ -6,7 +7,6 @@ import { RemoteDataStore } from './RemoteDataStore'
 import { AppRoute } from '../navigation/AppRoute'
 import { telemetry, TelemetryConfig } from '../telemetry/Telemetry'
 import { AppTelemetrySink } from '../telemetry/AppTelemetrySink'
-import { applyColorScheme } from '../theme/AppTokens'
 import { guardRoute } from '../navigation/RouteGuard'
 
 @Observed
@@ -29,13 +29,31 @@ export class AppStore {
     'HelpFeedback': AppRoute.HelpFeedback, 'Legal': AppRoute.Legal, 'About': AppRoute.About,
     'DeleteAccount': AppRoute.DeleteAccount, 'NotificationCenter': AppRoute.NotificationCenter,
     'StateGallery': AppRoute.StateGallery, 'SupportTicket': AppRoute.SupportTicket,
-    'NewSupportTicket': AppRoute.NewSupportTicket, 'ProductFeedback': AppRoute.ProductFeedback
+    'NewSupportTicket': AppRoute.NewSupportTicket, 'ProductFeedback': AppRoute.ProductFeedback,
+    'notifications.center': AppRoute.NotificationCenter, 'profile.home': AppRoute.Profile,
+    'profile.edit': AppRoute.ProfileEdit, 'profile.statistics': AppRoute.Statistics,
+    'profile.invite': AppRoute.Invite, 'profile.coupons': AppRoute.Coupons,
+    'membership.home': AppRoute.Membership,
+    'membership.plans': AppRoute.MembershipPlans, 'orders.list': AppRoute.Orders,
+    'membership.checkout': AppRoute.Checkout, 'membership.orders': AppRoute.Orders,
+    'settings.home': AppRoute.Settings, 'settings.accountSecurity': AppRoute.AccountSecurity,
+    'settings.devices': AppRoute.Devices, 'settings.notifications': AppRoute.NotificationSettings,
+    'settings.privacy': AppRoute.Privacy, 'settings.general': AppRoute.General,
+    'settings.appearance': AppRoute.Appearance, 'settings.language': AppRoute.Language,
+    'settings.textSize': AppRoute.TextSize, 'settings.storage': AppRoute.Storage,
+    'settings.permissions': AppRoute.Permissions,
+    'settings.helpFeedback': AppRoute.HelpFeedback, 'settings.legal': AppRoute.Legal,
+    'settings.about': AppRoute.About, 'support.home': AppRoute.HelpFeedback,
+    'support.newTicket': AppRoute.NewSupportTicket
   }
 
   routeStack: AppRoute[] = [AppRoute.Logo]
   signedIn: boolean = false
   online: boolean = true
   busy: boolean = false
+  theme: string = 'system'
+  language: string = 'zh-CN'
+  textScale: number = 1
   config: RuntimeConfig | null = null
   user: AppUser | null = null
   toastMessage: string = ''
@@ -47,9 +65,15 @@ export class AppStore {
   resetToken: string = ''
   pendingRoute: AppRoute | null = null
   remote: RemoteDataStore = new RemoteDataStore()
+  private context: common.UIAbilityContext | null = null
+  private initialized: boolean = false
+  private queuedEntryName: string | null = null
+  private queuedEntryCold: boolean = false
 
   async initialize(context: common.UIAbilityContext): Promise<void> {
+    this.context = context
     await localStore.initialize(context)
+    this.applyPreferences()
     apiClient.setInstallationId(localStore.installationId())
     const cached = localStore.readConfig()
     if (cached !== null) {
@@ -69,13 +93,20 @@ export class AppStore {
       this.signedIn = payload.user !== null
       this.online = true
       localStore.saveConfig(payload.config)
+      this.cacheUserPreferences()
     } catch (error) {
       this.online = false
       this.showToast('当前使用离线配置', true)
     }
     this.configureTelemetry()
-    this.applyTheme()
-    this.applyLanguage()
+    this.applyPreferences()
+    this.initialized = true
+    if (this.queuedEntryName !== null) {
+      const name = this.queuedEntryName
+      const cold = this.queuedEntryCold
+      this.queuedEntryName = null
+      this.openEntryByName(name, cold)
+    }
   }
 
   private configureTelemetry(): void {
@@ -84,17 +115,35 @@ export class AppStore {
     telemetry.configure(config, new AppTelemetrySink())
   }
 
-  // Applies the user's theme choice (settings.theme) to the global palette.
-  // 'system' currently resolves to light (reading OS color mode is a TODO).
-  private applyTheme(): void {
-    const theme = this.user !== null ? this.user.settings['theme'] : undefined
-    applyColorScheme(theme === 'dark')
+  private cacheUserPreferences(): void {
+    const settings = this.user?.settings
+    if (settings === undefined) return
+    const theme = settings['theme']
+    const language = settings['language']
+    const textScale = settings['textScale']
+    if (typeof theme === 'string') localStore.savePreference('theme', theme)
+    if (typeof language === 'string') localStore.savePreference('language', language)
+    if (typeof textScale === 'number') localStore.savePreference('textScale', textScale)
   }
 
-  // Propagates settings.language to the Accept-Language request header.
-  private applyLanguage(): void {
-    const language = this.user !== null ? this.user.settings['language'] : undefined
-    apiClient.setLanguage(language === 'en-US' ? 'en-US' : 'zh-CN')
+  private applyPreferences(): void {
+    if (this.context === null) return
+    const theme = localStore.readTheme()
+    const language = localStore.readLanguage() === 'en-US' ? 'en-US' : 'zh-CN'
+    const textScale = Math.min(1.3, Math.max(0.9, localStore.readTextScale()))
+    this.theme = theme
+    this.language = language
+    this.textScale = textScale
+    const colorMode = theme === 'dark'
+      ? ConfigurationConstant.ColorMode.COLOR_MODE_DARK
+      : theme === 'light'
+        ? ConfigurationConstant.ColorMode.COLOR_MODE_LIGHT
+        : ConfigurationConstant.ColorMode.COLOR_MODE_NOT_SET
+    const application = this.context.getApplicationContext()
+    application.setColorMode(colorMode)
+    application.setLanguage(language)
+    application.setFontSizeScale(textScale)
+    apiClient.setLanguage(language)
   }
 
   get route(): AppRoute {
@@ -122,6 +171,31 @@ export class AppStore {
     this.navigate(route)
   }
 
+  openEntryByName(name: string | null, cold: boolean): void {
+    if (name === null || name.length === 0 || name.includes('://')) return
+    if (!this.initialized) {
+      this.queuedEntryName = name
+      this.queuedEntryCold = cold
+      return
+    }
+    const target = AppStore.ROUTE_BY_NAME[name]
+    if (target === undefined) return
+    const decision = guardRoute(target, this.signedIn, this.config)
+    if (decision.pending !== null) this.pendingRoute = decision.pending
+    if (decision.unavailable) this.showToast('当前 App 未启用此功能')
+    if (cold) {
+      this.routeStack = decision.route === AppRoute.Home ?
+        [AppRoute.Home] : [AppRoute.Home, decision.route]
+    } else if (this.route !== decision.route) {
+      this.routeStack = [...this.routeStack, decision.route]
+    }
+    telemetry.screen(decision.route.toString())
+  }
+
+  resume(): void {
+    this.applyPreferences()
+  }
+
   replaceAll(route: AppRoute): void {
     const decision = guardRoute(route, this.signedIn, this.config)
     if (decision.pending !== null) this.pendingRoute = decision.pending
@@ -129,10 +203,20 @@ export class AppStore {
     telemetry.screen(decision.route.toString())
   }
 
+  replaceTop(route: AppRoute): void {
+    const decision = guardRoute(route, this.signedIn, this.config)
+    if (decision.pending !== null) this.pendingRoute = decision.pending
+    this.routeStack = [
+      ...this.routeStack.slice(0, this.routeStack.length - 1),
+      decision.route
+    ]
+    telemetry.screen(decision.route.toString())
+  }
+
   completeAuthentication(): void {
     const target = this.pendingRoute ?? AppRoute.Profile
     this.pendingRoute = null
-    this.replaceAll(target)
+    this.replaceTop(target)
   }
 
   back(): void {
@@ -165,12 +249,7 @@ export class AppStore {
   }
 
   async requestPhoneCode(phone: string): Promise<boolean> {
-    try {
-      return await apiClient.requestPhoneCode(phone)
-    } catch (error) {
-      this.showApiError(error as Error)
-      return false
-    }
+    return this.performBooleanRequest(() => apiClient.requestPhoneCode(phone))
   }
 
   async verifyPhoneCode(phone: string, code: string): Promise<boolean> {
@@ -190,37 +269,41 @@ export class AppStore {
   }
 
   async requestPasswordReset(email: string): Promise<boolean> {
-    try {
+    return this.performBooleanRequest(async () => {
       const accepted = await apiClient.requestPasswordReset(email)
       if (accepted) this.recoveryEmail = email
       return accepted
-    } catch (error) {
-      this.showApiError(error)
-      return false
-    }
+    })
   }
 
   async verifyPasswordReset(code: string): Promise<boolean> {
-    try {
+    return this.performBooleanRequest(async () => {
       this.resetToken = await apiClient.verifyPasswordReset(this.recoveryEmail, code)
       return this.resetToken.length > 0
-    } catch (error) {
-      this.showApiError(error)
-      return false
-    }
+    })
   }
 
   async resetPassword(newPassword: string): Promise<boolean> {
-    try {
+    return this.performBooleanRequest(async () => {
       const changed = await apiClient.resetPassword(this.resetToken, newPassword)
       if (changed) {
         this.recoveryEmail = ''
         this.resetToken = ''
       }
       return changed
+    })
+  }
+
+  private async performBooleanRequest(operation: () => Promise<boolean>): Promise<boolean> {
+    if (this.busy) return false
+    this.busy = true
+    try {
+      return await operation()
     } catch (error) {
       this.showApiError(error)
       return false
+    } finally {
+      this.busy = false
     }
   }
 
@@ -267,13 +350,18 @@ export class AppStore {
     this.busy = true
     const patch: Record<string, string | number | boolean> = {}
     patch[key] = value
+    if (typeof value !== 'boolean') localStore.savePreference(key, value)
+    if (this.user !== null) {
+      this.user.settings[key] = value
+    }
+    this.applyPreferences()
     try {
       const settings = await apiClient.saveSettings(patch)
       if (this.user !== null) {
         this.user.settings = settings
       }
-      this.applyTheme()
-      this.applyLanguage()
+      this.cacheUserPreferences()
+      this.applyPreferences()
       this.online = true
       this.showToast('设置已同步到服务端')
       return true

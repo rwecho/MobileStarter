@@ -17,10 +17,12 @@ export type SupportRoute = Readonly<{
   queueId: string;
 }>;
 
-export function getSupportIdentity(request: NextRequest): SupportIdentity {
+export async function getSupportIdentity(
+  request: NextRequest,
+): Promise<SupportIdentity> {
   const installationId = request.headers.get('x-installation-id')?.trim() ?? '';
   if (request.headers.has('authorization')) {
-    return { userId: requireAuth(request).user.id, installationId };
+    return { userId: (await requireAuth(request)).user.id, installationId };
   }
   if (!/^[a-zA-Z0-9._-]{8,100}$/.test(installationId)) {
     throw new ApiError(400, 'INSTALLATION_ID_REQUIRED', '匿名反馈需要安装标识');
@@ -28,9 +30,12 @@ export function getSupportIdentity(request: NextRequest): SupportIdentity {
   return { userId: null, installationId };
 }
 
-export function resolveSupportRoute(request: NextRequest, category: string): SupportRoute {
+export async function resolveSupportRoute(
+  request: NextRequest,
+  category: string,
+): Promise<SupportRoute> {
   const client = getClientContext(request);
-  const config = getRuntimeConfig(client.appId, client.environment).support;
+  const config = (await getRuntimeConfig(client.appId, client.environment)).support;
   if (!config.enabled) throw new ApiError(404, 'SUPPORT_DISABLED', '当前应用未启用客服');
   if (!config.categories.some((item) => item.id === category)) {
     throw new ApiError(400, 'CATEGORY_DISABLED', '当前应用未启用该问题分类');
@@ -53,27 +58,28 @@ export function resolveSupportRoute(request: NextRequest, category: string): Sup
   };
 }
 
-export function getOwnedTicket(
+export async function getOwnedTicket(
   request: NextRequest,
   ticketId: string,
-  identity = getSupportIdentity(request),
+  identity?: SupportIdentity,
 ) {
+  const owner = identity ?? await getSupportIdentity(request);
   const appId = getClientContext(request).appId;
-  const row = database.prepare(`
+  const row = await database.prepare(`
     SELECT id, app_id, user_id, installation_id, locale, market, data_region,
       queue_id, category, severity, subject, status, created_at, updated_at
     FROM support_tickets
     WHERE id = ? AND app_id = ? AND (
-      (? IS NOT NULL AND user_id = ?)
-      OR (? IS NULL AND user_id IS NULL AND installation_id = ?)
+      (?::text IS NOT NULL AND user_id = ?)
+      OR (?::text IS NULL AND user_id IS NULL AND installation_id = ?)
     )
   `).get(
     ticketId,
     appId,
-    identity.userId,
-    identity.userId,
-    identity.userId,
-    identity.installationId,
+    owner.userId,
+    owner.userId,
+    owner.userId,
+    owner.installationId,
   );
   if (!row) throw new ApiError(404, 'TICKET_NOT_FOUND', '工单不存在');
   return row;

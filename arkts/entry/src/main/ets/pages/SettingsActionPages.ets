@@ -6,6 +6,7 @@ import { AppIcon, AppIconName } from '../design_system/AppIcon'
 import { AppColors, AppRadii, AppSpacing } from '../theme/AppTokens'
 import { LegalDocument } from '../domain/Models'
 import { pickAvatarDataUrl } from '../media/AvatarPicker'
+import { appString, AppString } from '../localization/AppStrings'
 
 @Component
 export struct AccountSecurityPage {
@@ -79,9 +80,9 @@ export struct ChoicePreferencePage {
 
   aboutToAppear(): void {
     const settings = this.store.user?.settings
-    if (this.route === AppRoute.Appearance) this.selected = String(settings?.['theme'] ?? 'system')
-    if (this.route === AppRoute.Language) this.selected = String(settings?.['language'] ?? 'zh-CN')
-    if (this.route === AppRoute.TextSize) this.selected = String(settings?.['textScale'] ?? 1)
+    if (this.route === AppRoute.Appearance) this.selected = this.store.theme
+    if (this.route === AppRoute.Language) this.selected = this.store.language
+    if (this.route === AppRoute.TextSize) this.selected = String(this.store.textScale)
   }
 
   build() {
@@ -91,11 +92,13 @@ export struct ChoicePreferencePage {
         ForEach(this.options(), (option: string) => {
           Button(this.label(option))
             .width('100%').height(52)
-            .fontColor(option === this.selected ? AppColors.surface : AppColors.text)
+            .fontColor(option === this.selected ? AppColors.onBrand : AppColors.text)
             .backgroundColor(option === this.selected ? AppColors.brand : AppColors.surface)
             .onClick(() => this.selected = option)
         })
-        AppButton({ label: this.store.busy ? '保存中…' : '保存设置',
+        AppButton({ label: this.store.busy
+          ? appString(AppString.Saving, this.store.language)
+          : appString(AppString.SaveSettings, this.store.language),
           icon: AppIconName.Check, onTap: () => this.save() })
       }.padding(AppSpacing.x4).layoutWeight(1)
     }.width('100%').height('100%')
@@ -114,22 +117,22 @@ export struct ChoicePreferencePage {
   }
 
   private label(value: string): string {
-    if (value === 'system') return '跟随系统'
-    if (value === 'light') return '浅色'
-    if (value === 'dark') return '深色'
-    if (value === 'zh-CN') return '简体中文'
-    if (value === 'en-US') return 'English'
-    if (value === '0.9') return '较小'
-    if (value === '1') return '标准'
-    if (value === '1.15') return '较大'
-    if (value === '1.3') return '特大'
+    if (value === 'system') return appString(AppString.ThemeSystem, this.store.language)
+    if (value === 'light') return appString(AppString.ThemeLight, this.store.language)
+    if (value === 'dark') return appString(AppString.ThemeDark, this.store.language)
+    if (value === 'zh-CN') return appString(AppString.LanguageChinese, this.store.language)
+    if (value === 'en-US') return appString(AppString.LanguageEnglish, this.store.language)
+    if (value === '0.9') return appString(AppString.TextSmall, this.store.language)
+    if (value === '1') return appString(AppString.TextStandard, this.store.language)
+    if (value === '1.15') return appString(AppString.TextLarge, this.store.language)
+    if (value === '1.3') return appString(AppString.TextExtraLarge, this.store.language)
     return value
   }
 
   private title(): string {
-    if (this.route === AppRoute.Appearance) return '外观主题'
-    if (this.route === AppRoute.Language) return '语言'
-    return '字体大小'
+    if (this.route === AppRoute.Appearance) return appString(AppString.Appearance, this.store.language)
+    if (this.route === AppRoute.Language) return appString(AppString.Language, this.store.language)
+    return appString(AppString.TextSize, this.store.language)
   }
 }
 
@@ -190,49 +193,55 @@ export struct ProfileEditPage {
 
   build() {
     Column() {
-      PageHeader({ store: this.store, title: '个人资料' })
-      Column({ space: AppSpacing.x4 }) {
-        Row({ space: AppSpacing.x3 }) {
+      PageHeader({ store: this.store,
+        title: appString(AppString.ProfileEdit, this.store.language) })
+      Scroll() {
+        Column({ space: AppSpacing.x4 }) {
           if (this.avatarUrl.length > 0) {
             Image(this.avatarUrl)
-              .width(64).height(64).borderRadius(32)
+              .width(88).height(88).borderRadius(44).objectFit(ImageFit.Cover)
               .backgroundColor(AppColors.surfaceMuted)
           } else {
             Column() {
-              AppIcon({ name: AppIconName.User, iconSize: 28, color: AppColors.textSecondary })
+              AppIcon({ name: AppIconName.User, iconSize: 36, color: AppColors.brand })
             }
-            .width(64).height(64).borderRadius(32)
-            .backgroundColor(AppColors.surfaceMuted)
+            .width(88).height(88).borderRadius(44)
+            .backgroundColor(AppColors.brandSoft)
             .justifyContent(FlexAlign.Center)
           }
-          Column({ space: AppSpacing.x2 }) {
-            AppButton({ label: '选择头像', icon: AppIconName.User,
-              onTap: () => this.pickAvatar() })
-            TextInput({ placeholder: '或粘贴头像 URL', text: this.avatarUrl })
-              .height(48).backgroundColor(AppColors.surface).borderRadius(AppRadii.control)
-              .onChange(value => this.avatarUrl = value)
-          }.layoutWeight(1)
-        }.width('100%')
-        AppListRow({ store: this.store, label: '用户名（不可修改）',
-          value: `@${this.store.user?.username ?? ''}` })
-        TextInput({ placeholder: '显示名称', text: this.displayName })
-          .height(52).backgroundColor(AppColors.surface).borderRadius(AppRadii.control)
-          .onChange(value => this.displayName = value)
-        TextInput({ placeholder: '个人简介', text: this.bio })
-          .height(72).backgroundColor(AppColors.surface).borderRadius(AppRadii.control)
-          .onChange(value => this.bio = value)
-        AppButton({ label: this.store.busy ? '保存中…' : '保存资料',
-          icon: AppIconName.Check,
-          onTap: () => this.store.updateProfile(this.displayName, this.bio, this.avatarUrl) })
-      }.padding(AppSpacing.x4).layoutWeight(1)
+          AppButton({ label: appString(AppString.ChooseAvatar, this.store.language),
+            icon: AppIconName.User, onTap: () => this.pickAvatar() })
+          AppListRow({ store: this.store,
+            label: appString(AppString.UsernameReadonly, this.store.language),
+            value: `@${this.store.user?.username ?? ''}` })
+          TextInput({ placeholder: appString(AppString.DisplayName, this.store.language),
+            text: this.displayName })
+            .height(52).maxLength(40).backgroundColor(AppColors.surface)
+            .borderRadius(AppRadii.control).onChange(value => this.displayName = value)
+          TextInput({ placeholder: appString(AppString.Bio, this.store.language), text: this.bio })
+            .height(96).maxLength(160).backgroundColor(AppColors.surface)
+            .borderRadius(AppRadii.control).onChange(value => this.bio = value)
+          AppButton({ label: this.store.busy
+            ? appString(AppString.Saving, this.store.language)
+            : appString(AppString.SaveProfile, this.store.language),
+            icon: AppIconName.Check,
+            onTap: () => this.store.updateProfile(this.displayName, this.bio, this.avatarUrl) })
+        }
+        .padding(AppSpacing.x4)
+        .width('100%')
+        .constraintSize({ minHeight: '100%' })
+        .justifyContent(FlexAlign.Start)
+      }.layoutWeight(1)
     }.width('100%').height('100%')
   }
 
   private async pickAvatar(): Promise<void> {
     const context = this.getUIContext().getHostContext() as common.UIAbilityContext
-    const dataUrl = await pickAvatarDataUrl(context)
-    if (dataUrl !== null) {
-      this.avatarUrl = dataUrl
+    try {
+      const dataUrl = await pickAvatarDataUrl(context)
+      if (dataUrl !== null) this.avatarUrl = dataUrl
+    } catch (error) {
+      this.store.showToast('头像处理失败，请重试', true)
     }
   }
 }

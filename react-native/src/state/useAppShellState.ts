@@ -31,6 +31,18 @@ export function useNavigationState() {
       { key: `route-${routeKey}`, name },
     ]);
   }, []);
+  const openEntry = useCallback((name: AppRoute, cold: boolean) => {
+    routeKey += 1;
+    const entry = { key: `route-${routeKey}`, name };
+    setStack((current) => {
+      if (current[current.length - 1]?.name === name) return current;
+      if (cold) {
+        const home = { key: `route-${routeKey}-home`, name: 'home' as AppRoute };
+        return name === 'home' ? [home] : [home, entry];
+      }
+      return [...current, entry];
+    });
+  }, []);
   const back = useCallback(() => {
     setStack((current) => current.length > 1 ? current.slice(0, -1) : current);
   }, []);
@@ -40,8 +52,9 @@ export function useNavigationState() {
     navigate,
     replace,
     replaceTop,
+    openEntry,
     back,
-  }), [back, navigate, replace, replaceTop, stack]);
+  }), [back, navigate, openEntry, replace, replaceTop, stack]);
 }
 
 export function useFeedbackState() {

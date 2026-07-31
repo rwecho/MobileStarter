@@ -1,7 +1,7 @@
-import { DatabaseSync } from 'node:sqlite';
+import type { PostgresDatabase } from './postgres-database';
 
-export function initializeProductSchema(database: DatabaseSync) {
-  database.exec(`
+export async function initializeProductSchema(database: PostgresDatabase) {
+  await database.exec(`
     CREATE TABLE IF NOT EXISTS notifications (
       id TEXT PRIMARY KEY, user_id TEXT NOT NULL, type TEXT NOT NULL,
       title TEXT NOT NULL, body TEXT NOT NULL, route TEXT, read_at TEXT,

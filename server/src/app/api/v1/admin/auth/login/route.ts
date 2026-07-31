@@ -14,12 +14,12 @@ const schema = z.object({
 export async function POST(request: NextRequest) {
   try {
     const input = schema.parse(await request.json());
-    if (!appExists(input.appId)) {
+    if (!await appExists(input.appId)) {
       throw new ApiError(404, 'APP_NOT_FOUND', 'app_id 不存在，请确认后重试');
     }
     const admin = await verifyAdminCredentials(input.identifier, input.password);
     if (!admin) throw new ApiError(401, 'INVALID_CREDENTIALS', '账号或密码错误');
-    const { token } = createSession(admin.id, input.appId);
+    const { token } = await createSession(admin.id, input.appId);
     await setAdminCookie(token);
     return ok({ ...admin, appId: input.appId });
   } catch (error) {

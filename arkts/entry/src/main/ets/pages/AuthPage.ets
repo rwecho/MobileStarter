@@ -37,23 +37,31 @@ export struct AuthPage {
         Text('安全同步你的会员、订单与偏好设置。')
           .fontColor(AppColors.textSecondary)
           .width('100%')
-        TextInput({
-          placeholder: this.mode === AuthMode.Phone ? '+86 13800000000' : '邮箱',
-          text: this.email
-        })
-          .height(52)
-          .backgroundColor(AppColors.surface)
-          .borderRadius(AppRadii.control)
-          .onChange(value => this.email = value)
+        if (this.mode !== AuthMode.Verify && this.mode !== AuthMode.Reset) {
+          TextInput({
+            placeholder: this.mode === AuthMode.Phone ? '+86 13800000000' : '邮箱',
+            text: this.email
+          })
+            .height(52)
+            .backgroundColor(AppColors.surface)
+            .borderRadius(AppRadii.control)
+            .onChange(value => this.email = value)
+        } else {
+          Text(this.store.recoveryEmail)
+            .fontColor(AppColors.textSecondary)
+            .width('100%')
+        }
         if (this.mode !== AuthMode.Forgot &&
           (this.mode !== AuthMode.Phone || this.phoneCodeSent)) {
           TextInput({
             placeholder: this.mode === AuthMode.Verify ||
-              this.mode === AuthMode.Phone ? '验证码' : '密码',
+              this.mode === AuthMode.Phone ? '验证码' :
+              this.mode === AuthMode.Reset ? '新密码' : '密码',
             text: this.password
           })
             .height(52)
-            .type(this.mode === AuthMode.Verify ? InputType.Number : InputType.Password)
+            .type(this.mode === AuthMode.Verify ||
+              this.mode === AuthMode.Phone ? InputType.Number : InputType.Password)
             .backgroundColor(AppColors.surface)
             .borderRadius(AppRadii.control)
             .onChange(value => this.password = value)
@@ -211,24 +219,28 @@ struct AuthProviderRow {
       AuthProviderButton({
         label: 'Apple',
         icon: $r('app.media.apple'),
+        iconStyle: AuthIconStyle.Monochrome,
         isEnabled: this.store.authProviders['apple'] === true,
         onTap: () => this.onSocial('apple')
       })
       AuthProviderButton({
         label: 'Google',
         icon: $r('app.media.google'),
+        iconStyle: AuthIconStyle.Branded,
         isEnabled: this.store.authProviders['google'] === true,
         onTap: () => this.onSocial('google')
       })
       AuthProviderButton({
         label: 'GitHub',
         icon: $r('app.media.github'),
+        iconStyle: AuthIconStyle.Monochrome,
         isEnabled: this.store.authProviders['github'] === true,
         onTap: () => this.onSocial('github')
       })
       AuthProviderButton({
         label: '手机号',
         icon: $r('app.media.phone'),
+        iconStyle: AuthIconStyle.Monochrome,
         isEnabled: this.store.authProviders['phone'] === true,
         onTap: () => this.store.navigate(AppRoute.PhoneSignIn)
       })
@@ -238,19 +250,36 @@ struct AuthProviderRow {
   }
 }
 
+enum AuthIconStyle {
+  Branded,
+  Monochrome
+}
+
 @Component
 struct AuthProviderButton {
   @Prop label: string
   @Prop icon: Resource
+  @Prop iconStyle: AuthIconStyle = AuthIconStyle.Monochrome
   @Prop isEnabled: boolean = false
   onTap: () => void = () => {}
 
   build() {
     Column({ space: AppSpacing.x1 }) {
-      Image(this.icon)
-        .width(24)
-        .height(24)
-        .padding(14)
+      Column() {
+        if (this.iconStyle === AuthIconStyle.Monochrome) {
+          Image(this.icon)
+            .width(24)
+            .height(24)
+            .fillColor(AppColors.text)
+        } else {
+          Image(this.icon)
+            .width(24)
+            .height(24)
+        }
+      }
+        .width(52)
+        .height(52)
+        .justifyContent(FlexAlign.Center)
         .backgroundColor(AppColors.surface)
         .border({ width: 1, color: AppColors.border })
         .borderRadius(26)

@@ -13,6 +13,7 @@ import {
   UserSettings,
 } from '../domain/models';
 import { AppRoute } from '../navigation/routes';
+import { EntrySource } from '../navigation/useEntryIntents';
 import { guardRoute } from '../navigation/routeGuards';
 import { telemetry } from '../telemetry/Telemetry';
 import { defaultProviderPolicy, defaultProviders } from '../auth/authDefaults';
@@ -71,6 +72,7 @@ type AppContextValue = Readonly<{
   showToast: (message: string, tone?: ToastTone) => void;
   showConfirm: (state: ConfirmState) => void;
   closeConfirm: () => void;
+  openEntryRoute: (route: AppRoute, cold: boolean, source?: EntrySource) => void;
 }>;
 
 const AppContext = createContext<AppContextValue | null>(null);
@@ -144,6 +146,25 @@ export function AppProvider({ children }: Readonly<{ children: ReactNode }>) {
     if (decision.pending) setPendingRoute(decision.pending);
     navigation.replace(decision.route);
   }, [config.features, navigation, user]);
+  const openEntryRoute = useCallback((
+    route: AppRoute,
+    cold: boolean,
+    source: EntrySource = 'deepLink',
+  ) => {
+    const decision = guardRoute(route, { signedIn: user !== null, features: config.features });
+    if (decision.pending) setPendingRoute(decision.pending);
+    if (decision.unavailable) {
+      feedback.showToast('目标内容不可用，已返回首页', 'info');
+      navigation.openEntry('home', cold);
+      return;
+    }
+    navigation.openEntry(decision.route, cold);
+    telemetry.track('entry_open', {
+      route,
+      source,
+      launchState: cold ? 'cold' : 'warm',
+    });
+  }, [config.features, feedback, navigation, user]);
   const actions = useAccountActions({
     run,
     setUser,
@@ -179,6 +200,7 @@ export function AppProvider({ children }: Readonly<{ children: ReactNode }>) {
     online,
     busy,
     refreshBootstrap,
+    openEntryRoute,
   }), [
     actions,
     authProviders,
@@ -191,6 +213,7 @@ export function AppProvider({ children }: Readonly<{ children: ReactNode }>) {
     navigate,
     navigation,
     online,
+    openEntryRoute,
     refreshBootstrap,
     replace,
     user,

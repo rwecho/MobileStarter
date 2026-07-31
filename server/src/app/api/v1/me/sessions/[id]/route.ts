@@ -8,9 +8,9 @@ export async function DELETE(
   context: Readonly<{ params: Promise<{ id: string }> }>,
 ) {
   try {
-    const { user } = requireAuth(request);
+    const { user } = await requireAuth(request);
     const { id } = await context.params;
-    const result = database.prepare(`
+    const result = await database.prepare(`
       UPDATE sessions SET revoked_at = ?
       WHERE id = ? AND user_id = ? AND revoked_at IS NULL
     `).run(nowIso(), id, user.id);

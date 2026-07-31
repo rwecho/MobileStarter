@@ -4,6 +4,7 @@ import { AppIcon, AppIconName } from '../design_system/AppIcon'
 import { AppButton, AppListRow, PageHeader } from '../design_system/Components'
 import { AppColors, AppRadii, AppSpacing } from '../theme/AppTokens'
 import { MembershipTier } from '../domain/Models'
+import { appString, AppString } from '../localization/AppStrings'
 
 @Component
 export struct ProfilePage {
@@ -11,15 +12,17 @@ export struct ProfilePage {
 
   build() {
     Column() {
-      PageHeader({ store: this.store, title: '我的' })
+      PageHeader({ store: this.store,
+        title: appString(AppString.ProfileTitle, this.store.language) })
       if (!this.store.signedIn) {
         Column({ space: AppSpacing.x4 }) {
           AppIcon({ name: AppIconName.User, color: AppColors.brand, iconSize: 56 })
-          Text('登录后同步你的数据').fontSize(22).fontWeight(FontWeight.Bold)
-          Text('会员、订单、优惠券与设置会安全同步。')
+          Text(appString(AppString.SignInPrompt, this.store.language))
+            .fontSize(22).fontWeight(FontWeight.Bold)
+          Text(appString(AppString.SignInDescription, this.store.language))
             .fontColor(AppColors.textSecondary)
           AppButton({
-            label: '登录或注册',
+            label: appString(AppString.SignInAction, this.store.language),
             onTap: () => this.store.navigate(AppRoute.SignIn)
           })
         }
@@ -29,40 +32,53 @@ export struct ProfilePage {
       } else {
         Scroll() {
           Column({ space: AppSpacing.x4 }) {
-            AppListRow({
-              store: this.store,
-              label: this.store.user?.displayName ?? 'MobileUI 用户',
-              value: this.store.user?.email ?? '',
-              icon: AppIconName.User
-            })
+            ProfileIdentityCard({ store: this.store })
             Column() {
               AppListRow({
                 store: this.store,
-                label: '个人资料',
+                label: appString(AppString.ProfileEdit, this.store.language),
                 route: AppRoute.ProfileEdit,
                 icon: AppIconName.User
               })
               AppListRow({
                 store: this.store,
-                label: '会员中心',
+                label: appString(AppString.Membership, this.store.language),
                 route: AppRoute.Membership,
                 icon: AppIconName.Crown
               })
+              if (this.store.config?.features['statistics'] === true) {
+                AppListRow({
+                  store: this.store,
+                  label: appString(AppString.Statistics, this.store.language),
+                  route: AppRoute.Statistics,
+                  icon: AppIconName.Home
+                })
+              }
+              if (this.store.config?.features['coupons'] === true) {
+                AppListRow({
+                  store: this.store,
+                  label: '优惠券',
+                  route: AppRoute.Coupons,
+                  icon: AppIconName.Gift
+                })
+              }
+              if (this.store.config?.features['invites'] === true) {
+                AppListRow({
+                  store: this.store,
+                  label: '邀请好友',
+                  route: AppRoute.Invite,
+                  icon: AppIconName.Gift
+                })
+              }
               AppListRow({
                 store: this.store,
-                label: '使用统计',
-                route: AppRoute.Statistics,
-                icon: AppIconName.Home
-              })
-              AppListRow({
-                store: this.store,
-                label: '订单管理',
+                label: appString(AppString.Orders, this.store.language),
                 route: AppRoute.Orders,
                 icon: AppIconName.Gift
               })
               AppListRow({
                 store: this.store,
-                label: '设置',
+                label: appString(AppString.Settings, this.store.language),
                 route: AppRoute.Settings,
                 icon: AppIconName.Settings
               })
@@ -70,12 +86,15 @@ export struct ProfilePage {
             .backgroundColor(AppColors.surface)
             .borderRadius(AppRadii.card)
             AppButton({
-              label: '退出登录',
+              label: appString(AppString.SignOut, this.store.language),
               destructive: true,
               onTap: () => this.confirmSignOut()
             })
           }
           .padding(AppSpacing.x4)
+          .width('100%')
+          .constraintSize({ minHeight: '100%' })
+          .justifyContent(FlexAlign.Start)
         }
         .layoutWeight(1)
       }
@@ -101,6 +120,43 @@ export struct ProfilePage {
 }
 
 @Component
+export struct ProfileIdentityCard {
+  @ObjectLink store: AppStore
+
+  build() {
+    Row({ space: AppSpacing.x4 }) {
+      if ((this.store.user?.avatarUrl ?? '').length > 0) {
+        Image(this.store.user?.avatarUrl ?? '')
+          .width(64).height(64).borderRadius(32)
+          .objectFit(ImageFit.Cover)
+      } else {
+        Column() {
+          AppIcon({ name: AppIconName.User, color: AppColors.brand, iconSize: 28 })
+        }
+        .width(64).height(64).borderRadius(32)
+        .justifyContent(FlexAlign.Center)
+        .backgroundColor(AppColors.brandSoft)
+      }
+      Column({ space: AppSpacing.x1 }) {
+        Text(this.store.user?.displayName ?? '')
+          .fontSize(18).fontWeight(FontWeight.Bold).fontColor(AppColors.text)
+        Text(`@${this.store.user?.username ?? ''} · ${this.store.user?.email ?? ''}`)
+          .fontSize(13).fontColor(AppColors.textSecondary)
+        if ((this.store.user?.bio ?? '').length > 0) {
+          Text(this.store.user?.bio ?? '').fontSize(13).fontColor(AppColors.textSecondary)
+        }
+      }
+      .alignItems(HorizontalAlign.Start)
+      .layoutWeight(1)
+    }
+    .width('100%')
+    .padding(AppSpacing.x4)
+    .backgroundColor(AppColors.surface)
+    .borderRadius(AppRadii.card)
+  }
+}
+
+@Component
 export struct MembershipPage {
   @ObjectLink store: AppStore
 
@@ -113,27 +169,27 @@ export struct MembershipPage {
             Column({ space: AppSpacing.x3 }) {
               Row() {
                 Text(tier.name)
-                  .fontColor(AppColors.surface)
+                  .fontColor(AppColors.membershipText)
                   .fontWeight(FontWeight.Bold)
                   .fontSize(22)
                   .layoutWeight(1)
                 if (this.store.user?.tierId === tier.id) {
-                  Text('当前').fontColor(AppColors.surface).fontSize(12)
+                  Text('当前').fontColor(AppColors.membershipText).fontSize(12)
                 }
                 if (tier.recommended && this.store.user?.tierId !== tier.id) {
-                  Text('推荐').fontColor(AppColors.surface).fontSize(12)
+                  Text('推荐').fontColor(AppColors.membershipText).fontSize(12)
                 }
               }.width('100%')
               if (tier.summary.length > 0) {
-                Text(tier.summary).fontColor(AppColors.surface)
+                Text(tier.summary).fontColor(AppColors.membershipText)
               }
               ForEach(tier.entitlements, (entitlement: string) => {
-                Text(`· ${entitlement}`).fontColor(AppColors.surface).fontSize(13)
+                Text(`· ${entitlement}`).fontColor(AppColors.membershipText).fontSize(13)
               })
             }
             .alignItems(HorizontalAlign.Start)
             .padding(AppSpacing.x6)
-            .backgroundColor(AppColors.text)
+            .backgroundColor(AppColors.membershipSurface)
             .borderRadius(AppRadii.card)
           })
           Column() {

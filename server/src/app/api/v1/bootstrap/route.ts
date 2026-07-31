@@ -11,13 +11,13 @@ import { getClientContext } from '@/server/client-context';
 
 export const dynamic = 'force-dynamic';
 
-export function GET(request: NextRequest) {
+export async function GET(request: NextRequest) {
   try {
     const client = getClientContext(request);
-    const config = getRuntimeConfig(client.appId, client.environment);
+    const config = await getRuntimeConfig(client.appId, client.environment);
     let user = null;
     try {
-      user = toPublicUser(requireAuth(request).user);
+      user = toPublicUser((await requireAuth(request)).user);
     } catch {
       user = null;
     }

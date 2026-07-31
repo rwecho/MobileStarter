@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import { SafeAreaView } from 'react-native';
 import { AppRouter } from './src/navigation/AppRouter';
 import { AppProvider } from './src/state/AppStore';
@@ -8,6 +8,8 @@ import { SupportProvider } from './src/support/SupportStore';
 import { AuthRecoveryProvider } from './src/auth/AuthRecoveryStore';
 import { PreferencesProvider } from './src/preferences/PreferencesProvider';
 import { usePreferences } from './src/preferences/PreferencesProvider';
+import { useApp } from './src/state/AppStore';
+import { useEntryIntents } from './src/navigation/useEntryIntents';
 
 export default function App() {
   return (
@@ -27,6 +29,9 @@ export default function App() {
 
 function AppSurface() {
   const { palette } = usePreferences();
+  const { openEntryRoute, refreshBootstrap } = useApp();
+  const resume = useCallback(() => { void refreshBootstrap(); }, [refreshBootstrap]);
+  useEntryIntents(openEntryRoute, resume);
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: palette.background }]}>
       <AppRouter />

@@ -124,7 +124,7 @@ export default function RegisterPage() {
                 list="app-id-options"
                 value={form.appId}
                 onChange={update('appId')}
-                placeholder="如 mobileui"
+                placeholder="如 zhongbei"
                 autoComplete="off"
               />
               <datalist id="app-id-options">

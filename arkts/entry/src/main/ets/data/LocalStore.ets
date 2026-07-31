@@ -7,6 +7,9 @@ const TOKEN_KEY: string = 'sessionToken'
 const REFRESH_TOKEN_KEY: string = 'sessionRefreshToken'
 const CONFIG_KEY: string = 'runtimeConfig'
 const INSTALLATION_KEY: string = 'installationId'
+const THEME_KEY: string = 'preference.theme'
+const LANGUAGE_KEY: string = 'preference.language'
+const TEXT_SCALE_KEY: string = 'preference.textScale'
 
 export class LocalStore {
   private store?: preferences.Preferences
@@ -47,6 +50,25 @@ export class LocalStore {
 
   saveConfig(config: RuntimeConfig): void {
     this.store?.putSync(CONFIG_KEY, JSON.stringify(config))
+    this.store?.flush()
+  }
+
+  readTheme(): string {
+    return String(this.store?.getSync(THEME_KEY, 'system') ?? 'system')
+  }
+
+  readLanguage(): string {
+    return String(this.store?.getSync(LANGUAGE_KEY, 'zh-CN') ?? 'zh-CN')
+  }
+
+  readTextScale(): number {
+    return Number(this.store?.getSync(TEXT_SCALE_KEY, 1) ?? 1)
+  }
+
+  savePreference(key: string, value: string | number): void {
+    if (key === 'theme') this.store?.putSync(THEME_KEY, value)
+    if (key === 'language') this.store?.putSync(LANGUAGE_KEY, value)
+    if (key === 'textScale') this.store?.putSync(TEXT_SCALE_KEY, value)
     this.store?.flush()
   }
 

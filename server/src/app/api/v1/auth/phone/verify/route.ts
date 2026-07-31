@@ -8,7 +8,7 @@ export async function POST(request: NextRequest) {
   try {
     const input = phoneCodeVerifySchema.parse(await request.json());
     const client = getClientContext(request);
-    return ok(verifyPhoneCode(client.appId, input.phone, input.code, input.deviceName));
+    return ok(await verifyPhoneCode(client.appId, input.phone, input.code, input.deviceName));
   } catch (error) {
     return handleError(error);
   }

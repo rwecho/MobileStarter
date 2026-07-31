@@ -6,22 +6,25 @@ import { handleError, ok } from '@/server/http';
 
 type ReferralRow = { code: string; invited: number };
 
-export function GET(request: NextRequest) {
+export async function GET(request: NextRequest) {
   try {
-    const { user } = requireAuth(request);
+    const { user } = await requireAuth(request);
     const code = referralCode(user.app_id, user.id);
-    database.prepare(`
-      INSERT OR IGNORE INTO referral_profiles(user_id, code, created_at)
-      VALUES (?, ?, ?)
+    await database.prepare(`
+      INSERT INTO referral_profiles(user_id, code, created_at)
+      VALUES (?, ?, ?) ON CONFLICT DO NOTHING
     `).run(user.id, code, nowIso());
-    const row = database.prepare(`
+    const row = await database.prepare(`
       SELECT referral_profiles.code,
         (SELECT COUNT(*) FROM users invited
           WHERE invited.app_id = ? AND invited.settings LIKE '%' || referral_profiles.code || '%'
         ) AS invited
       FROM referral_profiles WHERE user_id = ?
     `).get(user.app_id, user.id) as ReferralRow;
-    const origin = process.env.MOBILEUI_PUBLIC_ORIGIN ?? 'https://example.com';
+    const origin =
+      process.env.AUTH_PUBLIC_ORIGIN ??
+      process.env.MOBILEUI_PUBLIC_ORIGIN ??
+      'https://example.com';
     return ok({ code: row.code, invited: Number(row.invited), shareUrl: `${origin}/invite/${row.code}` });
   } catch (error) {
     return handleError(error);

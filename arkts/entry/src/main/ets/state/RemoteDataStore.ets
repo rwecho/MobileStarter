@@ -100,17 +100,27 @@ export class RemoteDataStore {
   async loadHome(): Promise<void> {
     this.helpState = new AsyncState<HelpArticle[]>(AsyncStatus.Loading)
     this.ticketListState = new AsyncState<SupportTicket[]>(AsyncStatus.Loading)
+    await Promise.all([this.loadHelp(), this.loadTicketList()])
+  }
+
+  private async loadHelp(): Promise<void> {
     try {
       const help = await apiClient.help()
-      const tickets = await apiClient.tickets()
       this.helpState = help.length === 0
         ? new AsyncState<HelpArticle[]>(AsyncStatus.Empty)
         : new AsyncState<HelpArticle[]>(AsyncStatus.Success, help)
+    } catch (error) {
+      this.helpState = this.failure<HelpArticle[]>(error)
+    }
+  }
+
+  private async loadTicketList(): Promise<void> {
+    try {
+      const tickets = await apiClient.tickets()
       this.ticketListState = tickets.length === 0
         ? new AsyncState<SupportTicket[]>(AsyncStatus.Empty)
         : new AsyncState<SupportTicket[]>(AsyncStatus.Success, tickets)
     } catch (error) {
-      this.helpState = this.failure<HelpArticle[]>(error)
       this.ticketListState = this.failure<SupportTicket[]>(error)
     }
   }

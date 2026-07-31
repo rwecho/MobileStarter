@@ -8,7 +8,7 @@ const resendCooldownMs = 60_000;
 const maximumAttempts = 5;
 
 export async function requestPhoneCode(appId: string, phone: string) {
-  const latest = database.prepare(`
+  const latest = await database.prepare(`
     SELECT created_at FROM phone_auth_challenges
     WHERE app_id = ? AND phone = ? ORDER BY created_at DESC LIMIT 1
   `).get(appId, phone) as { created_at: string } | undefined;
@@ -17,7 +17,7 @@ export async function requestPhoneCode(appId: string, phone: string) {
   }
   const code = String(crypto.getRandomValues(new Uint32Array(1))[0] % 1_000_000)
     .padStart(6, '0');
-  database.prepare(`
+  await database.prepare(`
     INSERT INTO phone_auth_challenges(
       id, app_id, phone, code_hash, expires_at, created_at
     ) VALUES (?, ?, ?, ?, ?, ?)
@@ -33,13 +33,13 @@ export async function requestPhoneCode(appId: string, phone: string) {
   return requestResult();
 }
 
-export function verifyPhoneCode(
+export async function verifyPhoneCode(
   appId: string,
   phone: string,
   code: string,
   deviceName: string,
 ) {
-  const challenge = database.prepare(`
+  const challenge = await database.prepare(`
     SELECT * FROM phone_auth_challenges
     WHERE app_id = ? AND phone = ? AND used_at IS NULL
     ORDER BY created_at DESC LIMIT 1
@@ -51,23 +51,23 @@ export function verifyPhoneCode(
     throw new ApiError(429, 'PHONE_CODE_LOCKED', '尝试次数过多，请重新获取验证码');
   }
   if (challenge.code_hash !== codeHash(appId, phone, code)) {
-    database.prepare(
+    await database.prepare(
       'UPDATE phone_auth_challenges SET attempts = attempts + 1 WHERE id = ?',
     ).run(challenge.id);
     throw new ApiError(400, 'PHONE_CODE_INVALID', '验证码无效或已过期');
   }
-  const userId = findOrCreatePhoneUser(appId, phone);
-  runTransaction(() => {
-    database.prepare(
+  const userId = await findOrCreatePhoneUser(appId, phone);
+  await runTransaction(async () => {
+    await database.prepare(
       'UPDATE phone_auth_challenges SET used_at = ? WHERE id = ?',
     ).run(nowIso(), challenge.id);
   });
-  return createUserSession(userId, appId, deviceName);
+  return await createUserSession(userId, appId, deviceName);
 }
 
-function findOrCreatePhoneUser(appId: string, phone: string) {
+async function findOrCreatePhoneUser(appId: string, phone: string) {
   const subject = `${appId}:${phone}`;
-  const identity = database.prepare(`
+  const identity = await database.prepare(`
     SELECT user_id FROM external_identities
     WHERE provider = 'phone' AND provider_subject = ?
   `).get(subject) as { user_id: string } | undefined;
@@ -75,7 +75,7 @@ function findOrCreatePhoneUser(appId: string, phone: string) {
   const userId = createId();
   const createdAt = nowIso();
   const email = `phone-${hashToken(subject).slice(0, 24)}@phone.invalid`;
-  database.prepare(`
+  await database.prepare(`
     INSERT INTO users(
       id, app_id, email, password_hash, username, created_at, updated_at
     ) VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -88,7 +88,7 @@ function findOrCreatePhoneUser(appId: string, phone: string) {
     createdAt,
     createdAt,
   );
-  database.prepare(`
+  await database.prepare(`
     INSERT INTO external_identities(
       id, user_id, provider, provider_subject, created_at
     ) VALUES (?, ?, 'phone', ?, ?)
@@ -99,7 +99,7 @@ function findOrCreatePhoneUser(appId: string, phone: string) {
 async function deliverPhoneCode(appId: string, phone: string, code: string) {
   const messageId = createId();
   const payload = JSON.stringify({ code, expiresInMinutes: challengeMinutes });
-  database.prepare(`
+  await database.prepare(`
     INSERT INTO outbound_messages(
       id, app_id, channel, recipient, template, payload, status, created_at
     ) VALUES (?, ?, 'sms', ?, 'phone_login_code', ?, 'pending', ?)
@@ -117,11 +117,11 @@ async function deliverPhoneCode(appId: string, phone: string, code: string) {
       signal: AbortSignal.timeout(8000),
     });
     if (!response.ok) throw new Error(`HTTP_${response.status}`);
-    database.prepare(
+    await database.prepare(
       'UPDATE outbound_messages SET status = ?, sent_at = ? WHERE id = ?',
     ).run('sent', nowIso(), messageId);
   } catch {
-    database.prepare(`
+    await database.prepare(`
       UPDATE outbound_messages SET status = ?, error_code = ? WHERE id = ?
     `).run('failed', 'DELIVERY_FAILED', messageId);
   }

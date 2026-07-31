@@ -21,7 +21,7 @@ export function guardRoute(
   if (requiresAuthentication(route) && !signedIn) {
     return new RouteDecision(AppRoute.SignIn, route)
   }
-  if (!featureAllows(route, config?.features ?? {})) {
+  if (!featureAllows(route, config)) {
     return new RouteDecision(AppRoute.Home, null, true)
   }
   return new RouteDecision(route)
@@ -37,7 +37,8 @@ function requiresAuthentication(route: AppRoute): boolean {
     route === AppRoute.ProductFeedback
 }
 
-function featureAllows(route: AppRoute, features: Record<string, boolean>): boolean {
+function featureAllows(route: AppRoute, config: RuntimeConfig | null): boolean {
+  const features = config?.features ?? {}
   if (route === AppRoute.Membership || route === AppRoute.MembershipPlans ||
     route === AppRoute.Checkout || route === AppRoute.Orders) {
     return features['membership'] === true
@@ -48,5 +49,9 @@ function featureAllows(route: AppRoute, features: Record<string, boolean>): bool
   if (route === AppRoute.Coupons) return features['coupons'] === true
   if (route === AppRoute.Invite) return features['invites'] === true
   if (route === AppRoute.DeleteAccount) return features['accountDeletion'] === true
+  if (route === AppRoute.HelpFeedback || route === AppRoute.SupportTicket ||
+    route === AppRoute.NewSupportTicket || route === AppRoute.ProductFeedback) {
+    return config?.support.enabled === true
+  }
   return true
 }

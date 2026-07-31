@@ -16,21 +16,21 @@ const schema = z.object({
 export async function POST(request: NextRequest) {
   try {
     const input = schema.parse(await request.json());
-    const bootstrap = !adminExists();
+    const bootstrap = !await adminExists();
     if (bootstrap) {
       if (!input.appId) {
         throw new ApiError(400, 'APP_ID_REQUIRED', '请选择要绑定的 app_id');
       }
-      if (!appExists(input.appId)) {
+      if (!await appExists(input.appId)) {
         throw new ApiError(404, 'APP_NOT_FOUND', 'app_id 不存在，请确认后重试');
       }
     } else {
       // 已有管理员：必须是登录态管理员才能创建新管理员（邀请制）。
-      adminContext(request);
+      await adminContext(request);
     }
     const profile = await createAdmin(input);
     if (bootstrap) {
-      const { token } = createSession(profile.id, input.appId as string);
+      const { token } = await createSession(profile.id, input.appId as string);
       await setAdminCookie(token);
       return ok({ profile, autoLogin: true }, 201);
     }

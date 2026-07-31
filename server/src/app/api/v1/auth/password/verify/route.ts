@@ -8,7 +8,7 @@ export async function POST(request: NextRequest) {
   try {
     const input = verifyResetCodeSchema.parse(await request.json());
     const client = getClientContext(request);
-    return ok(verifyPasswordResetCode(client.appId, input.email, input.code));
+    return ok(await verifyPasswordResetCode(client.appId, input.email, input.code));
   } catch (error) {
     return handleError(error);
   }

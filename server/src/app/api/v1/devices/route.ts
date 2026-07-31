@@ -8,12 +8,12 @@ import { pushDeviceSchema } from '@/server/schemas';
 
 export async function POST(request: NextRequest) {
   try {
-    const { user } = requireAuth(request);
+    const { user } = await requireAuth(request);
     const client = getClientContext(request);
     const input = pushDeviceSchema.parse(await request.json());
     const id = createId();
     const now = nowIso();
-    database.prepare(`
+    await database.prepare(`
       INSERT INTO push_devices(
         id, app_id, environment, user_id, installation_id, platform, provider,
         push_token, locale, timezone, app_version, enabled, created_at, updated_at
@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
       client.platform, input.provider, input.token, input.locale,
       input.timezone, client.appVersion, now, now,
     );
-    const row = database.prepare(`
+    const row = await database.prepare(`
       SELECT id, installation_id AS installationId, platform, provider,
         locale, timezone, app_version AS appVersion, enabled, updated_at AS updatedAt
       FROM push_devices
@@ -40,11 +40,11 @@ export async function POST(request: NextRequest) {
   }
 }
 
-export function GET(request: NextRequest) {
+export async function GET(request: NextRequest) {
   try {
-    const { user } = requireAuth(request);
+    const { user } = await requireAuth(request);
     const client = getClientContext(request);
-    return ok(database.prepare(`
+    return ok(await database.prepare(`
       SELECT id, installation_id AS installationId, platform, provider,
         locale, timezone, app_version AS appVersion, enabled, updated_at AS updatedAt
       FROM push_devices WHERE app_id = ? AND environment = ? AND user_id = ?

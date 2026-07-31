@@ -5,7 +5,7 @@ import { processNotificationJobs } from '@/server/notification-jobs';
 
 export async function POST(request: NextRequest) {
   try {
-    authorizeAdmin(request);
+    await authorizeAdmin(request);
     return ok(await processNotificationJobs());
   } catch (error) {
     return handleError(error);

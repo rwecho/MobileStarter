@@ -5,7 +5,7 @@
 - React Native TypeScript：通过。
 - Next.js TypeScript 与生产构建：通过。
 - 同一 `eventId` 第一次接收 `accepted=1`，第二次接收 `duplicates=1`。
-- 包含 `token` 的属性上传后，SQLite 仅保存允许字段。
+- 包含 `token` 的属性上传后，数据库仅保存允许字段。
 - 三端静态架构检查：通过。
 
 ## 2026-07-29 — 客服、反馈与租户隔离
@@ -20,7 +20,8 @@
 - 测试账号在验证后删除。
 - 测试工单与测试反馈在验证后从本地数据库清理。
 
-这些结果来自生产模式 Next.js 服务和真实 SQLite 数据库，不是 mock 响应。
+这些结果来自 PostgreSQL 切换前的生产模式 Next.js 服务和真实 SQLite
+数据库，不是 mock 响应；数据库切换后的集成验证以当前 Server CI 为准。
 
 ## 2026-07-29 — 找回密码
 

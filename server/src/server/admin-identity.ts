@@ -24,8 +24,8 @@ const ADMIN_PASSWORD_POLICY: PasswordPolicy = {
 
 type AdminUser = AdminProfile & Readonly<{ passwordHash: string }>;
 
-export function adminExists(): boolean {
-  return Boolean(database.prepare('SELECT 1 FROM admin_users LIMIT 1').get());
+export async function adminExists(): Promise<boolean> {
+  return Boolean(await database.prepare('SELECT 1 FROM admin_users LIMIT 1').get());
 }
 
 export async function createAdmin(input: Readonly<{
@@ -35,10 +35,10 @@ export async function createAdmin(input: Readonly<{
 }>): Promise<AdminProfile> {
   const username = input.username.trim();
   const email = input.email.trim().toLowerCase();
-  if (database.prepare('SELECT 1 FROM admin_users WHERE username = ?').get(username)) {
+  if (await database.prepare('SELECT 1 FROM admin_users WHERE username = ?').get(username)) {
     throw new ApiError(409, 'USERNAME_TAKEN', '用户名已被占用');
   }
-  if (database.prepare('SELECT 1 FROM admin_users WHERE email = ?').get(email)) {
+  if (await database.prepare('SELECT 1 FROM admin_users WHERE email = ?').get(email)) {
     throw new ApiError(409, 'EMAIL_TAKEN', '邮箱已被占用');
   }
   const reasons = validatePasswordAgainstPolicy(ADMIN_PASSWORD_POLICY, input.password);
@@ -48,7 +48,7 @@ export async function createAdmin(input: Readonly<{
   const id = createId();
   const createdAt = nowIso();
   const passwordHash = await hashPassword(input.password);
-  database.prepare(`
+  await database.prepare(`
     INSERT INTO admin_users(id, username, email, password_hash, created_at, updated_at)
     VALUES (?, ?, ?, ?, ?, ?)
   `).run(id, username, email, passwordHash, createdAt, createdAt);
@@ -59,26 +59,29 @@ export async function verifyAdminCredentials(
   identifier: string,
   password: string,
 ): Promise<AdminProfile | null> {
-  const admin = findAdminByIdentifier(identifier);
+  const admin = await findAdminByIdentifier(identifier);
   if (!admin) return null;
   const valid = await verifyPassword(admin.passwordHash, password);
   return valid ? toProfile(admin) : null;
 }
 
-export function createSession(adminId: string, appId: string): { token: string; expiresAt: string } {
+export async function createSession(
+  adminId: string,
+  appId: string,
+): Promise<{ token: string; expiresAt: string }> {
   const token = createSessionToken();
   const id = createId();
   const createdAt = nowIso();
   const expiresAt = new Date(Date.now() + ADMIN_SESSION_TTL_MS).toISOString();
-  database.prepare(`
+  await database.prepare(`
     INSERT INTO admin_sessions(id, admin_id, token_hash, app_id, created_at, expires_at)
     VALUES (?, ?, ?, ?, ?, ?)
   `).run(id, adminId, hashToken(token), appId, createdAt, expiresAt);
   return { token, expiresAt };
 }
 
-export function getAdminByToken(token: string): AdminSession | null {
-  const row = database.prepare(`
+export async function getAdminByToken(token: string): Promise<AdminSession | null> {
+  const row = await database.prepare(`
     SELECT u.id AS id, u.username AS username, u.email AS email,
       u.created_at AS createdAt, s.app_id AS appId
     FROM admin_users u JOIN admin_sessions s ON s.admin_id = u.id
@@ -86,8 +89,7 @@ export function getAdminByToken(token: string): AdminSession | null {
   `).get(hashToken(token), nowIso()) as {
     id: string; username: string; email: string; createdAt: string; appId: string;
   } | undefined;
-  // Rebuild as plain objects: node:sqlite rows have a null prototype, which Next's
-  // RSC serializer rejects when passed to client components. An empty app_id means
+  // Rebuild as plain objects at the repository boundary. An empty app_id means
   // a pre-app-binding session — treat it as unauthenticated so the admin re-logs in.
   if (!row || !row.appId) return null;
   return {
@@ -96,21 +98,23 @@ export function getAdminByToken(token: string): AdminSession | null {
   };
 }
 
-export function revokeSession(token: string): void {
-  database.prepare(
+export async function revokeSession(token: string): Promise<void> {
+  await database.prepare(
     'UPDATE admin_sessions SET revoked_at = ? WHERE token_hash = ? AND revoked_at IS NULL',
   ).run(nowIso(), hashToken(token));
 }
 
-export function getAdminFromRequest(request: NextRequest): AdminSession | null {
+export async function getAdminFromRequest(
+  request: NextRequest,
+): Promise<AdminSession | null> {
   const token = request.cookies.get(ADMIN_COOKIE)?.value;
   if (!token) return null;
-  return getAdminByToken(token);
+  return await getAdminByToken(token);
 }
 
-function findAdminByIdentifier(identifier: string): AdminUser | null {
+async function findAdminByIdentifier(identifier: string): Promise<AdminUser | null> {
   const value = identifier.trim();
-  const row = database.prepare(`
+  const row = await database.prepare(`
     SELECT id, username, email, password_hash AS passwordHash, created_at AS createdAt
     FROM admin_users WHERE username = ? OR email = ?
   `).get(value, value.toLowerCase()) as AdminUser | undefined;

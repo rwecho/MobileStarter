@@ -7,7 +7,7 @@ import { getClientContext } from '@/server/client-context';
 export async function POST(request: NextRequest) {
   try {
     const input = refreshSchema.parse(await request.json());
-    return ok(rotateRefreshToken(getClientContext(request).appId, input.refreshToken));
+    return ok(await rotateRefreshToken(getClientContext(request).appId, input.refreshToken));
   } catch (error) {
     return handleError(error);
   }

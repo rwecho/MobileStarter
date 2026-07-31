@@ -10,10 +10,10 @@ const querySchema = z.object({
   locale: z.string().trim().optional(),
 });
 
-export function GET(request: NextRequest) {
+export async function GET(request: NextRequest) {
   try {
     const input = querySchema.parse(Object.fromEntries(request.nextUrl.searchParams));
-    return ok({ docs: getPublicLegal(input.app, input.env, input.type, input.locale) });
+    return ok({ docs: await getPublicLegal(input.app, input.env, input.type, input.locale) });
   } catch (error) {
     return handleError(error);
   }

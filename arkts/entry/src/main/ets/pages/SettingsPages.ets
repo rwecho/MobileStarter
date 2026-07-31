@@ -3,6 +3,7 @@ import { AppStore } from '../state/AppStore'
 import { AppIconName } from '../design_system/AppIcon'
 import { AppButton, AppListRow, PageHeader } from '../design_system/Components'
 import { AppColors, AppRadii, AppSpacing } from '../theme/AppTokens'
+import { appString, AppString } from '../localization/AppStrings'
 
 @Component
 export struct SettingsPage {
@@ -10,12 +11,12 @@ export struct SettingsPage {
 
   build() {
     Column() {
-      PageHeader({ store: this.store, title: '设置' })
+      PageHeader({ store: this.store, title: appString(AppString.Settings, this.store.language) })
       Scroll() {
         Column({ space: AppSpacing.x5 }) {
           SettingsGroup({
             store: this.store,
-            title: '账户与服务',
+            title: appString(AppString.AccountServices, this.store.language),
             routes: this.visibleRoutes([
               AppRoute.AccountSecurity,
               AppRoute.Devices,
@@ -24,7 +25,7 @@ export struct SettingsPage {
           })
           SettingsGroup({
             store: this.store,
-            title: '应用偏好',
+            title: appString(AppString.Preferences, this.store.language),
             routes: this.visibleRoutes([
               AppRoute.NotificationSettings,
               AppRoute.General,
@@ -35,7 +36,7 @@ export struct SettingsPage {
           })
           SettingsGroup({
             store: this.store,
-            title: '隐私、存储与支持',
+            title: appString(AppString.PrivacyStorageSupport, this.store.language),
             routes: this.visibleRoutes([
               AppRoute.Privacy,
               AppRoute.Permissions,
@@ -57,6 +58,9 @@ export struct SettingsPage {
 
   private visibleRoutes(routes: AppRoute[]): AppRoute[] {
     return routes.filter(route => {
+      if (route === AppRoute.HelpFeedback && this.store.config?.support.enabled !== true) {
+        return false
+      }
       const key = this.policyKey(route)
       if (key.length === 0) return true
       return this.store.config?.settingsPolicy[key]?.visibility !== 'hidden'
@@ -90,13 +94,35 @@ struct SettingsGroup {
         ForEach(this.routes, (route: AppRoute) => {
           AppListRow({
             store: this.store,
-            label: route === AppRoute.Membership ? '会员与订阅' : routeTitle(route),
+            label: this.routeLabel(route),
             route: route
           })
         })
       }
       .backgroundColor(AppColors.surface)
       .borderRadius(AppRadii.card)
+    }
+  }
+
+  private routeLabel(route: AppRoute): string {
+    switch (route) {
+      case AppRoute.Membership: return appString(AppString.Membership, this.store.language)
+      case AppRoute.AccountSecurity: return appString(AppString.AccountSecurity, this.store.language)
+      case AppRoute.Devices: return appString(AppString.Devices, this.store.language)
+      case AppRoute.NotificationSettings:
+        return appString(AppString.NotificationSettings, this.store.language)
+      case AppRoute.General: return appString(AppString.General, this.store.language)
+      case AppRoute.Appearance: return appString(AppString.Appearance, this.store.language)
+      case AppRoute.Language: return appString(AppString.Language, this.store.language)
+      case AppRoute.TextSize: return appString(AppString.TextSize, this.store.language)
+      case AppRoute.Privacy: return appString(AppString.Privacy, this.store.language)
+      case AppRoute.Permissions: return appString(AppString.Permissions, this.store.language)
+      case AppRoute.Storage: return appString(AppString.Storage, this.store.language)
+      case AppRoute.HelpFeedback: return appString(AppString.HelpFeedback, this.store.language)
+      case AppRoute.Legal: return appString(AppString.Legal, this.store.language)
+      case AppRoute.About: return appString(AppString.About, this.store.language)
+      case AppRoute.DeleteAccount: return appString(AppString.DeleteAccount, this.store.language)
+      default: return routeTitle(route)
     }
   }
 }
@@ -108,9 +134,14 @@ export struct SettingDetailPage {
   @State isEnabled: boolean = true
   @State password: string = ''
 
+  aboutToAppear(): void {
+    const value = this.store.user?.settings[this.settingKey()]
+    if (typeof value === 'boolean') this.isEnabled = value
+  }
+
   build() {
     Column() {
-      PageHeader({ store: this.store, title: routeTitle(this.route) })
+      PageHeader({ store: this.store, title: this.title() })
       Column({ space: AppSpacing.x4 }) {
         if (this.route === AppRoute.DeleteAccount) {
           TextInput({ placeholder: '输入当前密码', text: this.password })
@@ -179,6 +210,22 @@ export struct SettingDetailPage {
       case AppRoute.General: return 'autoplayEnabled'
       default: return 'notificationsEnabled'
     }
+  }
+
+  private title(): string {
+    if (this.route === AppRoute.NotificationSettings) {
+      return appString(AppString.NotificationSettings, this.store.language)
+    }
+    if (this.route === AppRoute.Privacy) {
+      return appString(AppString.Privacy, this.store.language)
+    }
+    if (this.route === AppRoute.General) {
+      return appString(AppString.General, this.store.language)
+    }
+    if (this.route === AppRoute.DeleteAccount) {
+      return appString(AppString.DeleteAccount, this.store.language)
+    }
+    return routeTitle(this.route)
   }
 }
 

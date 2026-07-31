@@ -7,7 +7,7 @@ import { getClientContext } from '@/server/client-context';
 export async function POST(request: NextRequest) {
   try {
     const input = verifyEmailSchema.parse(await request.json());
-    return ok(verifyEmail(getClientContext(request).appId, input.email, input.code));
+    return ok(await verifyEmail(getClientContext(request).appId, input.email, input.code));
   } catch (error) {
     return handleError(error);
   }

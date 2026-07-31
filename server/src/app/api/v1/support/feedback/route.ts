@@ -11,9 +11,9 @@ import {
 
 export async function POST(request: NextRequest) {
   try {
-    const identity = getSupportIdentity(request);
+    const identity = await getSupportIdentity(request);
     const input = feedbackSchema.parse(await request.json());
-    const route = resolveSupportRoute(request, 'suggestion');
+    const route = await resolveSupportRoute(request, 'suggestion');
     const id = createId();
     const now = nowIso();
     const insertFeedback = database.prepare(`
@@ -27,14 +27,14 @@ export async function POST(request: NextRequest) {
         id, feedback_id, file_name, mime_type, content, created_at
       ) VALUES (?, ?, ?, ?, ?, ?)
     `);
-    runTransaction(() => {
-      insertFeedback.run(
+    await runTransaction(async () => {
+      await insertFeedback.run(
         id, route.appId, identity.userId, identity.installationId || null,
         route.locale, route.market, route.dataRegion, route.queueId,
         input.category, input.title, input.body, input.rating ?? null, now, now,
       );
-      input.screenshots.forEach((screenshot) => {
-        insertAttachment.run(
+      for (const screenshot of input.screenshots) {
+        await insertAttachment.run(
           createId(),
           id,
           screenshot.fileName,
@@ -42,9 +42,9 @@ export async function POST(request: NextRequest) {
           screenshot.data,
           now,
         );
-      });
+      }
     });
-    const row = database.prepare('SELECT * FROM product_feedback WHERE id = ?').get(id);
+    const row = await database.prepare('SELECT * FROM product_feedback WHERE id = ?').get(id);
     return ok(feedbackView(row as Record<string, unknown>), 201);
   } catch (error) {
     return handleError(error);

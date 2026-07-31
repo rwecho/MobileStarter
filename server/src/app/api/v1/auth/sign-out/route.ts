@@ -2,10 +2,10 @@ import { NextRequest } from 'next/server';
 import { requireAuth, revokeSession } from '@/server/auth';
 import { handleError, ok } from '@/server/http';
 
-export function POST(request: NextRequest) {
+export async function POST(request: NextRequest) {
   try {
-    const { session } = requireAuth(request);
-    revokeSession(session.id);
+    const { session } = await requireAuth(request);
+    await revokeSession(session.id);
     return ok({ signedOut: true });
   } catch (error) {
     return handleError(error);

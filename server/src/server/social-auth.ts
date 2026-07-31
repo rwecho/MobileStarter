@@ -68,16 +68,16 @@ export function publicProviderConfig(config: RuntimeConfig, platform: ClientPlat
 export async function socialSignIn(input: SocialInput, config: RuntimeConfig, platform: ClientPlatform) {
   ensureConfigured(input.provider, config, platform);
   const profile = await readProfile(input, config, platform);
-  const identity = database.prepare(`
+  const identity = await database.prepare(`
     SELECT user_id AS userId FROM external_identities
     WHERE provider = ? AND provider_subject = ?
   `).get(
     input.provider,
     scopedSubject(input.appId, profile.subject),
   ) as { userId: string } | undefined;
-  if (identity) return createUserSession(identity.userId, input.appId, input.deviceName);
-  const userId = findOrCreateUser(input.appId, profile);
-  database.prepare(`
+  if (identity) return await createUserSession(identity.userId, input.appId, input.deviceName);
+  const userId = await findOrCreateUser(input.appId, profile);
+  await database.prepare(`
     INSERT INTO external_identities(
       id, user_id, provider, provider_subject, email, created_at
     ) VALUES (?, ?, ?, ?, ?, ?)
@@ -89,7 +89,7 @@ export async function socialSignIn(input: SocialInput, config: RuntimeConfig, pl
     profile.email,
     nowIso(),
   );
-  return createUserSession(userId, input.appId, input.deviceName);
+  return await createUserSession(userId, input.appId, input.deviceName);
 }
 
 function ensureConfigured(
@@ -207,9 +207,9 @@ async function exchangeGitHubCode(input: SocialInput, providerClientId: string) 
   return body.access_token;
 }
 
-function findOrCreateUser(appId: string, profile: SocialProfile) {
+async function findOrCreateUser(appId: string, profile: SocialProfile) {
   if (profile.email && profile.emailVerified) {
-    const existing = database.prepare(
+    const existing = await database.prepare(
       'SELECT id FROM users WHERE app_id = ? AND email = ?',
     ).get(appId, profile.email.toLowerCase()) as { id: string } | undefined;
     if (existing) return existing.id;
@@ -217,7 +217,7 @@ function findOrCreateUser(appId: string, profile: SocialProfile) {
   const id = createId();
   const timestamp = nowIso();
   const email = profile.email?.toLowerCase() ?? `external-${id}@invalid.local`;
-  database.prepare(`
+  await database.prepare(`
     INSERT INTO users(
       id, app_id, email, password_hash, username, email_verified, created_at, updated_at
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -231,7 +231,7 @@ function findOrCreateUser(appId: string, profile: SocialProfile) {
     timestamp,
     timestamp,
   );
-  return getUserRow(id).id;
+  return (await getUserRow(id)).id;
 }
 
 function scopedSubject(appId: string, subject: string) {

@@ -7,10 +7,10 @@ export function DELETE(
   request: NextRequest,
   context: { params: Promise<{ id: string }> },
 ) {
-  return context.params.then(({ id }) => {
+  return context.params.then(async ({ id }) => {
     try {
-      const { user } = requireAuth(request);
-      const result = database.prepare(`
+      const { user } = await requireAuth(request);
+      const result = await database.prepare(`
         UPDATE push_devices SET enabled = 0, updated_at = ?
         WHERE id = ? AND user_id = ? AND enabled = 1
       `).run(nowIso(), id, user.id);

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import 'app_controller.dart';
@@ -15,19 +17,52 @@ class MobileUiApp extends StatefulWidget {
   State<MobileUiApp> createState() => _MobileUiAppState();
 }
 
-class _MobileUiAppState extends State<MobileUiApp> {
+class _MobileUiAppState extends State<MobileUiApp>
+    with WidgetsBindingObserver {
   late final AppController controller;
   final supportController = SupportController(SupportRepository());
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     controller = AppController(AppRepository());
-    controller.initialize();
+    unawaited(_initialize());
+  }
+
+  Future<void> _initialize() async {
+    await controller.initialize();
+    controller.openEntryName(
+      _routeName(WidgetsBinding.instance.platformDispatcher.defaultRouteName),
+      cold: true,
+    );
+  }
+
+  @override
+  Future<bool> didPushRouteInformation(RouteInformation routeInformation) async {
+    controller.openEntryName(
+      _routeName(routeInformation.uri.toString()),
+      cold: false,
+    );
+    return true;
+  }
+
+  String? _routeName(String location) {
+    if (location.isEmpty || location == '/') return null;
+    final uri = Uri.tryParse(location);
+    if (uri == null) return null;
+    return uri.queryParameters['route'] ??
+        (uri.pathSegments.isEmpty ? null : uri.pathSegments.last);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) unawaited(controller.resume());
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     controller.dispose();
     supportController.dispose();
     super.dispose();

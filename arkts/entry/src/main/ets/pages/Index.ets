@@ -1,5 +1,6 @@
 ﻿import common from '@ohos.app.ability.common'
 import { AppRoute } from '../navigation/AppRoute'
+import { EntryIntent, entryIntentInbox } from '../navigation/EntryIntent'
 import { AppStore } from '../state/AppStore'
 import { AppColors, AppRadii, AppSpacing } from '../theme/AppTokens'
 import { AppIcon, AppIconName } from '../design_system/AppIcon'
@@ -28,6 +29,19 @@ struct Index {
 
   aboutToAppear(): void {
     this.store.initialize(this.getUIContext().getHostContext() as common.UIAbilityContext)
+    entryIntentInbox.subscribe(this)
+  }
+
+  aboutToDisappear(): void {
+    entryIntentInbox.unsubscribe(this)
+  }
+
+  onEntryIntent(intent: EntryIntent): void {
+    this.store.openEntryByName(intent.routeName, intent.cold)
+  }
+
+  onResume(): void {
+    this.store.resume()
   }
 
   build() {
@@ -91,13 +105,13 @@ struct ProfileHost {
     } else if (this.store.route === AppRoute.ProfileEdit) {
       ProfileEditPage({ store: this.store })
     } else if (this.store.route === AppRoute.Statistics) {
-      StatisticsPage({ store: this.store })
+      StatisticsPage({ store: this.store, remote: this.store.remote })
     } else if (this.store.route === AppRoute.Invite) {
-      InvitePage({ store: this.store })
+      InvitePage({ store: this.store, remote: this.store.remote })
     } else if (this.store.route === AppRoute.Coupons) {
-      CouponsPage({ store: this.store })
+      CouponsPage({ store: this.store, remote: this.store.remote })
     } else if (this.store.route === AppRoute.Orders) {
-      OrdersPage({ store: this.store })
+      OrdersPage({ store: this.store, remote: this.store.remote })
     } else {
       MembershipPage({ store: this.store })
     }
@@ -111,9 +125,9 @@ struct SettingsHost {
     if (this.store.route === AppRoute.Settings) {
       SettingsPage({ store: this.store })
     } else if (this.store.route === AppRoute.Devices) {
-      SessionsPage({ store: this.store })
+      SessionsPage({ store: this.store, remote: this.store.remote })
     } else if (this.store.route === AppRoute.NotificationCenter) {
-      NotificationPage({ store: this.store })
+      NotificationPage({ store: this.store, remote: this.store.remote })
     } else if (this.store.route === AppRoute.AccountSecurity) {
       AccountSecurityPage({ store: this.store })
     } else if (this.isChoiceRoute()) {
@@ -126,9 +140,9 @@ struct SettingsHost {
       this.store.route === AppRoute.Permissions) {
       SettingsUtilityPage({ store: this.store, route: this.store.route })
     } else if (this.store.route === AppRoute.HelpFeedback) {
-      SupportHomePage({ store: this.store })
+      SupportHomePage({ store: this.store, remote: this.store.remote })
     } else if (this.store.route === AppRoute.SupportTicket) {
-      SupportTicketPage({ store: this.store })
+      SupportTicketPage({ store: this.store, remote: this.store.remote })
     } else if (this.store.route === AppRoute.NewSupportTicket) {
       NewSupportTicketPage({ store: this.store })
     } else if (this.store.route === AppRoute.ProductFeedback) {

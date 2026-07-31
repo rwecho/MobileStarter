@@ -2,7 +2,7 @@
   "expo": {
     "name": "MobileStarter",
     "slug": "mobilestarter",
-    "scheme": "mobilestarter",
+    "scheme": ["mobilestarter", "mobileui"],
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",

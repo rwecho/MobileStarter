@@ -59,6 +59,26 @@ final class AppController extends ChangeNotifier {
     notifyListeners();
   }
 
+  void openEntryName(String? name, {required bool cold}) {
+    final target = appRouteFromName(name);
+    if (target == null) return;
+    final decision = guardRoute(target, signedIn: signedIn, config: _config);
+    _pendingRoute = decision.pending ?? _pendingRoute;
+    final next = decision.route;
+    if (cold) {
+      _stack
+        ..clear()
+        ..add(AppRoute.home);
+      if (next != AppRoute.home) _stack.add(next);
+    } else if (_stack.last != next) {
+      _stack.add(next);
+    }
+    telemetry.screen(next.name);
+    notifyListeners();
+  }
+
+  Future<void> resume() => initialize();
+
   void navigate(AppRoute route) {
     final decision = guardRoute(route, signedIn: signedIn, config: _config);
     _pendingRoute = decision.pending ?? _pendingRoute;
@@ -77,10 +97,20 @@ final class AppController extends ChangeNotifier {
     notifyListeners();
   }
 
+  void replaceTop(AppRoute route) {
+    final decision = guardRoute(route, signedIn: signedIn, config: _config);
+    _pendingRoute = decision.pending ?? _pendingRoute;
+    _stack
+      ..removeLast()
+      ..add(decision.route);
+    telemetry.screen(decision.route.name);
+    notifyListeners();
+  }
+
   void completeAuthentication() {
     final target = _pendingRoute ?? AppRoute.profile;
     _pendingRoute = null;
-    replaceAll(target);
+    replaceTop(target);
   }
 
   void back() {

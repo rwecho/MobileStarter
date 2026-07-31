@@ -1,4 +1,4 @@
-import type { SQLInputValue } from 'node:sqlite';
+import type { SQLInputValue } from './postgres-database';
 import { database } from './database';
 import { nowIso, sinceIso } from './time';
 import type { AdminScope } from './admin-auth';
@@ -27,8 +27,8 @@ export type OnlineStats = Readonly<{
   sessions: readonly OnlineSession[];
 }>;
 
-export function countOnlineSessions(appId: string) {
-  return scalar(
+export async function countOnlineSessions(appId: string) {
+  return await scalar(
     `SELECT COUNT(*) AS c FROM sessions s
      JOIN users u ON u.id = s.user_id
      WHERE u.app_id = ? AND s.revoked_at IS NULL
@@ -39,8 +39,8 @@ export function countOnlineSessions(appId: string) {
   );
 }
 
-export function countOnlineUsers(appId: string) {
-  return scalar(
+export async function countOnlineUsers(appId: string) {
+  return await scalar(
     `SELECT COUNT(DISTINCT s.user_id) AS c FROM sessions s
      JOIN users u ON u.id = s.user_id
      WHERE u.app_id = ? AND s.revoked_at IS NULL
@@ -51,31 +51,35 @@ export function countOnlineUsers(appId: string) {
   );
 }
 
-export function getOnlineStats(scope: AdminScope): OnlineStats {
+export async function getOnlineStats(scope: AdminScope): Promise<OnlineStats> {
   const now = nowIso();
   const onlineCutoff = sinceIso(ONLINE_WINDOW_MINUTES);
   const dayCutoff = sinceIso(DAY_MINUTES);
   return {
-    onlineSessions: countOnlineSessions(scope.appId),
-    onlineUsers: countOnlineUsers(scope.appId),
-    activeSessions: scalar(
+    onlineSessions: await countOnlineSessions(scope.appId),
+    onlineUsers: await countOnlineUsers(scope.appId),
+    activeSessions: await scalar(
       `SELECT COUNT(*) AS c FROM sessions s JOIN users u ON u.id = s.user_id
        WHERE u.app_id = ? AND s.revoked_at IS NULL AND s.expires_at > ?`,
       scope.appId,
       now,
     ),
-    totalSessions: scalar(
+    totalSessions: await scalar(
       `SELECT COUNT(*) AS c FROM sessions s JOIN users u ON u.id = s.user_id
        WHERE u.app_id = ?`,
       scope.appId,
     ),
-    series: series(scope.appId, dayCutoff),
-    sessions: listOnline(scope.appId, now, onlineCutoff),
+    series: await series(scope.appId, dayCutoff),
+    sessions: await listOnline(scope.appId, now, onlineCutoff),
   };
 }
 
-function listOnline(appId: string, now: string, cutoff: string): OnlineSession[] {
-  return database.prepare(`
+async function listOnline(
+  appId: string,
+  now: string,
+  cutoff: string,
+): Promise<OnlineSession[]> {
+  return await database.prepare(`
     SELECT s.id, s.user_id AS userId, u.username, s.device_name AS deviceName,
       s.last_seen_at AS lastSeenAt, s.created_at AS createdAt,
       s.expires_at AS expiresAt
@@ -86,8 +90,8 @@ function listOnline(appId: string, now: string, cutoff: string): OnlineSession[]
   `).all(appId, now, cutoff) as OnlineSession[];
 }
 
-function series(appId: string, since: string): HourBucket[] {
-  return database.prepare(`
+async function series(appId: string, since: string): Promise<HourBucket[]> {
+  return await database.prepare(`
     SELECT substr(last_seen_at, 1, 13) AS bucket, COUNT(*) AS count
     FROM sessions s JOIN users u ON u.id = s.user_id
     WHERE u.app_id = ? AND s.last_seen_at >= ?
@@ -95,6 +99,6 @@ function series(appId: string, since: string): HourBucket[] {
   `).all(appId, since) as HourBucket[];
 }
 
-function scalar(sql: string, ...params: SQLInputValue[]) {
-  return (database.prepare(sql).get(...params) as { c: number }).c;
+async function scalar(sql: string, ...params: SQLInputValue[]) {
+  return (await database.prepare(sql).get(...params) as { c: number }).c;
 }

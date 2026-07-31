@@ -71,7 +71,7 @@ export default function LoginPage() {
               list="app-id-options"
               value={appId}
               onChange={(event) => setAppId(event.target.value)}
-              placeholder="如 mobileui"
+              placeholder="如 zhongbei"
               autoComplete="off"
             />
             <datalist id="app-id-options">

@@ -40,6 +40,8 @@ final class AppController extends ChangeNotifier {
   AppUser? get user => _user;
 
   Future<void> initialize() async {
+    _actionState = const Loading<void>();
+    notifyListeners();
     try {
       final result = await _repository.bootstrap();
       _config = result.config;

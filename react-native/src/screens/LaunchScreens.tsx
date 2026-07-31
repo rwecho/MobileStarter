@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { AppButton, OfflineBanner } from '../design-system/components';
 import { PromoIllustration } from '../design-system/PromoIllustration';
@@ -7,39 +7,55 @@ import { usePreferences } from '../preferences/PreferencesProvider';
 import { colors, radii, spacing } from '../theme/tokens';
 import { styles } from '../theme/styles';
 
+const LogoImage = require('../../assets/splash-icon.png');
+
+// ── Logo screen ──────────────────────────────────────────────────────
+// Shows the shared brand logo while the app bootstraps, then auto‑navigates
+// to the promo screen after a minimum display time. No tap required.
+
 export function LogoScreen() {
   const { navigate, config } = useApp();
-  const { palette } = usePreferences();
+  const timer = useRef<ReturnType<typeof setTimeout>>(null);
+
+  useEffect(() => {
+    timer.current = setTimeout(() => navigate('launch.promo'), 1500);
+    return () => { if (timer.current) clearTimeout(timer.current); };
+  }, [navigate]);
+
   return (
-    <Pressable
-      accessibilityLabel="进入宣传页"
-      onPress={() => navigate('launch.promo')}
-      style={styles.centered}
-    >
-      <View style={launchStyles.logo}>
-        <View style={[launchStyles.logoInner, { backgroundColor: palette.surface }]} />
-      </View>
+    <View accessibilityLabel="启动中" style={styles.centered}>
+      <Image
+        source={LogoImage}
+        style={launchStyles.logoMark}
+        accessibilityLabel="品牌图标"
+      />
       <Text style={styles.title}>{config.brand.appName}</Text>
       <Text style={styles.secondary}>{config.brand.tagline}</Text>
-      <Text style={styles.caption}>轻触继续</Text>
-    </Pressable>
+    </View>
   );
 }
+
+// ── Promo / campaign screen ──────────────────────────────────────────
+// Displays the campaign artwork with a 3‑2‑1 countdown that auto‑enters
+// the home screen when it reaches 0. A "跳过" button lets the user skip.
 
 export function PromoScreen() {
   const { replace, config, online } = useApp();
   const { palette } = usePreferences();
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const countdown = 3 - elapsedSeconds;
-  const canSkip = config.splash.skippable && elapsedSeconds >= 1;
+  const canSkip = config.splash.skippable !== false;
 
   useEffect(() => {
-    const timers = [1, 2, 3].map((second) => setTimeout(
-      () => setElapsedSeconds(second),
-      second * 1000,
-    ));
+    const timers = [1, 2, 3].map((sec) =>
+      setTimeout(() => setElapsedSeconds(sec), sec * 1000),
+    );
     return () => timers.forEach(clearTimeout);
   }, []);
+
+  useEffect(() => {
+    if (elapsedSeconds >= 3) replace('home');
+  }, [elapsedSeconds, replace]);
 
   return (
     <View style={launchStyles.promo}>
@@ -49,7 +65,7 @@ export function PromoScreen() {
           accessibilityLiveRegion="polite"
           style={[launchStyles.countdown, { backgroundColor: palette.surfaceMuted }]}
         >
-          <Text style={styles.caption}>{countdown}</Text>
+          <Text style={launchStyles.countdownNumber}>{countdown}</Text>
         </View>
       ) : null}
       {canSkip ? (
@@ -72,7 +88,9 @@ export function PromoScreen() {
           {online ? `配置版本 v${config.version}` : '离线 · 使用最近成功配置'}
         </Text>
       </View>
-      <AppButton label={config.splash.actionLabel} onPress={() => replace('home')} />
+      <Text style={launchStyles.autoHint}>
+        {countdown > 0 ? `${countdown} 秒后自动进入` : '即将进入…'}
+      </Text>
     </View>
   );
 }
@@ -107,21 +125,7 @@ export function OnboardingScreen() {
 }
 
 const launchStyles = StyleSheet.create({
-  logo: {
-    width: 84,
-    height: 84,
-    borderRadius: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.brand,
-  },
-  logoInner: {
-    width: 34,
-    height: 34,
-    borderRadius: radii.small,
-    backgroundColor: colors.surface,
-    transform: [{ rotate: '45deg' }],
-  },
+  logoMark: { width: 48, height: 48 },
   promo: { flex: 1, padding: spacing.x6, justifyContent: 'center', gap: spacing.x6 },
   skip: { position: 'absolute', right: spacing.x5, top: spacing.x4, padding: spacing.x3 },
   countdown: {
@@ -133,11 +137,17 @@ const launchStyles = StyleSheet.create({
     minWidth: 44,
     minHeight: 44,
     borderRadius: radii.round,
-    backgroundColor: colors.surfaceMuted,
     opacity: 0.72,
   },
+  countdownNumber: { fontSize: 18, fontWeight: '700', color: colors.brand },
   copy: { gap: spacing.x2 },
   badge: { color: colors.brand, fontSize: 13, fontWeight: '700' },
   fullWidth: { width: '100%' },
   promoImage: { width: '100%', height: 260 },
+  autoHint: {
+    textAlign: 'center',
+    color: colors.secondary,
+    fontSize: 13,
+    marginTop: spacing.x2,
+  },
 });

@@ -13,6 +13,8 @@ react-native/*.log
 react-native/google-services.json
 react-native/GoogleService-Info.plist
 react-native/package-lock.incomplete-*.json
+react-native/android/
+react-native/ios/
 
 # Flutter
 flutter/.dart_tool/

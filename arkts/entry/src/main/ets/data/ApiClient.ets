@@ -25,8 +25,26 @@ import {
   UsageSummary
 } from '../domain/Models'
 
-const API_BASE: string = 'http://10.0.2.2:3210'
-const APP_ID: string = 'mobileui-demo'
+const API_BASE: string = 'http://192.168.20.110:3210'
+const APP_ID: string = 'mobileui'
+
+interface SocialSignInInput {
+  provider: string
+  deviceName: string
+  idToken?: string
+  authorizationCode?: string
+  redirectUri?: string
+  codeVerifier?: string
+}
+
+interface TelemetryEventEnvelope {
+  eventId: string
+  name: string
+  screenId: string
+  occurredAt: string
+  configVersion: number
+  properties: Record<string, TelemetryValue>
+}
 
 export class ApiFailure extends Error {
   readonly code: string
@@ -151,14 +169,14 @@ export class ApiClient {
     redirectUri: string,
     codeVerifier: string
   ): Promise<AuthPayload> {
-    const body: Record<string, string | number | boolean> = {
+    const body: SocialSignInInput = {
       provider,
       deviceName: 'HarmonyOS · MobileUI'
     }
-    if (idToken.length > 0) body['idToken'] = idToken
-    if (authorizationCode.length > 0) body['authorizationCode'] = authorizationCode
-    if (redirectUri.length > 0) body['redirectUri'] = redirectUri
-    if (codeVerifier.length > 0) body['codeVerifier'] = codeVerifier
+    if (idToken.length > 0) body.idToken = idToken
+    if (authorizationCode.length > 0) body.authorizationCode = authorizationCode
+    if (redirectUri.length > 0) body.redirectUri = redirectUri
+    if (codeVerifier.length > 0) body.codeVerifier = codeVerifier
     return this.request<AuthPayload>(
       '/api/v1/auth/social', http.RequestMethod.POST, body
     )
@@ -314,7 +332,7 @@ export class ApiClient {
     const payload = JSON.stringify({
       anonymousId: batch.anonymousId,
       sessionId: batch.sessionId,
-      events: batch.events.map(event => ({
+      events: batch.events.map((event): TelemetryEventEnvelope => ({
         eventId: event.eventId,
         name: event.name,
         screenId: event.screenId,
@@ -353,7 +371,8 @@ export class ApiClient {
     method: http.RequestMethod,
     body?: Record<string, string | number | boolean> |
       SignInInput | SignUpInput | DeleteAccountInput
-      | PhoneCodeInput | PhoneVerifyInput | FeedbackInput | CreateTicketInput,
+      | PhoneCodeInput | PhoneVerifyInput | FeedbackInput | CreateTicketInput
+      | SocialSignInInput,
     retried: boolean = false
   ): Promise<T> {
     const client = http.createHttp()

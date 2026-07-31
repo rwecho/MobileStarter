@@ -3,41 +3,74 @@ import { AppStore } from '../state/AppStore'
 import { AppButton } from '../design_system/Components'
 import { AppColors, AppRadii, AppSpacing } from '../theme/AppTokens'
 
+// ── Logo page ─────────────────────────────────────────────────────────
+// Shows the shared brand logo while the app bootstraps, then auto‑navigates
+// to the promo page after a minimum display time. No tap required.
+
 @Component
 export struct LogoPage {
   @ObjectLink store: AppStore
+  private timer: number = -1
+
+  aboutToAppear(): void {
+    this.timer = setTimeout(() => {
+      this.store.navigate(AppRoute.Promo)
+    }, 1500)
+  }
+
+  aboutToDisappear(): void {
+    if (this.timer !== -1) clearTimeout(this.timer)
+  }
 
   build() {
     Column({ space: AppSpacing.x4 }) {
-      Stack() {
-        Rect()
-          .width(72)
-          .height(72)
-          .radius(AppRadii.card)
-          .fill(AppColors.brand)
-        Rect()
-          .width(30)
-          .height(30)
-          .radius(AppRadii.small)
-          .fill(AppColors.surface)
-          .rotate({ angle: 45 })
-      }
+      Image($r('app.media.logo'))
+        .width(48)
+        .height(48)
       Text(this.store.config?.brand.appName ?? 'MobileUI')
         .fontSize(28)
         .fontWeight(FontWeight.Bold)
-      Text('轻触继续').fontColor(AppColors.textSecondary)
+      Text('正在加载…')
+        .fontColor(AppColors.textSecondary)
     }
     .width('100%')
     .height('100%')
     .justifyContent(FlexAlign.Center)
-    .onClick(() => this.store.navigate(AppRoute.Promo))
   }
 }
+
+// ── Promo / campaign page ──────────────────────────────────────────────
+// Displays the campaign artwork with a 3‑2‑1 countdown that auto‑enters
+// the home screen when it reaches 0. A "跳过" button lets the user skip.
 
 @Component
 export struct PromoPage {
   @ObjectLink store: AppStore
+  @State countdown: number = 3
   @State imageFailed: boolean = false
+  private timer: number = -1
+  private entered: boolean = false
+
+  aboutToAppear(): void {
+    this.timer = setInterval(() => {
+      if (this.countdown <= 1) {
+        clearInterval(this.timer)
+        this.enter()
+        return
+      }
+      this.countdown--
+    }, 1000)
+  }
+
+  aboutToDisappear(): void {
+    if (this.timer !== -1) clearInterval(this.timer)
+  }
+
+  enter(): void {
+    if (this.entered) return
+    this.entered = true
+    this.store.replaceAll(AppRoute.Home)
+  }
 
   build() {
     Column({ space: AppSpacing.x5 }) {
@@ -45,7 +78,10 @@ export struct PromoPage {
         .fontColor(AppColors.textSecondary)
         .width('100%')
         .textAlign(TextAlign.End)
-        .onClick(() => this.store.replaceAll(AppRoute.Home))
+        .onClick(() => {
+          clearInterval(this.timer)
+          this.enter()
+        })
       Blank()
       if (this.store.config?.splash.imageUrl && !this.imageFailed) {
         Image(this.store.config.splash.imageUrl)
@@ -67,16 +103,20 @@ export struct PromoPage {
         '这里可以由远程配置展示活动、广告或新功能。')
         .fontColor(AppColors.textSecondary)
       Blank()
-      AppButton({
-        label: this.store.config?.splash.actionLabel ?? '立即体验',
-        onTap: () => this.store.replaceAll(AppRoute.Home)
-      })
+      Text(`${this.countdown}`)
+        .fontSize(48)
+        .fontWeight(FontWeight.Bold)
+        .fontColor(AppColors.brand)
+      Text(this.store.config?.splash.actionLabel ?? '秒后自动进入')
+        .fontColor(AppColors.textSecondary)
     }
     .padding(AppSpacing.x6)
     .width('100%')
     .height('100%')
   }
 }
+
+// ── Onboarding (unchanged) ────────────────────────────────────────────
 
 @Component
 export struct OnboardingPage {

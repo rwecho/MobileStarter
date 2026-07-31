@@ -9,6 +9,12 @@
     "web": {
       "bundler": "metro"
     },
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#FFFFFF"
+    },
+    "icon": "./assets/app-icon.png",
     "plugins": [
       "expo-web-browser",
       "@react-native-firebase/app",

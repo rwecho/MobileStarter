@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { defaultConfig } from '../src/domain/config.ts';
 import { createSessionToken, hashToken } from '../src/server/ids.ts';
 import { hashPassword, verifyPassword } from '../src/server/passwords.ts';
 import {
@@ -80,6 +81,17 @@ test('feedback accepts up to three bounded image screenshots', () => {
     ...base,
     screenshots: [screenshot, screenshot, screenshot, screenshot],
   }).success, false);
+});
+
+test('default legal configuration publishes complete three-document set', () => {
+  assert.deepEqual(
+    defaultConfig.legal.map((document) => document.type),
+    ['privacy', 'terms', 'subscription'],
+  );
+  for (const document of defaultConfig.legal) {
+    assert.ok(document.content.length > 300);
+    assert.match(document.content, /生效日期/);
+  }
 });
 
 test('telemetry enforces bounded batches and safe scalar properties', () => {

@@ -9,13 +9,17 @@
     "web": {
       "bundler": "metro"
     },
-    "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#FFFFFF"
-    },
     "icon": "./assets/app-icon.png",
     "plugins": [
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#FFFFFF",
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 88,
+          "resizeMode": "contain"
+        }
+      ],
       "expo-web-browser",
       "@react-native-firebase/app",
       "@react-native-firebase/analytics",
@@ -27,6 +31,10 @@
     },
     "android": {
       "package": "com.mobileui.mobilestarter",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/splash-icon.png",
+        "backgroundColor": "#A84444"
+      },
       "googleServicesFile": "./google-services.json"
     }
   }

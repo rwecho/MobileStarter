@@ -45,6 +45,18 @@ test('sign-up schema requires consent version and a minimum password length', ()
   }).success, false);
 });
 
+test('development test account signs in with email, username, or phone', async () => {
+  for (const identifier of ['test@mobileui.local', 'test', '+8613800000000']) {
+    const result = await signIn({
+      appId: APP,
+      identifier,
+      password: 'test123',
+      deviceName: 'test-runner',
+    });
+    assert.equal(result.user.email, 'test@mobileui.local');
+  }
+});
+
 test('sign-up enforces the runtime password policy', async () => {
   await assert.rejects(
     signUp({

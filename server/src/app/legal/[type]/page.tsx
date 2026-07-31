@@ -16,7 +16,9 @@ function readString(value: string | readonly string[] | undefined, fallback: str
 export async function generateMetadata({ params, searchParams }: Props): Promise<Metadata> {
   const { type } = await params;
   const sp = await searchParams;
-  const doc = findPublicLegal(readString(sp.app, 'mobileui'), type, readString(sp.locale, 'zh-CN'));
+  const appId = readString(sp.app, 'mobileui');
+  const locale = readString(sp.locale, 'zh-CN');
+  const doc = findPublicLegal(appId, type, locale);
   return { title: doc?.title ?? '法务文档' };
 }
 
@@ -35,8 +37,12 @@ export default async function LegalPage({ params, searchParams }: Props) {
           {labelFor(doc.type)} · {doc.locale}
         </p>
         <h1 className="mt-2 text-2xl font-semibold tracking-tight">{doc.title}</h1>
-        <p className="text-muted-foreground mt-1 text-xs">版本 {doc.revision} · 应用 {appId}</p>
-        <div className="mt-6 text-sm leading-relaxed whitespace-pre-line">{doc.content}</div>
+        <p className="text-muted-foreground mt-1 text-xs">
+          版本 {doc.revision} · 应用 {appId}
+        </p>
+        <div className="mt-6 text-sm leading-relaxed whitespace-pre-line">
+          {doc.content}
+        </div>
       </article>
     </main>
   );

@@ -16,6 +16,24 @@ final class HelpArticle {
   final String body;
 }
 
+final class FeedbackScreenshot {
+  const FeedbackScreenshot({
+    required this.fileName,
+    required this.mimeType,
+    required this.data,
+  });
+
+  final String fileName;
+  final String mimeType;
+  final String data;
+
+  Map<String, Object?> toJson() => {
+    'fileName': fileName,
+    'mimeType': mimeType,
+    'data': data,
+  };
+}
+
 final class SupportTicket {
   const SupportTicket({
     required this.id,

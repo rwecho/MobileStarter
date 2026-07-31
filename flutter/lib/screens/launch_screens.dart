@@ -7,6 +7,7 @@ import '../app/app_scope.dart';
 import '../design_system/components.dart';
 import '../navigation/app_route.dart';
 import '../theme/app_tokens.dart';
+import 'splash_header.dart';
 
 // ── Logo screen ───────────────────────────────────────────────────────────
 // Shows the brand logo while `AppController.initialize()` loads configuration,
@@ -22,42 +23,28 @@ class LogoScreen extends StatefulWidget {
 }
 
 class _LogoScreenState extends State<LogoScreen> {
-  late final AppController _controller;
-  Timer? _navigateTimer;
-  bool _navigating = false;
-
-  static const _minDisplay = Duration(milliseconds: 1200);
+  Timer? _timer;
 
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _controller = AppScope.of(context);
-    _controller.addListener(_onControllerChanged);
-    _onControllerChanged(); // in case it's already ready
+  void initState() {
+    super.initState();
+    // Show the brand logo while the app bootstraps in the background,
+    // then move on. The timer is independent of initialisation state so
+    // the user is never stuck on this screen.
+    _timer = Timer(const Duration(seconds: 2), () {
+      if (mounted) AppScope.of(context).navigate(AppRoute.promo);
+    });
   }
 
   @override
   void dispose() {
-    _controller.removeListener(_onControllerChanged);
-    _navigateTimer?.cancel();
+    _timer?.cancel();
     super.dispose();
-  }
-
-  void _onControllerChanged() {
-    if (_controller.busy || _navigateTimer != null) return;
-    // Wait a minimum time so the logo registers on screen.
-    _navigateTimer = Timer(_minDisplay, _go);
-  }
-
-  void _go() {
-    if (_navigating || !mounted) return;
-    _navigating = true;
-    _controller.navigate(AppRoute.promo);
   }
 
   @override
   Widget build(BuildContext context) {
-    final appName = _controller.config?.appName ?? 'MobileStarter';
+    final appName = AppScope.of(context).config?.appName ?? 'MobileStarter';
     return Scaffold(
       body: Center(
         child: Column(
@@ -67,10 +54,7 @@ class _LogoScreenState extends State<LogoScreen> {
             const SizedBox(height: AppSpacing.x4),
             Text(
               appName,
-              style: const TextStyle(
-                fontSize: 28,
-                fontWeight: FontWeight.w700,
-              ),
+              style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w700),
             ),
           ],
         ),
@@ -144,14 +128,11 @@ class _PromoScreenState extends State<PromoScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              if (campaign?.skippable != false)
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: TextButton(
-                    onPressed: _skip,
-                    child: const Text('跳过'),
-                  ),
-                ),
+              SplashHeader(
+                countdown: _countdown,
+                canSkip: campaign?.skippable != false,
+                onSkip: _skip,
+              ),
               const Spacer(),
               _CampaignImage(imageUrl: campaign?.imageUrl),
               const SizedBox(height: AppSpacing.x6),
@@ -165,26 +146,6 @@ class _PromoScreenState extends State<PromoScreen> {
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
               const Spacer(),
-              Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      '$_countdown',
-                      style: TextStyle(
-                        fontSize: 48,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.brand,
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.x1),
-                    Text(
-                      campaign?.actionLabel ?? '秒后自动进入',
-                      style: const TextStyle(color: AppColors.secondaryText),
-                    ),
-                  ],
-                ),
-              ),
             ],
           ),
         ),

@@ -6,7 +6,9 @@ import 'package:image_picker/image_picker.dart';
 import '../app/app_scope.dart';
 import '../design_system/app_icon.dart';
 import '../design_system/components.dart';
+import '../design_system/feedback.dart';
 import '../theme/app_tokens.dart';
+import 'profile_identity_card.dart';
 
 class ProfileEditScreen extends StatefulWidget {
   const ProfileEditScreen({super.key});
@@ -18,7 +20,7 @@ class ProfileEditScreen extends StatefulWidget {
 class _ProfileEditScreenState extends State<ProfileEditScreen> {
   late final TextEditingController displayName;
   late final TextEditingController bio;
-  late final TextEditingController avatarUrl;
+  String? avatarUrl;
   bool initialized = false;
 
   @override
@@ -29,14 +31,13 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
     final user = AppScope.of(context).user;
     displayName = TextEditingController(text: user?.displayName ?? '');
     bio = TextEditingController(text: user?.bio ?? '');
-    avatarUrl = TextEditingController(text: user?.avatarUrl ?? '');
+    avatarUrl = user?.avatarUrl;
   }
 
   @override
   void dispose() {
     displayName.dispose();
     bio.dispose();
-    avatarUrl.dispose();
     super.dispose();
   }
 
@@ -45,84 +46,56 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
     final controller = AppScope.of(context);
     return AppPage(
       title: '个人资料',
-      child: ListView(
-        padding: const EdgeInsets.all(AppSpacing.x4),
-        children: [
-          AppCard(
-            child: AppListTile(
-              label: '用户名（不可修改）',
-              value: '@${controller.user?.username ?? ''}',
-            ),
-          ),
-          const SizedBox(height: AppSpacing.x3),
-          TextField(
-            controller: displayName,
-            decoration: const InputDecoration(labelText: '显示名称'),
-            maxLength: 40,
-          ),
-          const SizedBox(height: AppSpacing.x3),
-          TextField(
-            controller: bio,
-            decoration: const InputDecoration(labelText: '个人简介'),
-            maxLength: 160,
-            maxLines: 3,
-          ),
-          const SizedBox(height: AppSpacing.x3),
-          Row(
+      child: Align(
+        alignment: Alignment.topCenter,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 640),
+          child: ListView(
+            padding: const EdgeInsets.all(AppSpacing.x4),
             children: [
-              CircleAvatar(
-                radius: 32,
-                backgroundColor: Theme.of(context).colorScheme.surface,
-                backgroundImage: _avatarImage,
-                child: _avatarImage == null
-                    ? const Icon(Icons.person, size: 32)
-                    : null,
+              ProfileIdentityCard(
+                displayName: displayName.text,
+                username: controller.user?.username ?? '',
+                email: controller.user?.email ?? '',
+                bio: bio.text,
+                avatarUrl: avatarUrl,
+                onAvatarTap: _pickAvatar,
               ),
-              const SizedBox(width: AppSpacing.x3),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    AppButton(
-                      label: '选择头像',
-                      icon: AppIconName.user,
-                      onPressed: _pickAvatar,
-                    ),
-                    const SizedBox(height: AppSpacing.x2),
-                    TextField(
-                      controller: avatarUrl,
-                      decoration: const InputDecoration(labelText: '头像 URL'),
-                      keyboardType: TextInputType.url,
-                    ),
-                  ],
-                ),
+              const SizedBox(height: AppSpacing.x3),
+              Text('显示名称', style: Theme.of(context).textTheme.titleMedium),
+              const SizedBox(height: AppSpacing.x2),
+              TextField(
+                controller: displayName,
+                decoration: const InputDecoration(hintText: '请输入显示名称'),
+                maxLength: 40,
+                onChanged: (_) => setState(() {}),
+              ),
+              const SizedBox(height: AppSpacing.x3),
+              Text('个人简介', style: Theme.of(context).textTheme.titleMedium),
+              const SizedBox(height: AppSpacing.x2),
+              TextField(
+                controller: bio,
+                decoration: const InputDecoration(hintText: '介绍一下自己'),
+                maxLength: 160,
+                minLines: 4,
+                maxLines: 6,
+                onChanged: (_) => setState(() {}),
+              ),
+              Text(
+                '用户名不可修改；头像仅在你主动选择后更新。',
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+              const SizedBox(height: AppSpacing.x4),
+              AppButton(
+                label: controller.busy ? '保存中…' : '保存资料',
+                icon: AppIconName.check,
+                onPressed: _save,
               ),
             ],
           ),
-          const SizedBox(height: AppSpacing.x4),
-          AppButton(
-            label: controller.busy ? '保存中…' : '保存资料',
-            icon: AppIconName.check,
-            onPressed: _save,
-          ),
-        ],
+        ),
       ),
     );
-  }
-
-  ImageProvider? get _avatarImage {
-    final value = avatarUrl.text.trim();
-    if (value.isEmpty) return null;
-    if (value.startsWith('data:')) {
-      final comma = value.indexOf(',');
-      if (comma <= 0) return null;
-      try {
-        return MemoryImage(base64Decode(value.substring(comma + 1)));
-      } catch (_) {
-        return null;
-      }
-    }
-    return NetworkImage(value);
   }
 
   Future<void> _pickAvatar() async {
@@ -138,7 +111,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
     // and persist via updateProfile (no separate upload endpoint, like RN).
     final bytes = await selection.readAsBytes();
     setState(() {
-      avatarUrl.text = 'data:image/jpeg;base64,${base64Encode(bytes)}';
+      avatarUrl = 'data:image/jpeg;base64,${base64Encode(bytes)}';
     });
   }
 
@@ -147,15 +120,13 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
     final success = await controller.updateProfile(
       displayName.text.trim(),
       bio.text.trim(),
-      avatarUrl.text.trim().isEmpty ? null : avatarUrl.text.trim(),
+      avatarUrl,
     );
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          success ? '个人资料已保存' : controller.consumeError() ?? '保存失败',
-        ),
-      ),
+    showAppToast(
+      context,
+      success ? '个人资料已保存' : controller.consumeError() ?? '保存失败',
+      error: !success,
     );
   }
 }

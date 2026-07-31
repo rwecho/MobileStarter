@@ -110,7 +110,7 @@ export type RuntimeConfig = Readonly<{
 
 export const defaultConfig: RuntimeConfig = {
   schemaVersion: 1,
-  version: 1,
+  version: 2,
   brand: {
     appName: 'MobileStarter',
     tagline: '把灵感变成作品',
@@ -198,24 +198,7 @@ export const defaultConfig: RuntimeConfig = {
       requireSymbol: false,
     },
   },
-  legal: [
-    {
-      type: 'privacy',
-      locale: 'zh-CN',
-      revision: '2026-07-29',
-      title: 'MobileStarter 隐私政策',
-      content: '我们仅为提供账号、同步、会员和通知服务处理必要数据。',
-      requiresReconsent: true,
-    },
-    {
-      type: 'terms',
-      locale: 'zh-CN',
-      revision: '2026-07-29',
-      title: 'MobileStarter 用户协议',
-      content: '使用服务前，请阅读并理解账号、内容和订阅相关规则。',
-      requiresReconsent: true,
-    },
-  ],
+  legal: defaultLegalDocuments,
   settingsPolicy: {
     language: { visibility: 'visible', mutability: 'user' },
     appearance: { visibility: 'visible', mutability: 'user' },
@@ -293,3 +276,4 @@ export const defaultConfig: RuntimeConfig = {
     },
   ],
 };
+import { defaultLegalDocuments } from './legal-documents';

@@ -62,7 +62,9 @@ final class AppRepository {
   }
 
   // environment（development/staging/production 等）同样必须显式配置，未配置即报错。
-  static const _appEnvironmentValue = String.fromEnvironment('MOBILEUI_APP_ENVIRONMENT');
+  static const _appEnvironmentValue = String.fromEnvironment(
+    'MOBILEUI_APP_ENVIRONMENT',
+  );
   static String get _appEnvironment {
     if (_appEnvironmentValue.isEmpty) {
       throw StateError(
@@ -71,12 +73,13 @@ final class AppRepository {
     }
     return _appEnvironmentValue;
   }
+
   static const _tokenKey = 'mobileui.sessionToken';
   static const _refreshTokenKey = 'mobileui.sessionRefreshToken';
   static const _bootstrapKey = 'mobileui.bootstrap.public';
 
   final http.Client _client;
-  final FlutterSecureStorage _secure = FlutterSecureStorage();
+  final FlutterSecureStorage _secure = const FlutterSecureStorage();
   String _token = '';
   String _acceptLanguage = 'zh-CN';
   Future<bool>? _refreshInFlight;
@@ -138,20 +141,20 @@ final class AppRepository {
     String password,
     String username,
     String consentVersion,
-  ) =>
-      _authenticate('/api/v1/auth/sign-up', {
-        'email': email,
-        'password': password,
-        'username': username,
-        'consentVersion': consentVersion,
-        'deviceName': 'Flutter · MobileUI',
-      });
+  ) => _authenticate('/api/v1/auth/sign-up', {
+    'email': email,
+    'password': password,
+    'username': username,
+    'consentVersion': consentVersion,
+    'deviceName': 'Flutter · MobileUI',
+  });
 
   Future<bool> verifyEmail(String email, String code) async {
-    await _request('/api/v1/auth/verify-email', method: 'POST', body: {
-      'email': email,
-      'code': code,
-    });
+    await _request(
+      '/api/v1/auth/verify-email',
+      method: 'POST',
+      body: {'email': email, 'code': code},
+    );
     return true;
   }
 
@@ -371,7 +374,10 @@ final class AppRepository {
     final refreshToken = await _secure.read(key: _refreshTokenKey) ?? '';
     if (refreshToken.isEmpty) return false;
     try {
-      final request = http.Request('POST', Uri.parse('$_apiBase/api/v1/auth/refresh'));
+      final request = http.Request(
+        'POST',
+        Uri.parse('$_apiBase/api/v1/auth/refresh'),
+      );
       request.headers.addAll(_headers(null));
       request.body = jsonEncode({'refreshToken': refreshToken});
       final streamed = await _client

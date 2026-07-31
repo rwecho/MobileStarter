@@ -36,6 +36,7 @@ export type AppRoute =
   | 'settings.legal'
   | 'settings.privacyPolicy'
   | 'settings.termsOfService'
+  | 'settings.subscriptionTerms'
   | 'settings.about'
   | 'settings.deleteAccount'
   | 'notifications.center'

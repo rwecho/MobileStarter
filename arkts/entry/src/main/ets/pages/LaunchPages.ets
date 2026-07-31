@@ -74,14 +74,32 @@ export struct PromoPage {
 
   build() {
     Column({ space: AppSpacing.x5 }) {
-      Text('跳过')
-        .fontColor(AppColors.textSecondary)
-        .width('100%')
-        .textAlign(TextAlign.End)
-        .onClick(() => {
-          clearInterval(this.timer)
-          this.enter()
-        })
+      Row() {
+        Text(`${this.countdown}`)
+          .fontSize(18)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(AppColors.brand)
+          .width(44)
+          .height(44)
+          .textAlign(TextAlign.Center)
+          .backgroundColor(AppColors.brandSoft)
+          .borderRadius(22)
+          .accessibilityText(`倒计时 ${this.countdown}`)
+        Blank()
+        if (this.store.config?.splash.skippable !== false) {
+          Button('跳过')
+            .fontColor(AppColors.textSecondary)
+            .backgroundColor(Color.Transparent)
+            .height(44)
+            .padding({ left: AppSpacing.x3, right: AppSpacing.x3 })
+            .onClick(() => {
+              clearInterval(this.timer)
+              this.enter()
+            })
+        }
+      }
+      .width('100%')
+      .height(44)
       Blank()
       if (this.store.config?.splash.imageUrl && !this.imageFailed) {
         Image(this.store.config.splash.imageUrl)
@@ -103,12 +121,6 @@ export struct PromoPage {
         '这里可以由远程配置展示活动、广告或新功能。')
         .fontColor(AppColors.textSecondary)
       Blank()
-      Text(`${this.countdown}`)
-        .fontSize(48)
-        .fontWeight(FontWeight.Bold)
-        .fontColor(AppColors.brand)
-      Text(this.store.config?.splash.actionLabel ?? '秒后自动进入')
-        .fontColor(AppColors.textSecondary)
     }
     .padding(AppSpacing.x6)
     .width('100%')

@@ -49,11 +49,14 @@ class _SupportHomeScreenState extends State<SupportHomeScreen> {
             const SizedBox(height: AppSpacing.x5),
             Text('我的工单', style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: AppSpacing.x2),
-            _TicketState(state: controller.tickets),
+            _TicketState(
+              state: controller.tickets,
+              onRetry: controller.loadHome,
+            ),
             const SizedBox(height: AppSpacing.x5),
             Text('常见问题', style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: AppSpacing.x2),
-            _HelpState(state: controller.help),
+            _HelpState(state: controller.help, onRetry: controller.loadHome),
           ],
         ),
       ),
@@ -132,13 +135,14 @@ class _SupportTicketScreenState extends State<SupportTicketScreen> {
 }
 
 class _TicketState extends StatelessWidget {
-  const _TicketState({required this.state});
+  const _TicketState({required this.state, required this.onRetry});
   final AsyncState<List<SupportTicket>> state;
+  final VoidCallback onRetry;
 
   @override
   Widget build(BuildContext context) {
     if (state is! Success<List<SupportTicket>>) {
-      return Text(supportStateText(state));
+      return _SupportStateMessage(state: state, onRetry: onRetry);
     }
     final data = (state as Success<List<SupportTicket>>).data;
     return AppCard(
@@ -164,13 +168,14 @@ class _TicketState extends StatelessWidget {
 }
 
 class _HelpState extends StatelessWidget {
-  const _HelpState({required this.state});
+  const _HelpState({required this.state, required this.onRetry});
   final AsyncState<List<HelpArticle>> state;
+  final VoidCallback onRetry;
 
   @override
   Widget build(BuildContext context) {
     if (state is! Success<List<HelpArticle>>) {
-      return Text(supportStateText(state));
+      return _SupportStateMessage(state: state, onRetry: onRetry);
     }
     final data = (state as Success<List<HelpArticle>>).data;
     return Column(
@@ -189,6 +194,29 @@ class _HelpState extends StatelessWidget {
           .toList(),
     );
   }
+}
+
+class _SupportStateMessage<T> extends StatelessWidget {
+  const _SupportStateMessage({required this.state, required this.onRetry});
+
+  final AsyncState<T> state;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) => AppCard(
+    child: Padding(
+      padding: const EdgeInsets.all(AppSpacing.x4),
+      child: Column(
+        children: [
+          Text(supportStateText(state)),
+          if (state is Failure) ...[
+            const SizedBox(height: AppSpacing.x2),
+            TextButton(onPressed: onRetry, child: const Text('重新加载')),
+          ],
+        ],
+      ),
+    ),
+  );
 }
 
 String supportStateText<T>(AsyncState<T> state) => switch (state) {

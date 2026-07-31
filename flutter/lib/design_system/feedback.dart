@@ -4,13 +4,14 @@ import 'app_icon.dart';
 import 'components.dart';
 
 void showAppToast(BuildContext context, String message, {bool error = false}) {
+  final scheme = Theme.of(context).colorScheme;
   ScaffoldMessenger.of(context).showSnackBar(
     SnackBar(
       content: Row(
         children: [
           AppIcon(
             error ? AppIconName.alert : AppIconName.check,
-            color: error ? AppColors.error : AppColors.success,
+            color: error ? scheme.error : AppColors.success,
             size: 20,
           ),
           const SizedBox(width: AppSpacing.x3),

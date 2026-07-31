@@ -4,6 +4,7 @@ import { AppCard, ListRow, PageHeader } from '../design-system/components';
 import {
   LegalDocument,
   privacyPolicy,
+  subscriptionTerms,
   termsOfService,
 } from '../legal/legalDocuments';
 import { usePreferences } from '../preferences/PreferencesProvider';
@@ -30,6 +31,11 @@ export function LegalIndexScreen() {
             route="settings.termsOfService"
             value="账号与订阅规则"
           />
+          <ListRow
+            label="订阅与自动续期说明"
+            route="settings.subscriptionTerms"
+            value="付款、续期与取消规则"
+          />
         </AppCard>
         <Text style={styles.caption}>生效日期：2026 年 7 月 30 日 · 简体中文</Text>
       </ScrollView>
@@ -43,6 +49,10 @@ export function PrivacyPolicyScreen() {
 
 export function TermsOfServiceScreen() {
   return <LegalDocumentScreen document={termsOfService} />;
+}
+
+export function SubscriptionTermsScreen() {
+  return <LegalDocumentScreen document={subscriptionTerms} />;
 }
 
 function LegalDocumentScreen({ document }: Readonly<{ document: LegalDocument }>) {

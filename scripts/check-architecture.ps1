@@ -8,7 +8,8 @@ $sourcePatterns = @('*.dart', '*.ts', '*.tsx', '*.ets')
 $sourceFiles = foreach ($pattern in $sourcePatterns) {
   Get-ChildItem -LiteralPath $Root -Recurse -File -Filter $pattern |
     Where-Object {
-      $_.FullName -notmatch '[\\/](node_modules(?:\.[^\\/]+)?|build|dist|oh_modules|\.next)[\\/]'
+      $_.FullName -notmatch '[\\/](node_modules(?:\.[^\\/]+)?|build|dist|oh_modules|\.next)[\\/]' -and
+      $_.FullName -notmatch '[\\/]\.claude[\\/]worktrees[\\/]'
     }
 }
 
@@ -34,11 +35,19 @@ foreach ($file in $sourceFiles) {
 
 $svgFiles = Get-ChildItem -LiteralPath $Root -Recurse -File -Filter '*.svg' |
   Where-Object {
-    $_.FullName -notmatch '[\\/](node_modules(?:\.[^\\/]+)?|build|dist|oh_modules|\.next)[\\/]'
+    $_.FullName -notmatch '[\\/](node_modules(?:\.[^\\/]+)?|build|dist|oh_modules|\.next)[\\/]' -and
+    $_.FullName -notmatch '[\\/]\.claude[\\/]worktrees[\\/]'
   }
 foreach ($svg in $svgFiles) {
   $svgText = Get-Content -Raw -LiteralPath $svg.FullName
-  $isIllustration = $svg.BaseName -in @('promo', 'empty', 'offline')
+  $isIllustration = $svg.BaseName -in @(
+    'promo',
+    'empty',
+    'offline',
+    'logo',
+    'app_icon',
+    'start_window_icon'
+  )
   if (-not $isIllustration -and $svgText -notmatch 'viewBox="0 0 24 24"') {
     $errors.Add("$($svg.FullName): SVG must use viewBox 0 0 24 24")
   }

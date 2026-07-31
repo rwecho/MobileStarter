@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:app_settings/app_settings.dart';
 
@@ -51,7 +52,10 @@ class _SettingsUtilityScreenState extends State<SettingsUtilityScreen> {
 
   List<Widget> _storage() => [
     AppCard(
-      child: AppListTile(label: '可再生成缓存', value: _cacheLabel.isEmpty ? '计算中…' : _cacheLabel),
+      child: AppListTile(
+        label: '可再生成缓存',
+        value: _cacheLabel.isEmpty ? '计算中…' : _cacheLabel,
+      ),
     ),
     const SizedBox(height: AppSpacing.x3),
     const Text('清理不会删除登录凭证、个人设置或离线配置。'),
@@ -80,9 +84,9 @@ class _SettingsUtilityScreenState extends State<SettingsUtilityScreen> {
     ),
     const SizedBox(height: AppSpacing.x4),
     AppButton(
-      label: '打开系统设置',
+      label: busy ? '正在打开…' : '打开系统设置',
       icon: AppIconName.settings,
-      onPressed: () => AppSettings.openAppSettings(),
+      onPressed: busy ? null : _openSystemSettings,
     ),
   ];
 
@@ -103,8 +107,32 @@ class _SettingsUtilityScreenState extends State<SettingsUtilityScreen> {
     await SharedPreferencesAsync().remove('mobileui.telemetry.queue');
     if (!mounted) return;
     await _loadCacheLabel();
+    if (!mounted) return;
     setState(() => busy = false);
     showAppToast(context, '可再生成缓存已清理');
+  }
+
+  Future<void> _openSystemSettings() async {
+    if (kIsWeb) {
+      showAppToast(context, '网页端请在浏览器的站点设置中管理权限');
+      return;
+    }
+    final supported =
+        defaultTargetPlatform == TargetPlatform.android ||
+        defaultTargetPlatform == TargetPlatform.iOS ||
+        defaultTargetPlatform == TargetPlatform.macOS;
+    if (!supported) {
+      showAppToast(context, '当前平台不支持直接打开系统设置', error: true);
+      return;
+    }
+    setState(() => busy = true);
+    try {
+      await AppSettings.openAppSettings();
+    } catch (_) {
+      if (mounted) showAppToast(context, '无法打开系统设置，请手动前往设置', error: true);
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
   }
 }
 

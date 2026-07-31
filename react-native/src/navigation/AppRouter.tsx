@@ -19,6 +19,7 @@ import { DeleteAccountScreen, PreferenceScreen } from '../screens/SettingsPrefer
 import {
   LegalIndexScreen,
   PrivacyPolicyScreen,
+  SubscriptionTermsScreen,
   TermsOfServiceScreen,
 } from '../screens/LegalScreens';
 import { StateGalleryScreen } from '../screens/StateGalleryScreen';
@@ -98,6 +99,7 @@ export function AppRouter() {
     case 'settings.legal': screen = <LegalIndexScreen />; break;
     case 'settings.privacyPolicy': screen = <PrivacyPolicyScreen />; break;
     case 'settings.termsOfService': screen = <TermsOfServiceScreen />; break;
+    case 'settings.subscriptionTerms': screen = <SubscriptionTermsScreen />; break;
     case 'settings.helpFeedback': screen = <SupportHomeScreen />; break;
     case 'support.newTicket': screen = <NewTicketScreen />; break;
     case 'support.ticket': screen = <TicketDetailScreen />; break;

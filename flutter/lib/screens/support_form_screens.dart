@@ -3,8 +3,10 @@ import '../app/app_scope.dart';
 import '../design_system/components.dart';
 import '../navigation/app_route.dart';
 import '../support/support_controller.dart';
+import '../support/support_models.dart';
 import '../support/support_scope.dart';
 import '../theme/app_tokens.dart';
+import 'feedback_screenshots.dart';
 
 class NewSupportTicketScreen extends StatefulWidget {
   const NewSupportTicketScreen({super.key});
@@ -111,6 +113,7 @@ class _ProductFeedbackScreenState extends State<ProductFeedbackScreen> {
   final body = TextEditingController();
   String category = 'suggestion';
   int rating = 5;
+  List<FeedbackScreenshot> screenshots = const [];
 
   @override
   void dispose() {
@@ -159,6 +162,12 @@ class _ProductFeedbackScreenState extends State<ProductFeedbackScreen> {
               maxLength: 3000,
               maxLines: 6,
             ),
+            const SizedBox(height: AppSpacing.x4),
+            FeedbackScreenshots(
+              items: screenshots,
+              onChanged: (value) => setState(() => screenshots = value),
+            ),
+            const SizedBox(height: AppSpacing.x4),
             if (controller.lastError != null)
               Text(
                 controller.lastError!,
@@ -181,6 +190,7 @@ class _ProductFeedbackScreenState extends State<ProductFeedbackScreen> {
       title: title.text.trim(),
       body: body.text.trim(),
       rating: rating,
+      screenshots: screenshots,
     );
     if (success && mounted) AppScope.of(context).back();
   }

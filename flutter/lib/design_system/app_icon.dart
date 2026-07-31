@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import '../theme/app_tokens.dart';
 
 enum AppIconName {
   alert,
@@ -43,15 +42,10 @@ extension AppIconPath on AppIconName {
 }
 
 class AppIcon extends StatelessWidget {
-  const AppIcon(
-    this.name, {
-    this.color = AppColors.text,
-    this.size = 24,
-    super.key,
-  });
+  const AppIcon(this.name, {this.color, this.size = 24, super.key});
 
   final AppIconName name;
-  final Color color;
+  final Color? color;
   final double size;
 
   @override
@@ -60,7 +54,10 @@ class AppIcon extends StatelessWidget {
       name.path,
       width: size,
       height: size,
-      colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
+      colorFilter: ColorFilter.mode(
+        color ?? Theme.of(context).colorScheme.onSurface,
+        BlendMode.srcIn,
+      ),
     );
   }
 }

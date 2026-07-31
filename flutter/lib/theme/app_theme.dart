@@ -3,26 +3,30 @@ import 'app_tokens.dart';
 
 abstract final class AppTheme {
   static ThemeData get light => _build(
-        brightness: Brightness.light,
-        background: AppColors.background,
-        surface: AppColors.surface,
-        surfaceMuted: AppColors.surfaceMuted,
-        text: AppColors.text,
-        secondaryText: AppColors.secondaryText,
-        border: AppColors.border,
-        error: AppColors.error,
-      );
+    brightness: Brightness.light,
+    background: AppColors.background,
+    surface: AppColors.surface,
+    surfaceMuted: AppColors.surfaceMuted,
+    text: AppColors.text,
+    secondaryText: AppColors.secondaryText,
+    border: AppColors.border,
+    brandSoft: AppColors.brandSoft,
+    error: AppColors.error,
+    errorSoft: const Color(0xFFFDE8E8),
+  );
 
   static ThemeData get dark => _build(
-        brightness: Brightness.dark,
-        background: const Color(0xFF0F1115),
-        surface: const Color(0xFF1A1D24),
-        surfaceMuted: const Color(0xFF23272F),
-        text: const Color(0xFFE6E8EC),
-        secondaryText: const Color(0xFF9AA1AD),
-        border: const Color(0xFF2C313A),
-        error: const Color(0xFFE06C6C),
-      );
+    brightness: Brightness.dark,
+    background: AppDarkColors.background,
+    surface: AppDarkColors.surface,
+    surfaceMuted: AppDarkColors.surfaceMuted,
+    text: AppDarkColors.text,
+    secondaryText: AppDarkColors.secondaryText,
+    border: AppDarkColors.border,
+    brandSoft: AppDarkColors.brandSoft,
+    error: AppDarkColors.error,
+    errorSoft: AppDarkColors.errorSoft,
+  );
 
   static ThemeData _build({
     required Brightness brightness,
@@ -32,12 +36,17 @@ abstract final class AppTheme {
     required Color text,
     required Color secondaryText,
     required Color border,
+    required Color brandSoft,
     required Color error,
+    required Color errorSoft,
   }) {
     final isDark = brightness == Brightness.dark;
     final colorScheme = isDark
         ? ColorScheme.dark(
             primary: AppColors.brand,
+            onPrimary: AppColors.onBrand,
+            primaryContainer: brandSoft,
+            onPrimaryContainer: text,
             surface: surface,
             error: error,
             onSurface: text,
@@ -52,13 +61,17 @@ abstract final class AppTheme {
             onTertiary: surface,
             tertiaryContainer: border,
             onTertiaryContainer: text,
-            errorContainer: const Color(0xFF3D1A1A),
-            onErrorContainer: error,
+            onError: AppColors.onBrand,
+            errorContainer: errorSoft,
+            onErrorContainer: text,
             surfaceContainerHighest: surfaceMuted,
             outlineVariant: const Color(0xFF3A3E46),
           )
         : ColorScheme.light(
             primary: AppColors.brand,
+            onPrimary: AppColors.onBrand,
+            primaryContainer: brandSoft,
+            onPrimaryContainer: AppColors.brand,
             surface: surface,
             error: error,
             onSurface: text,
@@ -73,7 +86,8 @@ abstract final class AppTheme {
             onTertiary: surface,
             tertiaryContainer: AppColors.brandSoft,
             onTertiaryContainer: AppColors.brand,
-            errorContainer: const Color(0xFFFDE8E8),
+            onError: AppColors.onBrand,
+            errorContainer: errorSoft,
             onErrorContainer: error,
             surfaceContainerHighest: surfaceMuted,
             outlineVariant: const Color(0xFFEEF0F2),
@@ -85,8 +99,27 @@ abstract final class AppTheme {
       colorScheme: colorScheme,
       dividerColor: border,
       navigationBarTheme: NavigationBarThemeData(
-        indicatorColor: AppColors.brandSoft,
+        indicatorColor: brandSoft,
         backgroundColor: surface,
+        labelTextStyle: WidgetStatePropertyAll(TextStyle(color: text)),
+        iconTheme: WidgetStateProperty.resolveWith(
+          (states) => IconThemeData(
+            color: states.contains(WidgetState.selected)
+                ? AppColors.brand
+                : secondaryText,
+          ),
+        ),
+      ),
+      appBarTheme: AppBarTheme(
+        backgroundColor: surface,
+        foregroundColor: text,
+        surfaceTintColor: Colors.transparent,
+      ),
+      snackBarTheme: SnackBarThemeData(
+        backgroundColor: surfaceMuted,
+        contentTextStyle: TextStyle(color: text),
+        actionTextColor: isDark ? const Color(0xFFFFA0A0) : AppColors.brand,
+        behavior: SnackBarBehavior.floating,
       ),
       textTheme: TextTheme(
         headlineMedium: TextStyle(
@@ -101,6 +134,8 @@ abstract final class AppTheme {
         ),
         bodyLarge: TextStyle(color: text, fontSize: 16),
         bodyMedium: TextStyle(color: secondaryText, fontSize: 14),
+        titleMedium: TextStyle(color: text, fontSize: 16),
+        labelLarge: TextStyle(color: text, fontSize: 14),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,

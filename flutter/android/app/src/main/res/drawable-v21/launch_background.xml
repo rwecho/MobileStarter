@@ -3,10 +3,7 @@
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:drawable="?android:colorBackground" />
 
-    <!-- Brand logo mark (shared assets/illustrations/logo.svg) -->
-    <item>
-        <bitmap
-            android:gravity="center"
-            android:src="@drawable/launch_image" />
-    </item>
+    <item
+        android:drawable="@drawable/launch_logo"
+        android:gravity="center" />
 </layer-list>

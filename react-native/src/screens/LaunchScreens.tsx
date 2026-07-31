@@ -1,11 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, StyleSheet, Text, View } from 'react-native';
 import { AppButton, OfflineBanner } from '../design-system/components';
 import { PromoIllustration } from '../design-system/PromoIllustration';
 import { useApp } from '../state/AppStore';
 import { usePreferences } from '../preferences/PreferencesProvider';
-import { colors, radii, spacing } from '../theme/tokens';
+import { colors, spacing } from '../theme/tokens';
 import { styles } from '../theme/styles';
+import { SplashHeader } from './SplashHeader';
 
 const LogoImage = require('../../assets/splash-icon.png');
 
@@ -59,25 +60,12 @@ export function PromoScreen() {
 
   return (
     <View style={launchStyles.promo}>
-      {countdown > 0 ? (
-        <View
-          accessibilityLabel={`倒计时 ${countdown}`}
-          accessibilityLiveRegion="polite"
-          style={[launchStyles.countdown, { backgroundColor: palette.surfaceMuted }]}
-        >
-          <Text style={launchStyles.countdownNumber}>{countdown}</Text>
-        </View>
-      ) : null}
-      {canSkip ? (
-        <Pressable
-          accessibilityLabel="跳过宣传页"
-          accessibilityRole="button"
-          onPress={() => replace('home')}
-          style={launchStyles.skip}
-        >
-          <Text style={styles.secondary}>跳过</Text>
-        </Pressable>
-      ) : null}
+      <SplashHeader
+        canSkip={canSkip}
+        countdown={Math.max(countdown, 0)}
+        onSkip={() => replace('home')}
+        surfaceColor={palette.surfaceMuted}
+      />
       <OfflineBanner />
       <PromotionMedia uri={config.splash.imageUrl} />
       <View style={launchStyles.copy}>
@@ -88,9 +76,6 @@ export function PromoScreen() {
           {online ? `配置版本 v${config.version}` : '离线 · 使用最近成功配置'}
         </Text>
       </View>
-      <Text style={launchStyles.autoHint}>
-        {countdown > 0 ? `${countdown} 秒后自动进入` : '即将进入…'}
-      </Text>
     </View>
   );
 }
@@ -127,27 +112,8 @@ export function OnboardingScreen() {
 const launchStyles = StyleSheet.create({
   logoMark: { width: 48, height: 48 },
   promo: { flex: 1, padding: spacing.x6, justifyContent: 'center', gap: spacing.x6 },
-  skip: { position: 'absolute', right: spacing.x5, top: spacing.x4, padding: spacing.x3 },
-  countdown: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'absolute',
-    top: spacing.x4,
-    left: spacing.x5,
-    minWidth: 44,
-    minHeight: 44,
-    borderRadius: radii.round,
-    opacity: 0.72,
-  },
-  countdownNumber: { fontSize: 18, fontWeight: '700', color: colors.brand },
   copy: { gap: spacing.x2 },
   badge: { color: colors.brand, fontSize: 13, fontWeight: '700' },
   fullWidth: { width: '100%' },
   promoImage: { width: '100%', height: 260 },
-  autoHint: {
-    textAlign: 'center',
-    color: colors.secondary,
-    fontSize: 13,
-    marginTop: spacing.x2,
-  },
 });

@@ -17,20 +17,26 @@ final class SupportController extends ChangeNotifier {
     help = const Loading();
     tickets = const Loading();
     notifyListeners();
-    try {
-      final results = await Future.wait([
-        _repository.help(),
-        _repository.tickets(),
-      ]);
-      final articles = results[0] as List<HelpArticle>;
-      final items = results[1] as List<SupportTicket>;
-      help = articles.isEmpty ? const Empty() : Success(articles);
-      tickets = items.isEmpty ? const Empty() : Success(items);
-    } catch (error) {
-      help = Failure(error.toString());
-      tickets = Failure(error.toString());
-    }
+    await Future.wait([_loadHelp(), _loadTickets()]);
     notifyListeners();
+  }
+
+  Future<void> _loadHelp() async {
+    try {
+      final articles = await _repository.help();
+      help = articles.isEmpty ? const Empty() : Success(articles);
+    } catch (_) {
+      help = const Failure('常见问题暂时无法加载，请稍后重试');
+    }
+  }
+
+  Future<void> _loadTickets() async {
+    try {
+      final items = await _repository.tickets();
+      tickets = items.isEmpty ? const Empty() : Success(items);
+    } catch (_) {
+      tickets = const Failure('工单暂时无法加载，请稍后重试');
+    }
   }
 
   Future<bool> createTicket({
@@ -55,8 +61,8 @@ final class SupportController extends ChangeNotifier {
     notifyListeners();
     try {
       detail = Success(await _repository.ticket(id));
-    } catch (error) {
-      detail = Failure(error.toString());
+    } catch (_) {
+      detail = const Failure('工单详情暂时无法加载，请稍后重试');
     }
     notifyListeners();
   }
@@ -80,12 +86,14 @@ final class SupportController extends ChangeNotifier {
     required String title,
     required String body,
     required int rating,
+    required List<FeedbackScreenshot> screenshots,
   }) => _run(
     () => _repository.feedback(
       category: category,
       title: title,
       body: body,
       rating: rating,
+      screenshots: screenshots,
     ),
   );
 
@@ -97,8 +105,8 @@ final class SupportController extends ChangeNotifier {
     try {
       await operation();
       return true;
-    } catch (error) {
-      lastError = error.toString();
+    } catch (_) {
+      lastError = '提交失败，请检查网络后重试';
       return false;
     } finally {
       busy = false;

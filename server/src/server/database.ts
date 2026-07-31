@@ -47,26 +47,48 @@ export function nowIso() {
 
 async function ensureDevelopmentTestAccount() {
   const email = 'test@mobileui.local';
+  const passwordHash = await hashPassword('test123');
+  const timestamp = nowIso();
   const exists = database.prepare(
     'SELECT id FROM users WHERE app_id = ? AND email = ?',
   ).get('mobileui', email) as { id: string } | undefined;
   if (exists) {
     if (exists.id === 'development-test-account') {
-      database.prepare('UPDATE users SET username = ? WHERE id = ?')
-        .run('test', exists.id);
+      database.prepare(`
+        UPDATE users
+        SET username = ?, password_hash = ?, updated_at = ?
+        WHERE id = ?
+      `).run('test', passwordHash, timestamp, exists.id);
+      ensureDevelopmentTestPhone(exists.id, timestamp);
     }
     return;
   }
-  const createdAt = nowIso();
-  const passwordHash = await hashPassword('test123');
   database.prepare(`
     INSERT INTO users(
       id, app_id, email, password_hash, username, created_at, updated_at
     ) VALUES (?, ?, ?, ?, ?, ?, ?)
   `).run(
     'development-test-account', 'mobileui', email, passwordHash, 'test',
-    createdAt, createdAt,
+    timestamp, timestamp,
   );
+  ensureDevelopmentTestPhone('development-test-account', timestamp);
+}
+
+function ensureDevelopmentTestPhone(userId: string, createdAt: string) {
+  const subject = 'mobileui:+8613800000000';
+  const identity = database.prepare(`
+    SELECT user_id FROM external_identities
+    WHERE provider = 'phone' AND provider_subject = ?
+  `).get(subject) as { user_id: string } | undefined;
+  if (identity && identity.user_id !== userId) {
+    throw new Error('Development test phone is assigned to another account');
+  }
+  if (identity) return;
+  database.prepare(`
+    INSERT INTO external_identities(
+      id, user_id, provider, provider_subject, email, created_at
+    ) VALUES (?, ?, 'phone', ?, ?, ?)
+  `).run('development-test-phone', userId, subject, 'test@mobileui.local', createdAt);
 }
 
 async function ensureBootstrapAdmin() {
@@ -191,6 +213,15 @@ function upgradeConfig(document: string, appId: string, environment: string) {
       ...parsed,
       telemetry: parsed.telemetry ?? defaultConfig.telemetry,
       support: parsed.support ?? defaultConfig.support,
+    } as RuntimeConfig;
+    saveRuntimeConfig(upgraded, appId, environment);
+    return upgraded;
+  }
+  if ((parsed.version ?? 0) < defaultConfig.version) {
+    const upgraded = {
+      ...parsed,
+      version: defaultConfig.version,
+      legal: defaultConfig.legal,
     } as RuntimeConfig;
     saveRuntimeConfig(upgraded, appId, environment);
     return upgraded;

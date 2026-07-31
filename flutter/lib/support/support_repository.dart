@@ -1,7 +1,7 @@
 import 'dart:convert';
-import 'dart:io';
 import 'dart:math';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -26,7 +26,9 @@ final class SupportRepository {
   }
 
   // environment（development/staging/production 等）同样必须显式配置，未配置即报错。
-  static const _appEnvironmentValue = String.fromEnvironment('MOBILEUI_APP_ENVIRONMENT');
+  static const _appEnvironmentValue = String.fromEnvironment(
+    'MOBILEUI_APP_ENVIRONMENT',
+  );
   static String get _appEnvironment {
     if (_appEnvironmentValue.isEmpty) {
       throw StateError(
@@ -35,11 +37,12 @@ final class SupportRepository {
     }
     return _appEnvironmentValue;
   }
+
   static const _installationKey = 'mobileui.support.installationId';
   // Mirrors AppRepository._tokenKey so support calls carry the same session
   // token as the rest of the app (support tickets are user-scoped).
   static const _sessionTokenKey = 'mobileui.sessionToken';
-  final FlutterSecureStorage _secure = FlutterSecureStorage();
+  final FlutterSecureStorage _secure = const FlutterSecureStorage();
   Future<String>? _installationFuture;
 
   Future<List<HelpArticle>> help() async {
@@ -94,6 +97,7 @@ final class SupportRepository {
     required String title,
     required String body,
     required int rating,
+    required List<FeedbackScreenshot> screenshots,
   }) async {
     await _request(
       '/api/v1/support/feedback',
@@ -103,6 +107,7 @@ final class SupportRepository {
         'title': title,
         'body': body,
         'rating': rating,
+        'screenshots': screenshots.map((item) => item.toJson()).toList(),
       },
     );
   }
@@ -118,7 +123,7 @@ final class SupportRepository {
       'content-type': 'application/json',
       'x-app-id': _appId,
       'x-app-environment': _appEnvironment,
-      'x-platform': Platform.isIOS ? 'ios' : 'android',
+      'x-platform': _platformName(),
       'x-app-version': '1.0.0',
       'x-installation-id': installationId,
       'accept-language': 'zh-CN',
@@ -157,4 +162,16 @@ final class SupportRepository {
 
   static Map<String, Object?> _map(Object? value) =>
       Map<String, Object?>.from(value! as Map);
+}
+
+String _platformName() {
+  if (kIsWeb) return 'web';
+  return switch (defaultTargetPlatform) {
+    TargetPlatform.android => 'android',
+    TargetPlatform.iOS => 'ios',
+    TargetPlatform.macOS => 'macos',
+    TargetPlatform.windows => 'windows',
+    TargetPlatform.linux => 'linux',
+    TargetPlatform.fuchsia => 'fuchsia',
+  };
 }

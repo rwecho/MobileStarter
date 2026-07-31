@@ -78,12 +78,13 @@ class AppButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final color = destructive ? scheme.error : scheme.primary;
+    final foreground = destructive ? scheme.onError : scheme.onPrimary;
     return FilledButton(
       onPressed: onPressed,
       style: FilledButton.styleFrom(
         minimumSize: const Size.fromHeight(52),
         backgroundColor: color,
-        foregroundColor: scheme.onPrimary,
+        foregroundColor: foreground,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppRadii.control),
         ),
@@ -92,7 +93,7 @@ class AppButton extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           if (icon != null) ...[
-            AppIcon(icon!, color: scheme.onPrimary, size: 20),
+            AppIcon(icon!, color: foreground, size: 20),
             const SizedBox(width: AppSpacing.x2),
           ],
           Text(label),
@@ -109,12 +110,13 @@ class AppCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: scheme.surface,
-        border: Border.all(color: scheme.outline),
+    return Material(
+      color: scheme.surface,
+      shape: RoundedRectangleBorder(
+        side: BorderSide(color: scheme.outline),
         borderRadius: BorderRadius.circular(AppRadii.card),
       ),
+      clipBehavior: Clip.antiAlias,
       child: child,
     );
   }

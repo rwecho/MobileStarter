@@ -1,7 +1,14 @@
 'use client';
 
 import * as React from 'react';
-import { ChevronLeft, ChevronRight, Search } from 'lucide-react';
+import {
+  AlertTriangle,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  ChevronUp,
+  Search,
+} from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -36,6 +43,7 @@ export function LogsPanel() {
   const [name, setName] = React.useState('');
   const [platform, setPlatform] = React.useState('');
   const [offset, setOffset] = React.useState(0);
+  const [expandedId, setExpandedId] = React.useState<string | null>(null);
 
   const resetFilters = (patch: { since?: number; name?: string; platform?: string }) => {
     setOffset(0);
@@ -127,16 +135,42 @@ export function LogsPanel() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {rows.map((row) => (
-                    <TableRow key={row.eventId}>
-                      <TableCell className="text-muted-foreground whitespace-nowrap">{formatDateTime(row.receivedAt)}</TableCell>
-                      <TableCell className="font-medium">{row.name}</TableCell>
-                      <TableCell className="text-muted-foreground">{row.screenId ?? '—'}</TableCell>
-                      <TableCell><Badge variant="secondary">{row.platform}</Badge></TableCell>
-                      <TableCell className="text-muted-foreground font-mono text-xs">{row.appVersion}</TableCell>
-                      <TableCell className="text-muted-foreground font-mono text-xs">{row.userId ?? row.anonymousId.slice(0, 8)}</TableCell>
-                    </TableRow>
-                  ))}
+                  {rows.map((row) => {
+                    const expanded = expandedId === row.eventId;
+                    return (
+                      <React.Fragment key={row.eventId}>
+                        <TableRow>
+                          <TableCell className="text-muted-foreground whitespace-nowrap">
+                            {formatDateTime(row.receivedAt)}
+                          </TableCell>
+                          <TableCell>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-auto gap-2 px-0 font-medium"
+                              aria-expanded={expanded}
+                              onClick={() => setExpandedId(expanded ? null : row.eventId)}
+                            >
+                              {row.name === 'app_error' ? (
+                                <AlertTriangle className="size-4 text-destructive" />
+                              ) : null}
+                              {row.name}
+                              {expanded
+                                ? <ChevronUp className="size-3.5 opacity-50" />
+                                : <ChevronDown className="size-3.5 opacity-50" />}
+                            </Button>
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">{row.screenId ?? '—'}</TableCell>
+                          <TableCell><Badge variant="secondary">{row.platform}</Badge></TableCell>
+                          <TableCell className="text-muted-foreground font-mono text-xs">{row.appVersion}</TableCell>
+                          <TableCell className="text-muted-foreground whitespace-nowrap text-xs">
+                            {visitorLabel(row)}
+                          </TableCell>
+                        </TableRow>
+                        {expanded ? <LogDetailRow row={row} /> : null}
+                      </React.Fragment>
+                    );
+                  })}
                 </TableBody>
               </Table>
             )}
@@ -157,6 +191,62 @@ export function LogsPanel() {
       </Card>
     </div>
   );
+}
+
+function LogDetailRow({ row }: Readonly<{ row: LogRow }>) {
+  const properties = Object.entries(row.properties);
+  return (
+    <TableRow className="bg-muted/30 hover:bg-muted/30">
+      <TableCell colSpan={6} className="p-4">
+        <div className="grid gap-3 md:grid-cols-2">
+          <Detail label="事件 ID" value={row.eventId} mono />
+          <Detail label="发生时间" value={formatDateTime(row.occurredAt)} />
+          {properties.map(([key, value]) => (
+            <Detail
+              key={key}
+              label={propertyLabel(key)}
+              value={String(value)}
+              mono={key === 'error_name'}
+              wide={key === 'error_message'}
+            />
+          ))}
+          {!properties.length ? (
+            <p className="text-muted-foreground text-sm md:col-span-2">该事件没有附加属性。</p>
+          ) : null}
+        </div>
+      </TableCell>
+    </TableRow>
+  );
+}
+
+function Detail({
+  label, value, mono = false, wide = false,
+}: Readonly<{ label: string; value: string; mono?: boolean; wide?: boolean }>) {
+  return (
+    <div className={wide ? 'md:col-span-2' : undefined}>
+      <p className="text-muted-foreground mb-1 text-xs">{label}</p>
+      <p className={`break-words text-sm whitespace-pre-wrap ${mono ? 'font-mono text-xs' : ''}`}>
+        {value}
+      </p>
+    </div>
+  );
+}
+
+function propertyLabel(key: string) {
+  return {
+    error_name: '错误类型',
+    error_message: '错误信息',
+    error_stack: '调用栈',
+    duration_ms: '停留时间（毫秒）',
+    screen_id: '屏幕标识',
+    action_id: '操作标识',
+  }[key] ?? key;
+}
+
+function visitorLabel(row: LogRow) {
+  return row.userId
+    ? `用户 · ${row.userId.slice(0, 8)}`
+    : `匿名访客 · ${row.anonymousId.slice(-6)}`;
 }
 
 function FilterSelect({

@@ -5,6 +5,8 @@ import 'dart:math';
 import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -34,6 +36,7 @@ final class Telemetry {
   static const _batchSize = 25;
   static const _queueKey = 'mobileui.telemetry.queue';
   static const _anonymousKey = 'mobileui.telemetry.anonymousId';
+  static const _sessionTokenKey = 'mobileui.sessionToken';
   static const _apiBase = String.fromEnvironment(
     'MOBILEUI_API_URL',
     defaultValue: 'http://localhost:3210',
@@ -63,6 +66,7 @@ final class Telemetry {
 
   final _queue = <Map<String, Object?>>[];
   final _firebaseQueue = <Map<String, Object?>>[];
+  final _secure = const FlutterSecureStorage();
   final _sessionId = _id('session');
   TelemetryConfig _config = const TelemetryConfig();
   String _anonymousId = '';
@@ -131,12 +135,16 @@ final class Telemetry {
   }
 
   void report(Object error, StackTrace? stack) {
+    final message = error.toString();
+    final stackText = stack?.toString() ?? '';
     track('app_error', {
       'error_name': error.runtimeType.toString(),
-      'error_message': error.toString().substring(
+      'error_message': message.substring(
         0,
-        min(180, error.toString().length),
+        min(200, message.length),
       ),
+      if (stackText.isNotEmpty)
+        'error_stack': stackText.substring(0, min(200, stackText.length)),
     });
     if (_config.firebaseEnabled && _config.crashlyticsEnabled) {
       unawaited(
@@ -175,6 +183,7 @@ final class Telemetry {
     _flushing = true;
     final batch = _queue.take(_batchSize).toList(growable: false);
     try {
+      final token = await _secure.read(key: _sessionTokenKey) ?? '';
       final response = await http
           .post(
             Uri.parse('$_apiBase/api/v1/telemetry/events'),
@@ -182,8 +191,9 @@ final class Telemetry {
               'content-type': 'application/json',
               'x-app-id': _appId,
               'x-app-environment': _appEnvironment,
-              'x-platform': 'flutter',
+              'x-platform': _platform,
               'x-app-version': '1.0.0',
+              if (token.isNotEmpty) 'authorization': 'Bearer $token',
             },
             body: jsonEncode({
               'anonymousId': _anonymousId.isEmpty
@@ -266,6 +276,15 @@ final class Telemetry {
 
   static String _id(String prefix) =>
       '$prefix-${DateTime.now().microsecondsSinceEpoch}-${Random().nextInt(0x3FFFFFFF)}';
+
+  static String get _platform {
+    if (kIsWeb) return 'web';
+    return switch (defaultTargetPlatform) {
+      TargetPlatform.iOS => 'ios',
+      TargetPlatform.android => 'android',
+      _ => 'web',
+    };
+  }
 }
 
 final telemetry = Telemetry();

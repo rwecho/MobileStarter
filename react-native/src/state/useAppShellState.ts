@@ -24,6 +24,13 @@ export function useNavigationState() {
     routeKey += 1;
     setStack([{ key: `route-${routeKey}`, name }]);
   }, []);
+  const replaceTop = useCallback((name: AppRoute) => {
+    routeKey += 1;
+    setStack((current) => [
+      ...current.slice(0, -1),
+      { key: `route-${routeKey}`, name },
+    ]);
+  }, []);
   const back = useCallback(() => {
     setStack((current) => current.length > 1 ? current.slice(0, -1) : current);
   }, []);
@@ -32,8 +39,9 @@ export function useNavigationState() {
     canGoBack: stack.length > 1,
     navigate,
     replace,
+    replaceTop,
     back,
-  }), [back, navigate, replace, stack]);
+  }), [back, navigate, replace, replaceTop, stack]);
 }
 
 export function useFeedbackState() {

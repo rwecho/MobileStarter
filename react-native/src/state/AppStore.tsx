@@ -148,7 +148,7 @@ export function AppProvider({ children }: Readonly<{ children: ReactNode }>) {
     run,
     setUser,
     onAuthenticated: () => {
-      navigation.replace(pendingRoute ?? 'profile.home');
+      navigation.replaceTop(pendingRoute ?? 'profile.home');
       setPendingRoute(null);
     },
     onSignedOut: () => navigation.replace('home'),

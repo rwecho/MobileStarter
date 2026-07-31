@@ -51,6 +51,9 @@ release/logs/
 release/screenshots/
 release/*.zip
 
+# Claude Code
+.claude/
+
 # IDE and OS
 .idea/
 .vscode/

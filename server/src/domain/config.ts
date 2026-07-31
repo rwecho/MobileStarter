@@ -112,7 +112,7 @@ export const defaultConfig: RuntimeConfig = {
   schemaVersion: 1,
   version: 2,
   brand: {
-    appName: 'MobileStarter',
+    appName: '终北统一认证',
     tagline: '把灵感变成作品',
     primaryColor: '#A84444',
   },
@@ -212,6 +212,9 @@ export const defaultConfig: RuntimeConfig = {
     notifications: true,
     profileEditing: true,
     accountDeletion: true,
+    statistics: false,
+    coupons: false,
+    invites: false,
   },
   entitlements: [
     { key: 'export.hd', label: '高清导出', description: '导出 1080P 高清内容' },

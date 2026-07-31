@@ -27,8 +27,8 @@ const HEADER_ADMIN: AdminProfile = {
  * non-production an `x-admin-key` header is still accepted, taking the app_id
  * from the `x-app-id` header so local curl/automation keeps working.
  */
-export function authorizeAdmin(request: NextRequest): AdminSession {
-  const session = getAdminFromRequest(request);
+export async function authorizeAdmin(request: NextRequest): Promise<AdminSession> {
+  const session = await getAdminFromRequest(request);
   if (session) return session;
   if (process.env.NODE_ENV !== 'production') {
     const expected = process.env.MOBILEUI_ADMIN_KEY ?? 'local-development-admin';
@@ -50,11 +50,11 @@ export function authorizeAdmin(request: NextRequest): AdminSession {
  * comes from the `x-app-environment` header so the admin can switch release
  * lanes within that app.
  */
-export function adminContext(request: NextRequest): {
+export async function adminContext(request: NextRequest): Promise<{
   admin: AdminProfile;
   scope: AdminScope;
-} {
-  const { admin, appId } = authorizeAdmin(request);
+}> {
+  const { admin, appId } = await authorizeAdmin(request);
   const environment = request.headers.get('x-app-environment')?.trim();
   if (!environment) {
     throw new ApiError(400, 'ENVIRONMENT_REQUIRED', '缺少 x-app-environment 头：请先选择环境');

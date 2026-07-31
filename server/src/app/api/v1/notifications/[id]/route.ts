@@ -7,9 +7,9 @@ type RouteContext = { params: Promise<{ id: string }> };
 
 export async function PATCH(request: NextRequest, context: RouteContext) {
   try {
-    const { user } = requireAuth(request);
+    const { user } = await requireAuth(request);
     const { id } = await context.params;
-    const result = database.prepare(`
+    const result = await database.prepare(`
       UPDATE notifications SET read_at = COALESCE(read_at, ?)
       WHERE id = ? AND user_id = ?
     `).run(nowIso(), id, user.id);
@@ -24,9 +24,9 @@ export const PUT = PATCH;
 
 export async function DELETE(request: NextRequest, context: RouteContext) {
   try {
-    const { user } = requireAuth(request);
+    const { user } = await requireAuth(request);
     const { id } = await context.params;
-    const result = database.prepare(
+    const result = await database.prepare(
       'DELETE FROM notifications WHERE id = ? AND user_id = ?',
     ).run(id, user.id);
     if (!result.changes) throw new ApiError(404, 'NOTIFICATION_NOT_FOUND', '通知不存在');

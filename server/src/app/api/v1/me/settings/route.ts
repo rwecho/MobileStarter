@@ -6,9 +6,9 @@ import { getClientContext } from '@/server/client-context';
 import { settingsSchema } from '@/server/schemas';
 import { getRuntimeConfig } from '@/server/database';
 
-export function GET(request: NextRequest) {
+export async function GET(request: NextRequest) {
   try {
-    return ok(toPublicUser(requireAuth(request).user).settings);
+    return ok(toPublicUser((await requireAuth(request)).user).settings);
   } catch (error) {
     return handleError(error);
   }
@@ -16,14 +16,14 @@ export function GET(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
-    const { user } = requireAuth(request);
+    const { user } = await requireAuth(request);
     const patch = settingsSchema.parse(await request.json());
-    assertWritable(user.app_id, getClientContext(request).environment, Object.keys(patch));
+    await assertWritable(user.app_id, getClientContext(request).environment, Object.keys(patch));
     const current = JSON.parse(user.settings) as Record<string, unknown>;
-    database.prepare(
+    await database.prepare(
       'UPDATE users SET settings = ?, updated_at = ? WHERE id = ?',
     ).run(JSON.stringify({ ...current, ...patch }), nowIso(), user.id);
-    return ok(toPublicUser(getUserRow(user.id)).settings);
+    return ok(toPublicUser(await getUserRow(user.id)).settings);
   } catch (error) {
     return handleError(error);
   }
@@ -39,8 +39,8 @@ const settingPolicyMap: Readonly<Record<string, string>> = {
   autoplayEnabled: 'general',
 };
 
-function assertWritable(appId: string, environment: string, keys: readonly string[]) {
-  const policies = getRuntimeConfig(appId, environment).settingsPolicy;
+async function assertWritable(appId: string, environment: string, keys: readonly string[]) {
+  const policies = (await getRuntimeConfig(appId, environment)).settingsPolicy;
   for (const key of keys) {
     const policy = policies[settingPolicyMap[key]];
     if (!policy || policy.visibility === 'hidden' || policy.mutability !== 'user') {

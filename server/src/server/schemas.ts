@@ -5,7 +5,7 @@ export const signUpSchema = z.object({
   password: z.string().min(8, '密码至少 8 位').max(72),
   username: z.string().trim().min(2, '用户名至少 2 个字符').max(24),
   consentVersion: z.string().trim().min(1, '请先同意用户协议与隐私政策'),
-  deviceName: z.string().trim().min(1).max(80).default('MobileUI client'),
+  deviceName: z.string().trim().min(1).max(80).default('Zhongbei Auth client'),
 });
 
 export const refreshSchema = z.object({
@@ -33,7 +33,7 @@ export const passwordPolicySchema = z.object({
 export const signInSchema = z.object({
   identifier: z.string().trim().min(2, '请输入用户名、邮箱或手机号').max(254),
   password: z.string().min(1, '请输入密码').max(72),
-  deviceName: z.string().trim().min(1).max(80).default('MobileUI client'),
+  deviceName: z.string().trim().min(1).max(80).default('Zhongbei Auth client'),
 });
 
 export const phoneCodeRequestSchema = z.object({
@@ -42,7 +42,7 @@ export const phoneCodeRequestSchema = z.object({
 
 export const phoneCodeVerifySchema = phoneCodeRequestSchema.extend({
   code: z.string().regex(/^\d{6}$/),
-  deviceName: z.string().trim().min(1).max(80).default('MobileUI client'),
+  deviceName: z.string().trim().min(1).max(80).default('Zhongbei Auth client'),
 });
 
 export const forgotPasswordSchema = z.object({
@@ -66,7 +66,7 @@ export const socialSignInSchema = z.object({
   redirectUri: z.url().optional(),
   codeVerifier: z.string().min(43).max(128).optional(),
   nonce: z.string().min(8).max(200).optional(),
-  deviceName: z.string().trim().min(1).max(80).default('MobileUI client'),
+  deviceName: z.string().trim().min(1).max(80).default('Zhongbei Auth client'),
 });
 
 export const profileSchema = z.object({

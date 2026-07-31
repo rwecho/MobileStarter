@@ -3,10 +3,10 @@ import { getClientContext } from '@/server/client-context';
 import { getRuntimeConfig } from '@/server/database';
 import { handleError, ok } from '@/server/http';
 
-export function GET(request: NextRequest) {
+export async function GET(request: NextRequest) {
   try {
     const client = getClientContext(request);
-    const config = getRuntimeConfig(client.appId, client.environment);
+    const config = await getRuntimeConfig(client.appId, client.environment);
     return ok({
       entitlements: config.entitlements,
       tiers: config.tiers,

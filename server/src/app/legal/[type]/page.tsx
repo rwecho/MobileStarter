@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { findPublicLegal } from '@/server/public-legal';
+import { DEFAULT_APP_ID } from '@/server/service-identity';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,18 +17,18 @@ function readString(value: string | readonly string[] | undefined, fallback: str
 export async function generateMetadata({ params, searchParams }: Props): Promise<Metadata> {
   const { type } = await params;
   const sp = await searchParams;
-  const appId = readString(sp.app, 'mobileui');
+  const appId = readString(sp.app, DEFAULT_APP_ID);
   const locale = readString(sp.locale, 'zh-CN');
-  const doc = findPublicLegal(appId, type, locale);
+  const doc = await findPublicLegal(appId, type, locale);
   return { title: doc?.title ?? '法务文档' };
 }
 
 export default async function LegalPage({ params, searchParams }: Props) {
   const { type } = await params;
   const sp = await searchParams;
-  const appId = readString(sp.app, 'mobileui');
+  const appId = readString(sp.app, DEFAULT_APP_ID);
   const locale = readString(sp.locale, 'zh-CN');
-  const doc = findPublicLegal(appId, type, locale);
+  const doc = await findPublicLegal(appId, type, locale);
   if (!doc) notFound();
 
   return (

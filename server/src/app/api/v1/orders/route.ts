@@ -6,10 +6,10 @@ import { ApiError, handleError, ok } from '@/server/http';
 import { createOrder, ordersForUser } from '@/server/order-service';
 import { orderSchema } from '@/server/schemas';
 
-export function GET(request: NextRequest) {
+export async function GET(request: NextRequest) {
   try {
-    const { user } = requireAuth(request);
-    return ok(ordersForUser(user.id));
+    const { user } = await requireAuth(request);
+    return ok(await ordersForUser(user.id));
   } catch (error) {
     return handleError(error);
   }
@@ -17,14 +17,14 @@ export function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const { user } = requireAuth(request);
+    const { user } = await requireAuth(request);
     const idempotencyKey = request.headers.get('idempotency-key');
     if (!idempotencyKey) {
       throw new ApiError(400, 'IDEMPOTENCY_REQUIRED', '缺少幂等键');
     }
     const input = orderSchema.parse(await request.json());
     const client = getClientContext(request);
-    const config = getRuntimeConfig(user.app_id, client.environment);
+    const config = await getRuntimeConfig(user.app_id, client.environment);
     const order = await createOrder({
       appId: user.app_id,
       environment: client.environment,

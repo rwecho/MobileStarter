@@ -1,115 +1,129 @@
-import fs from 'node:fs';
-import path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { DatabaseSync } from 'node:sqlite';
-import { defaultConfig } from '@/domain/config';
-import type { RuntimeConfig } from '@/domain/config';
-import { hashPassword } from './passwords';
+import { defaultConfig, type RuntimeConfig } from '@/domain/config';
 import { initializeCoreSchema } from './database-schema-core';
 import { initializeProductSchema } from './database-schema-product';
+import { hashPassword } from './passwords';
+import { PostgresDatabase } from './postgres-database';
+import { DEFAULT_APP_ID } from './service-identity';
 
-const databasePath = process.env.MOBILEUI_DATABASE_PATH
-  ?? path.join(process.cwd(), 'data', 'mobileui.db');
+export const database = new PostgresDatabase();
 
-fs.mkdirSync(path.dirname(databasePath), { recursive: true });
-
-export const database = new DatabaseSync(databasePath);
-database.exec('PRAGMA busy_timeout = 10000');
-database.exec('PRAGMA foreign_keys = ON');
-initializeCoreSchema(database);
-initializeProductSchema(database);
-ensureUserColumns();
-ensureAdminSessionAppId();
-
-const insertConfig = database.prepare(`
-  INSERT OR IGNORE INTO runtime_config(app_id, version, document, updated_at)
-  VALUES (?, ?, ?, ?)
-`);
-insertConfig.run('mobileui', defaultConfig.version, JSON.stringify(defaultConfig), nowIso());
-database.prepare(`
-  INSERT OR IGNORE INTO runtime_configs(app_id, environment, version, document, updated_at)
-  VALUES (?, 'development', ?, ?, ?)
-`).run('mobileui', defaultConfig.version, JSON.stringify(defaultConfig), nowIso());
-database.prepare(`
-  INSERT OR IGNORE INTO config_revisions(
-    id, app_id, environment, version, document, action, actor, created_at
-  ) VALUES (?, 'mobileui', 'development', ?, ?, 'seed', 'system', ?)
-`).run(randomUUID(), defaultConfig.version, JSON.stringify(defaultConfig), nowIso());
-
-if (process.env.NODE_ENV !== 'production') {
-  await ensureDevelopmentTestAccount();
+if (
+  process.env.AUTH_SKIP_DATABASE_INIT !== '1' &&
+  process.env.MOBILEUI_SKIP_DATABASE_INIT !== '1'
+) {
+  await initializeCoreSchema(database);
+  await initializeProductSchema(database);
+  await applyIdempotentMigrations();
+  await seedDefaultConfig();
+  if (process.env.NODE_ENV !== 'production') {
+    await ensureDevelopmentTestAccount();
+  }
+  await ensureBootstrapAdmin();
 }
-await ensureBootstrapAdmin();
 
 export function nowIso() {
   return new Date().toISOString();
 }
 
+async function applyIdempotentMigrations() {
+  await database.exec(`
+    ALTER TABLE admin_sessions
+      ADD COLUMN IF NOT EXISTS app_id TEXT NOT NULL DEFAULT '';
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS display_name TEXT;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS bio TEXT NOT NULL DEFAULT '';
+    ALTER TABLE users
+      ADD COLUMN IF NOT EXISTS email_verified INTEGER NOT NULL DEFAULT 0;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS consent_version TEXT;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS consented_at TEXT;
+    UPDATE users SET display_name = username
+    WHERE display_name IS NULL OR trim(display_name) = '';
+  `);
+}
+
+async function seedDefaultConfig() {
+  const timestamp = nowIso();
+  const document = JSON.stringify(defaultConfig);
+  await database.prepare(`
+    INSERT INTO runtime_config(app_id, version, document, updated_at)
+    VALUES (?, ?, ?, ?) ON CONFLICT DO NOTHING
+  `).run(DEFAULT_APP_ID, defaultConfig.version, document, timestamp);
+  await database.prepare(`
+    INSERT INTO runtime_configs(app_id, environment, version, document, updated_at)
+    VALUES (?, 'development', ?, ?, ?) ON CONFLICT DO NOTHING
+  `).run(DEFAULT_APP_ID, defaultConfig.version, document, timestamp);
+  await database.prepare(`
+    INSERT INTO config_revisions(
+      id, app_id, environment, version, document, action, actor, created_at
+    ) VALUES (?, ?, 'development', ?, ?, 'seed', 'system', ?)
+    ON CONFLICT DO NOTHING
+  `).run(randomUUID(), DEFAULT_APP_ID, defaultConfig.version, document, timestamp);
+}
+
 async function ensureDevelopmentTestAccount() {
-  const email = 'test@mobileui.local';
+  const email = 'test@zhongbei.local';
   const passwordHash = await hashPassword('test123');
   const timestamp = nowIso();
-  const exists = database.prepare(
+  const exists = await database.prepare(
     'SELECT id FROM users WHERE app_id = ? AND email = ?',
-  ).get('mobileui', email) as { id: string } | undefined;
+  ).get<{ id: string }>(DEFAULT_APP_ID, email);
   if (exists) {
     if (exists.id === 'development-test-account') {
-      database.prepare(`
-        UPDATE users
-        SET username = ?, password_hash = ?, updated_at = ?
+      await database.prepare(`
+        UPDATE users SET username = ?, password_hash = ?, updated_at = ?
         WHERE id = ?
       `).run('test', passwordHash, timestamp, exists.id);
-      ensureDevelopmentTestPhone(exists.id, timestamp);
+      await ensureDevelopmentTestPhone(exists.id, timestamp);
     }
     return;
   }
-  database.prepare(`
+  await database.prepare(`
     INSERT INTO users(
       id, app_id, email, password_hash, username, created_at, updated_at
     ) VALUES (?, ?, ?, ?, ?, ?, ?)
   `).run(
-    'development-test-account', 'mobileui', email, passwordHash, 'test',
+    'development-test-account', DEFAULT_APP_ID, email, passwordHash, 'test',
     timestamp, timestamp,
   );
-  ensureDevelopmentTestPhone('development-test-account', timestamp);
+  await ensureDevelopmentTestPhone('development-test-account', timestamp);
 }
 
-function ensureDevelopmentTestPhone(userId: string, createdAt: string) {
-  const subject = 'mobileui:+8613800000000';
-  const identity = database.prepare(`
+async function ensureDevelopmentTestPhone(userId: string, createdAt: string) {
+  const subject = `${DEFAULT_APP_ID}:+8613800000000`;
+  const identity = await database.prepare(`
     SELECT user_id FROM external_identities
     WHERE provider = 'phone' AND provider_subject = ?
-  `).get(subject) as { user_id: string } | undefined;
+  `).get<{ user_id: string }>(subject);
   if (identity && identity.user_id !== userId) {
     throw new Error('Development test phone is assigned to another account');
   }
   if (identity) return;
-  database.prepare(`
+  await database.prepare(`
     INSERT INTO external_identities(
       id, user_id, provider, provider_subject, email, created_at
     ) VALUES (?, ?, 'phone', ?, ?, ?)
-  `).run('development-test-phone', userId, subject, 'test@mobileui.local', createdAt);
+  `).run('development-test-phone', userId, subject, 'test@zhongbei.local', createdAt);
 }
 
 async function ensureBootstrapAdmin() {
   const envUsername = process.env.MOBILEUI_BOOTSTRAP_ADMIN_USERNAME;
   if (envUsername) {
-    const exists = database.prepare(
+    const exists = await database.prepare(
       'SELECT 1 FROM admin_users WHERE username = ?',
     ).get(envUsername);
     if (!exists) {
       const password = process.env.MOBILEUI_BOOTSTRAP_ADMIN_PASSWORD;
       const email = process.env.MOBILEUI_BOOTSTRAP_ADMIN_EMAIL
-        ?? `${envUsername}@mobileui.local`;
+        ?? `${envUsername}@zhongbei.local`;
       if (password) await seedAdmin(envUsername, email, password);
     }
     return;
   }
   if (process.env.NODE_ENV !== 'production') {
-    const exists = database.prepare(
+    const exists = await database.prepare(
       'SELECT 1 FROM admin_users WHERE username = ?',
     ).get('admin');
-    if (!exists) await seedAdmin('admin', 'admin@mobileui.local', 'admin123');
+    if (!exists) await seedAdmin('admin', 'admin@zhongbei.local', 'admin123');
   }
 }
 
@@ -117,132 +131,121 @@ async function seedAdmin(username: string, email: string, password: string) {
   const id = randomUUID();
   const createdAt = nowIso();
   const passwordHash = await hashPassword(password);
-  database.prepare(`
+  await database.prepare(`
     INSERT INTO admin_users(id, username, email, password_hash, created_at, updated_at)
     VALUES (?, ?, ?, ?, ?, ?)
   `).run(id, username, email, passwordHash, createdAt, createdAt);
 }
 
-function ensureAdminSessionAppId() {
-  const columns = database.prepare('PRAGMA table_info(admin_sessions)').all() as Array<{
-    name: string;
-  }>;
-  if (!columns.some((column) => column.name === 'app_id')) {
-    database.exec("ALTER TABLE admin_sessions ADD COLUMN app_id TEXT NOT NULL DEFAULT ''");
-  }
+export async function runTransaction<T>(action: () => Promise<T>) {
+  return database.transaction(action);
 }
 
-function ensureUserColumns() {
-  const columns = database.prepare('PRAGMA table_info(users)').all() as Array<{
-    name: string;
-  }>;
-  const names = new Set(columns.map((column) => column.name));
-  if (!names.has('display_name')) {
-    database.exec('ALTER TABLE users ADD COLUMN display_name TEXT');
-  }
-  if (!names.has('bio')) {
-    database.exec("ALTER TABLE users ADD COLUMN bio TEXT NOT NULL DEFAULT ''");
-  }
-  if (!names.has('email_verified')) {
-    database.exec('ALTER TABLE users ADD COLUMN email_verified INTEGER NOT NULL DEFAULT 0');
-  }
-  if (!names.has('consent_version')) {
-    database.exec('ALTER TABLE users ADD COLUMN consent_version TEXT');
-  }
-  if (!names.has('consented_at')) {
-    database.exec('ALTER TABLE users ADD COLUMN consented_at TEXT');
-  }
-  database.exec(`
-    UPDATE users SET display_name = username
-    WHERE display_name IS NULL OR trim(display_name) = ''
-  `);
-}
-
-export function runTransaction(action: () => void) {
-  database.exec('BEGIN IMMEDIATE');
-  try {
-    action();
-    database.exec('COMMIT');
-  } catch (error) {
-    if (database.isTransaction) database.exec('ROLLBACK');
-    throw error;
-  }
-}
-
-export function getRuntimeConfig(
-  appId = 'mobileui',
+export async function getRuntimeConfig(
+  appId = DEFAULT_APP_ID,
   environment = 'development',
-): RuntimeConfig {
-  const current = database.prepare(`
+): Promise<RuntimeConfig> {
+  const current = await database.prepare(`
     SELECT document FROM runtime_configs WHERE app_id = ? AND environment = ?
-  `).get(appId, environment) as { document: string } | undefined;
-  if (current) return upgradeConfig(current.document, appId, environment);
-  const row = appId === 'mobileui' && environment === 'development'
-    ? database.prepare(
+  `).get<{ document: string }>(appId, environment);
+  if (current) return await upgradeConfig(current.document, appId, environment);
+  const row = appId === DEFAULT_APP_ID && environment === 'development'
+    ? await database.prepare(
       'SELECT document FROM runtime_config WHERE app_id = ?',
-    ).get(appId) as { document: string } | undefined
+    ).get<{ document: string }>(appId)
     : undefined;
   if (!row) {
-    seedConfigScope(appId, environment);
+    await seedConfigScope(appId, environment);
     return defaultConfig;
   }
-  return upgradeConfig(row.document, appId, environment);
+  return await upgradeConfig(row.document, appId, environment);
 }
 
-function seedConfigScope(appId: string, environment: string) {
-  saveRuntimeConfig(defaultConfig, appId, environment);
-  database.prepare(`
-    INSERT OR IGNORE INTO config_revisions(
+async function seedConfigScope(appId: string, environment: string) {
+  await saveRuntimeConfig(defaultConfig, appId, environment);
+  await database.prepare(`
+    INSERT INTO config_revisions(
       id, app_id, environment, version, document, action, actor, created_at
-    ) VALUES (?, ?, ?, ?, ?, 'seed', 'system', ?)
+    ) VALUES (?, ?, ?, ?, ?, 'seed', 'system', ?) ON CONFLICT DO NOTHING
   `).run(
     randomUUID(), appId, environment, defaultConfig.version,
     JSON.stringify(defaultConfig), nowIso(),
   );
 }
 
-function upgradeConfig(document: string, appId: string, environment: string) {
+async function upgradeConfig(
+  document: string,
+  appId: string,
+  environment: string,
+) {
   const parsed = JSON.parse(document) as Partial<RuntimeConfig>;
   if (!parsed.schemaVersion) {
-    saveRuntimeConfig(defaultConfig, appId, environment);
+    await saveRuntimeConfig(defaultConfig, appId, environment);
     return defaultConfig;
   }
-  if (!parsed.support || !parsed.telemetry) {
-    const upgraded = {
-      ...defaultConfig,
-      ...parsed,
-      telemetry: parsed.telemetry ?? defaultConfig.telemetry,
-      support: parsed.support ?? defaultConfig.support,
-    } as RuntimeConfig;
-    saveRuntimeConfig(upgraded, appId, environment);
-    return upgraded;
-  }
+  const upgraded = mergeRuntimeConfig(parsed);
   if ((parsed.version ?? 0) < defaultConfig.version) {
-    const upgraded = {
+    const versionUpgraded = mergeRuntimeConfig({
       ...parsed,
       version: defaultConfig.version,
       legal: defaultConfig.legal,
-    } as RuntimeConfig;
-    saveRuntimeConfig(upgraded, appId, environment);
-    return upgraded;
+    });
+    await saveRuntimeConfig(versionUpgraded, appId, environment);
+    return versionUpgraded;
   }
-  return parsed as RuntimeConfig;
+  if (JSON.stringify(upgraded) !== JSON.stringify(parsed)) {
+    await saveRuntimeConfig(upgraded, appId, environment);
+  }
+  return upgraded;
 }
 
-export function saveRuntimeConfig(
+function mergeRuntimeConfig(parsed: Partial<RuntimeConfig>): RuntimeConfig {
+  const auth = parsed.auth as Partial<RuntimeConfig['auth']> | undefined;
+  return {
+    ...defaultConfig,
+    ...parsed,
+    brand: { ...defaultConfig.brand, ...parsed.brand },
+    splash: { ...defaultConfig.splash, ...parsed.splash },
+    telemetry: { ...defaultConfig.telemetry, ...parsed.telemetry },
+    support: parsed.support ?? defaultConfig.support,
+    auth: {
+      ...defaultConfig.auth,
+      ...auth,
+      providers: auth?.providers ?? defaultConfig.auth.providers,
+      passwordPolicy: {
+        ...defaultConfig.auth.passwordPolicy,
+        ...auth?.passwordPolicy,
+      },
+    },
+    legal: parsed.legal ?? defaultConfig.legal,
+    settingsPolicy: {
+      ...defaultConfig.settingsPolicy,
+      ...parsed.settingsPolicy,
+    },
+    features: {
+      ...defaultConfig.features,
+      ...parsed.features,
+    },
+    entitlements: parsed.entitlements ?? defaultConfig.entitlements,
+    tiers: parsed.tiers ?? defaultConfig.tiers,
+    plans: parsed.plans ?? defaultConfig.plans,
+  };
+}
+
+export async function saveRuntimeConfig(
   config: RuntimeConfig,
-  appId = 'mobileui',
+  appId = DEFAULT_APP_ID,
   environment = 'development',
 ) {
-  database.prepare(`
+  await database.prepare(`
     INSERT INTO runtime_configs(app_id, environment, version, document, updated_at)
     VALUES (?, ?, ?, ?, ?)
     ON CONFLICT(app_id, environment) DO UPDATE SET
       version = excluded.version, document = excluded.document,
       updated_at = excluded.updated_at
   `).run(appId, environment, config.version, JSON.stringify(config), nowIso());
-  if (appId === 'mobileui' && environment === 'development') {
-    database.prepare(`
+  if (appId === DEFAULT_APP_ID && environment === 'development') {
+    await database.prepare(`
       INSERT INTO runtime_config(app_id, version, document, updated_at)
       VALUES (?, ?, ?, ?)
       ON CONFLICT(app_id) DO UPDATE SET
@@ -252,19 +255,19 @@ export function saveRuntimeConfig(
   }
 }
 
-export function getConfigDraft(appId: string, environment: string) {
-  const row = database.prepare(`
+export async function getConfigDraft(appId: string, environment: string) {
+  const row = await database.prepare(`
     SELECT document FROM config_drafts WHERE app_id = ? AND environment = ?
-  `).get(appId, environment) as { document: string } | undefined;
+  `).get<{ document: string }>(appId, environment);
   return row ? JSON.parse(row.document) as RuntimeConfig : null;
 }
 
-export function saveConfigDraft(
+export async function saveConfigDraft(
   config: RuntimeConfig,
   appId: string,
   environment: string,
 ) {
-  database.prepare(`
+  await database.prepare(`
     INSERT INTO config_drafts(app_id, environment, document, updated_at)
     VALUES (?, ?, ?, ?)
     ON CONFLICT(app_id, environment) DO UPDATE SET

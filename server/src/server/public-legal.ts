@@ -14,13 +14,13 @@ export type PublicLegalDoc = Readonly<{
  * App Store policy links and the in-app legal viewer. Defaults to the
  * `production` environment since public links must reflect the released config.
  */
-export function getPublicLegal(
+export async function getPublicLegal(
   appId: string,
   environment = 'production',
   type?: string,
   locale?: string,
-): PublicLegalDoc[] {
-  const config = getRuntimeConfig(appId, environment);
+): Promise<PublicLegalDoc[]> {
+  const config = await getRuntimeConfig(appId, environment);
   return config.legal
     .filter((doc) => (type ? doc.type === type : true))
     .filter((doc) => (locale ? doc.locale === locale : true))
@@ -35,13 +35,13 @@ export function getPublicLegal(
 }
 
 /** Picks the best legal doc for a type: prefer the requested locale, else any. */
-export function findPublicLegal(
+export async function findPublicLegal(
   appId: string,
   type: string,
   locale: string,
   environment = 'production',
-): PublicLegalDoc | null {
-  return getPublicLegal(appId, environment, type, locale)[0]
-    ?? getPublicLegal(appId, environment, type)[0]
+): Promise<PublicLegalDoc | null> {
+  return (await getPublicLegal(appId, environment, type, locale))[0]
+    ?? (await getPublicLegal(appId, environment, type))[0]
     ?? null;
 }

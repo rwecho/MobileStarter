@@ -11,10 +11,10 @@ type SessionRow = {
   last_seen_at: string;
 };
 
-export function GET(request: NextRequest) {
+export async function GET(request: NextRequest) {
   try {
-    const { user, session } = requireAuth(request);
-    const rows = database.prepare(`
+    const { user, session } = await requireAuth(request);
+    const rows = await database.prepare(`
       SELECT id, device_name, created_at, last_seen_at
       FROM sessions WHERE user_id = ? AND revoked_at IS NULL
       ORDER BY last_seen_at DESC

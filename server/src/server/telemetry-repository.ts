@@ -1,4 +1,4 @@
-import type { SQLInputValue } from 'node:sqlite';
+import type { SQLInputValue } from './postgres-database';
 import { database } from './database';
 import { sinceIso } from './time';
 import type { AdminScope } from './admin-auth';
@@ -36,9 +36,12 @@ export type LogSummary = Readonly<{
   platforms: readonly string[];
 }>;
 
-export function listLogs(scope: AdminScope, filters: LogFilters): LogRow[] {
+export async function listLogs(
+  scope: AdminScope,
+  filters: LogFilters,
+): Promise<LogRow[]> {
   const { where, params } = buildWhere(scope, filters);
-  const rows = database.prepare(`
+  const rows = await database.prepare(`
     SELECT event_id AS eventId, name, screen_id AS screenId, platform,
       app_version AS appVersion, occurred_at AS occurredAt, received_at AS receivedAt,
       anonymous_id AS anonymousId, user_id AS userId, properties
@@ -50,26 +53,29 @@ export function listLogs(scope: AdminScope, filters: LogFilters): LogRow[] {
   return rows.map((row) => ({ ...row, properties: parseJson(row.properties) }));
 }
 
-export function getLogSummary(scope: AdminScope, sinceMinutes: number): LogSummary {
+export async function getLogSummary(
+  scope: AdminScope,
+  sinceMinutes: number,
+): Promise<LogSummary> {
   const since = sinceIso(sinceMinutes);
   const base = 'app_id = ? AND received_at >= ?';
-  const byName = tally(
+  const byName = await tally(
     `SELECT name AS key, COUNT(*) AS count FROM telemetry_events WHERE ${base} GROUP BY name ORDER BY count DESC LIMIT 8`,
     scope.appId,
     since,
   );
-  const byPlatform = tally(
+  const byPlatform = await tally(
     `SELECT platform AS key, COUNT(*) AS count FROM telemetry_events WHERE ${base} GROUP BY platform ORDER BY count DESC`,
     scope.appId,
     since,
   );
-  const series = database.prepare(`
+  const series = await database.prepare(`
     SELECT substr(received_at, 1, 13) AS bucket, COUNT(*) AS count
     FROM telemetry_events WHERE ${base}
     GROUP BY bucket ORDER BY bucket
   `).all(scope.appId, since) as HourPoint[];
   return {
-    total: scalar(
+    total: await scalar(
       `SELECT COUNT(*) AS c FROM telemetry_events WHERE ${base}`,
       scope.appId,
       since,
@@ -100,12 +106,12 @@ function buildWhere(scope: AdminScope, filters: LogFilters) {
   return { where: `WHERE ${clauses.join(' AND ')}`, params };
 }
 
-function tally(sql: string, ...params: SQLInputValue[]): LogTally[] {
-  return database.prepare(sql).all(...params) as LogTally[];
+async function tally(sql: string, ...params: SQLInputValue[]): Promise<LogTally[]> {
+  return await database.prepare(sql).all(...params) as LogTally[];
 }
 
-function scalar(sql: string, ...params: SQLInputValue[]) {
-  return (database.prepare(sql).get(...params) as { c: number }).c;
+async function scalar(sql: string, ...params: SQLInputValue[]) {
+  return (await database.prepare(sql).get(...params) as { c: number }).c;
 }
 
 function parseJson(value: string) {

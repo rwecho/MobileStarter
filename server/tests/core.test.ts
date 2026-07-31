@@ -57,7 +57,7 @@ test('sign-in accepts username, email, and international phone identifiers', () 
 test('profile updates display fields but reject username changes', () => {
   assert.equal(profileSchema.safeParse({
     displayName: 'Test User',
-    bio: 'MobileUI test account',
+    bio: 'Zhongbei Auth test account',
   }).success, true);
   assert.equal(profileSchema.safeParse({ username: 'renamed-login' }).success, false);
 });

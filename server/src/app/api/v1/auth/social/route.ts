@@ -9,7 +9,7 @@ export async function POST(request: NextRequest) {
   try {
     const input = socialSignInSchema.parse(await request.json());
     const client = getClientContext(request);
-    const config = getRuntimeConfig(client.appId, client.environment);
+    const config = await getRuntimeConfig(client.appId, client.environment);
     return ok(await socialSignIn({ ...input, appId: client.appId }, config, client.platform));
   } catch (error) {
     return handleError(error);

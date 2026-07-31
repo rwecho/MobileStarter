@@ -13,19 +13,19 @@ type RefreshRow = {
   revoked_at: string | null;
 };
 
-export function rotateRefreshToken(appId: string, rawRefreshToken: string) {
-  const row = database.prepare(
+export async function rotateRefreshToken(appId: string, rawRefreshToken: string) {
+  const row = await database.prepare(
     'SELECT * FROM refresh_tokens WHERE token_hash = ?',
   ).get(hashToken(rawRefreshToken)) as RefreshRow | undefined;
   if (!row) throw new ApiError(401, 'REFRESH_TOKEN_INVALID', '登录状态已过期');
   if (row.revoked_at) {
-    revokeRefreshFamily(row.family_id);
+    await revokeRefreshFamily(row.family_id);
     throw new ApiError(401, 'REFRESH_TOKEN_REUSED', '登录状态异常，请重新登录');
   }
   if (row.expires_at <= nowIso()) {
     throw new ApiError(401, 'REFRESH_TOKEN_EXPIRED', '登录状态已过期');
   }
-  const user = getUserRow(row.user_id);
+  const user = await getUserRow(row.user_id);
   if (user.app_id !== appId) {
     throw new ApiError(401, 'TENANT_MISMATCH', '登录状态不属于当前应用');
   }
@@ -35,11 +35,11 @@ export function rotateRefreshToken(appId: string, rawRefreshToken: string) {
   const now = nowIso();
   const accessExpires = new Date(Date.now() + ACCESS_TOKEN_TTL_MS).toISOString();
   const refreshExpires = new Date(Date.now() + REFRESH_TOKEN_TTL_MS).toISOString();
-  runTransaction(() => {
-    database.prepare(
+  await runTransaction(async () => {
+    await database.prepare(
       'UPDATE refresh_tokens SET revoked_at = ?, replaced_by = ? WHERE id = ?',
     ).run(now, newRefreshId, row.id);
-    database.prepare(`
+    await database.prepare(`
       INSERT INTO refresh_tokens(
         id, app_id, user_id, session_id, family_id, token_hash, expires_at, created_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -53,7 +53,7 @@ export function rotateRefreshToken(appId: string, rawRefreshToken: string) {
       refreshExpires,
       now,
     );
-    database.prepare(
+    await database.prepare(
       'UPDATE sessions SET token_hash = ?, expires_at = ?, last_seen_at = ? WHERE id = ?',
     ).run(hashToken(newAccess), accessExpires, now, row.session_id);
   });

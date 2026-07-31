@@ -6,22 +6,24 @@ import { handleError, ok } from '@/server/http';
 type SummaryRow = { sessions: number; screenViews: number; activeMinutes: number };
 type ScreenRow = { screenId: string; views: number; durationMs: number };
 
-export function GET(request: NextRequest) {
+export async function GET(request: NextRequest) {
   try {
-    const { user } = requireAuth(request);
-    const summary = database.prepare(`
+    const { user } = await requireAuth(request);
+    const summary = await database.prepare(`
       SELECT COUNT(DISTINCT session_id) AS sessions,
         SUM(CASE WHEN name = 'screen_view' THEN 1 ELSE 0 END) AS screenViews,
         CAST(COALESCE(SUM(CASE WHEN name = 'screen_leave'
-          THEN json_extract(properties, '$.duration_ms') ELSE 0 END), 0) / 60000 AS INTEGER)
+          THEN COALESCE((properties::jsonb ->> 'duration_ms')::numeric, 0)
+          ELSE 0 END), 0) / 60000 AS INTEGER)
           AS activeMinutes
       FROM telemetry_events WHERE app_id = ? AND user_id = ?
     `).get(user.app_id, user.id) as SummaryRow;
-    const screens = database.prepare(`
+    const screens = await database.prepare(`
       SELECT COALESCE(screen_id, 'unknown') AS screenId,
         SUM(CASE WHEN name = 'screen_view' THEN 1 ELSE 0 END) AS views,
         COALESCE(SUM(CASE WHEN name = 'screen_leave'
-          THEN json_extract(properties, '$.duration_ms') ELSE 0 END), 0) AS durationMs
+          THEN COALESCE((properties::jsonb ->> 'duration_ms')::numeric, 0)
+          ELSE 0 END), 0) AS durationMs
       FROM telemetry_events
       WHERE app_id = ? AND user_id = ? AND screen_id IS NOT NULL
       GROUP BY screen_id ORDER BY durationMs DESC, views DESC LIMIT 20

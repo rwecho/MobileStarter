@@ -3,10 +3,10 @@ import { getClientContext } from '@/server/client-context';
 import { getRuntimeConfig } from '@/server/database';
 import { handleError, ok } from '@/server/http';
 
-export function GET(request: NextRequest) {
+export async function GET(request: NextRequest) {
   try {
     const client = getClientContext(request);
-    const support = getRuntimeConfig(client.appId, client.environment).support;
+    const support = (await getRuntimeConfig(client.appId, client.environment)).support;
     return ok({
       enabled: support.enabled,
       market: support.market,

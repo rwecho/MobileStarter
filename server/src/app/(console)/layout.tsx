@@ -11,7 +11,7 @@ export default async function ConsoleLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   const store = await cookies();
   const token = store.get(ADMIN_COOKIE)?.value;
-  const session = token ? getAdminByToken(token) : null;
+  const session = token ? await getAdminByToken(token) : null;
   if (!session) redirect('/login');
 
   return (

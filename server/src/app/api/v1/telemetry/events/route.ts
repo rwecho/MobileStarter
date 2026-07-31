@@ -11,17 +11,18 @@ export async function POST(request: NextRequest) {
   try {
     const client = getClientContext(request);
     const batch = telemetryBatchSchema.parse(await request.json());
-    const userId = optionalUserId(request);
+    const userId = await optionalUserId(request);
     const insert = database.prepare(`
-      INSERT OR IGNORE INTO telemetry_events(
+      INSERT INTO telemetry_events(
         event_id, app_id, user_id, anonymous_id, session_id, name, screen_id,
         occurred_at, platform, app_version, config_version, properties, received_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT DO NOTHING
     `);
     let accepted = 0;
     for (const event of batch.events) {
       const properties = sanitize(event.properties);
-      const result = insert.run(
+      const result = await insert.run(
         event.eventId,
         client.appId,
         userId,
@@ -44,9 +45,9 @@ export async function POST(request: NextRequest) {
   }
 }
 
-function optionalUserId(request: NextRequest) {
+async function optionalUserId(request: NextRequest) {
   try {
-    return requireAuth(request).user.id;
+    return (await requireAuth(request)).user.id;
   } catch {
     return null;
   }
@@ -57,4 +58,3 @@ function sanitize(properties: Readonly<Record<string, string | number | boolean>
     Object.entries(properties).filter(([key]) => !forbiddenKey.test(key)),
   );
 }
-

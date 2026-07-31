@@ -6,9 +6,9 @@ import { notificationJobSchema } from '@/server/schemas';
 
 export async function POST(request: NextRequest) {
   try {
-    const { scope } = adminContext(request);
+    const { scope } = await adminContext(request);
     const input = notificationJobSchema.parse(await request.json());
-    return ok(enqueueNotification({
+    return ok(await enqueueNotification({
       appId: scope.appId,
       environment: scope.environment,
       type: input.type,

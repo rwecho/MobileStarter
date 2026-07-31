@@ -10,12 +10,12 @@ export type IssuedTokens = Readonly<{
   sessionId: string;
 }>;
 
-export function issueSessionPair(
+export async function issueSessionPair(
   userId: string,
   appId: string,
   deviceName: string,
   familyId: string,
-): IssuedTokens {
+): Promise<IssuedTokens> {
   const token = createSessionToken();
   const refreshToken = createSessionToken();
   const sessionId = createId();
@@ -23,8 +23,8 @@ export function issueSessionPair(
   const createdAt = nowIso();
   const sessionExpires = new Date(Date.now() + ACCESS_TOKEN_TTL_MS).toISOString();
   const refreshExpires = new Date(Date.now() + REFRESH_TOKEN_TTL_MS).toISOString();
-  runTransaction(() => {
-    database.prepare(`
+  await runTransaction(async () => {
+    await database.prepare(`
       INSERT INTO sessions(
         id, user_id, token_hash, device_name, created_at, last_seen_at, expires_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -37,7 +37,7 @@ export function issueSessionPair(
       createdAt,
       sessionExpires,
     );
-    database.prepare(`
+    await database.prepare(`
       INSERT INTO refresh_tokens(
         id, app_id, user_id, session_id, family_id, token_hash, expires_at, created_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -46,25 +46,25 @@ export function issueSessionPair(
   return { token, refreshToken, sessionId };
 }
 
-export function revokeRefreshForSession(sessionId: string) {
-  database.prepare(
+export async function revokeRefreshForSession(sessionId: string) {
+  await database.prepare(
     'UPDATE refresh_tokens SET revoked_at = ? WHERE session_id = ? AND revoked_at IS NULL',
   ).run(nowIso(), sessionId);
 }
 
-export function revokeAllRefreshForUser(userId: string) {
-  database.prepare(
+export async function revokeAllRefreshForUser(userId: string) {
+  await database.prepare(
     'UPDATE refresh_tokens SET revoked_at = ? WHERE user_id = ? AND revoked_at IS NULL',
   ).run(nowIso(), userId);
 }
 
-export function revokeRefreshFamily(familyId: string) {
+export async function revokeRefreshFamily(familyId: string) {
   const now = nowIso();
-  runTransaction(() => {
-    database.prepare(
+  await runTransaction(async () => {
+    await database.prepare(
       'UPDATE refresh_tokens SET revoked_at = ? WHERE family_id = ? AND revoked_at IS NULL',
     ).run(now, familyId);
-    database.prepare(`
+    await database.prepare(`
       UPDATE sessions SET revoked_at = ?
       WHERE id IN (SELECT session_id FROM refresh_tokens WHERE family_id = ?)
         AND revoked_at IS NULL

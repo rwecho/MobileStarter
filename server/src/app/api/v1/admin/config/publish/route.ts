@@ -5,8 +5,8 @@ import { handleError, ok } from '@/server/http';
 
 export async function POST(request: NextRequest) {
   try {
-    const { scope } = adminContext(request);
-    const config = publishDraft(scope, request.headers.get('x-admin-actor') ?? 'admin');
+    const { scope } = await adminContext(request);
+    const config = await publishDraft(scope, request.headers.get('x-admin-actor') ?? 'admin');
     return ok(config);
   } catch (error) {
     return handleError(error);

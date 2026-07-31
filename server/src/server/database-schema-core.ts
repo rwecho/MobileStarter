@@ -1,7 +1,7 @@
-import { DatabaseSync } from 'node:sqlite';
+import type { PostgresDatabase } from './postgres-database';
 
-export function initializeCoreSchema(database: DatabaseSync) {
-  database.exec(`
+export async function initializeCoreSchema(database: PostgresDatabase) {
+  await database.exec(`
     CREATE TABLE IF NOT EXISTS runtime_config (
       app_id TEXT PRIMARY KEY, version INTEGER NOT NULL,
       document TEXT NOT NULL, updated_at TEXT NOT NULL
@@ -32,6 +32,8 @@ export function initializeCoreSchema(database: DatabaseSync) {
       password_hash TEXT NOT NULL, username TEXT NOT NULL, display_name TEXT,
       bio TEXT NOT NULL DEFAULT '', avatar_url TEXT,
       tier_id TEXT NOT NULL DEFAULT 'free', settings TEXT NOT NULL DEFAULT '{}',
+      email_verified INTEGER NOT NULL DEFAULT 0,
+      consent_version TEXT, consented_at TEXT,
       created_at TEXT NOT NULL, updated_at TEXT NOT NULL, UNIQUE(app_id, email)
     );
     CREATE TABLE IF NOT EXISTS external_identities (

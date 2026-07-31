@@ -25,12 +25,11 @@ type DeliveryRow = {
   attempts: number;
 };
 
-export function enqueueNotification(input: JobInput) {
+export async function enqueueNotification(input: JobInput) {
   const jobId = createId();
   const now = nowIso();
-  database.exec('BEGIN IMMEDIATE');
-  try {
-    database.prepare(`
+  await database.transaction(async () => {
+    await database.prepare(`
       INSERT INTO notification_jobs(
         id, app_id, environment, type, title, body, route, status, created_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?)
@@ -38,21 +37,17 @@ export function enqueueNotification(input: JobInput) {
       jobId, input.appId, input.environment, input.type,
       input.title, input.body, input.route, now,
     );
-    createInboxNotifications(jobId, input, now);
-    createDeliveries(jobId, input, now);
-    database.exec('COMMIT');
-  } catch (error) {
-    if (database.isTransaction) database.exec('ROLLBACK');
-    throw error;
-  }
-  return jobSummary(jobId);
+    await createInboxNotifications(jobId, input, now);
+    await createDeliveries(jobId, input, now);
+  });
+  return await jobSummary(jobId);
 }
 
 export async function processNotificationJobs(limit = 100) {
-  const deliveries = pendingDeliveries(limit);
+  const deliveries = await pendingDeliveries(limit);
   for (const delivery of deliveries) await processDelivery(delivery);
   const jobIds = [...new Set(deliveries.map((delivery) => delivery.jobId))];
-  database.prepare(`
+  await database.prepare(`
     UPDATE notification_jobs SET status = 'complete', completed_at = ?
     WHERE status != 'complete' AND NOT EXISTS (
       SELECT 1 FROM notification_deliveries
@@ -62,28 +57,28 @@ export async function processNotificationJobs(limit = 100) {
   return { processed: deliveries.length, jobsTouched: jobIds.length };
 }
 
-function createInboxNotifications(jobId: string, input: JobInput, now: string) {
-  database.prepare(`
+async function createInboxNotifications(jobId: string, input: JobInput, now: string) {
+  await database.prepare(`
     INSERT INTO notifications(id, user_id, type, title, body, route, created_at)
-    SELECT lower(hex(randomblob(16))), id, ?, ?, ?, ?, ?
+    SELECT gen_random_uuid()::text, id, ?, ?, ?, ?, ?
     FROM users WHERE app_id = ?
   `).run(input.type, input.title, input.body, input.route, now, input.appId);
-  database.prepare(`
+  await database.prepare(`
     UPDATE notification_jobs SET started_at = ? WHERE id = ?
   `).run(now, jobId);
 }
 
-function createDeliveries(jobId: string, input: JobInput, now: string) {
-  database.prepare(`
+async function createDeliveries(jobId: string, input: JobInput, now: string) {
+  await database.prepare(`
     INSERT INTO notification_deliveries(id, job_id, device_id, status, updated_at)
-    SELECT lower(hex(randomblob(16))), ?, id, 'pending', ?
+    SELECT gen_random_uuid()::text, ?, id, 'pending', ?
     FROM push_devices
     WHERE app_id = ? AND environment = ? AND enabled = 1
   `).run(jobId, now, input.appId, input.environment);
 }
 
-function pendingDeliveries(limit: number) {
-  return database.prepare(`
+async function pendingDeliveries(limit: number) {
+  return await database.prepare(`
     SELECT delivery.id, delivery.job_id AS jobId, delivery.device_id AS deviceId,
       job.app_id AS appId, job.environment, device.provider,
       device.push_token AS token, job.title, job.body, job.route,
@@ -110,9 +105,9 @@ async function processDelivery(delivery: DeliveryRow) {
         route: delivery.route,
       },
     );
-    updateDelivery(delivery, result.delivered, result.permanent, result.messageId, result.errorCode);
+    await updateDelivery(delivery, result.delivered, result.permanent, result.messageId, result.errorCode);
   } catch (error) {
-    updateDelivery(
+    await updateDelivery(
       delivery,
       false,
       false,
@@ -122,7 +117,7 @@ async function processDelivery(delivery: DeliveryRow) {
   }
 }
 
-function updateDelivery(
+async function updateDelivery(
   delivery: DeliveryRow,
   delivered: boolean,
   permanent: boolean,
@@ -135,19 +130,19 @@ function updateDelivery(
   const retryAt = status === 'retry'
     ? new Date(Date.now() + Math.min(300, 2 ** attempts * 5) * 1000).toISOString()
     : null;
-  database.prepare(`
+  await database.prepare(`
     UPDATE notification_deliveries SET status = ?, attempts = ?,
       provider_message_id = ?, error_code = ?, next_attempt_at = ?, updated_at = ?
     WHERE id = ?
   `).run(status, attempts, messageId ?? null, errorCode ?? null, retryAt, nowIso(), delivery.id);
   if (permanent) {
-    database.prepare('UPDATE push_devices SET enabled = 0, updated_at = ? WHERE id = ?')
+    await database.prepare('UPDATE push_devices SET enabled = 0, updated_at = ? WHERE id = ?')
       .run(nowIso(), delivery.deviceId);
   }
 }
 
-function jobSummary(id: string) {
-  return database.prepare(`
+async function jobSummary(id: string) {
+  return await database.prepare(`
     SELECT job.id, job.status, job.created_at AS createdAt,
       COUNT(delivery.id) AS deliveries
     FROM notification_jobs job

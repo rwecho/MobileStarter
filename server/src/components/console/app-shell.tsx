@@ -79,7 +79,7 @@ function BrandHeader() {
         <BrandIcon className="size-5" aria-hidden />
       </span>
       <span className="flex flex-col leading-tight">
-        <span className="text-sm font-semibold">MobileStarter</span>
+        <span className="text-sm font-semibold">终北统一认证</span>
         <span className="text-muted-foreground text-xs">运行时控制台</span>
       </span>
     </Link>

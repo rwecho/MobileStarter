@@ -52,7 +52,15 @@ export function handleError(error: unknown) {
       } satisfies ApiErrorBody,
     }, { status: error.status });
   }
-  console.error(JSON.stringify({ level: 'error', traceId, message: 'Unhandled API error' }));
+  const details = error instanceof Error
+    ? { errorName: error.name, errorMessage: error.message, stack: error.stack }
+    : { errorName: 'UnknownError', errorMessage: String(error) };
+  console.error(JSON.stringify({
+    level: 'error',
+    traceId,
+    message: 'Unhandled API error',
+    ...details,
+  }));
   return NextResponse.json({
     error: {
       code: 'INTERNAL_ERROR',

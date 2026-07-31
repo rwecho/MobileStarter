@@ -3,10 +3,10 @@ import { requireAuth } from '@/server/auth';
 import { database } from '@/server/database';
 import { handleError, ok } from '@/server/http';
 
-export function GET(request: NextRequest) {
+export async function GET(request: NextRequest) {
   try {
-    const { user } = requireAuth(request);
-    const notifications = database.prepare(`
+    const { user } = await requireAuth(request);
+    const notifications = await database.prepare(`
       SELECT id, type, title, body, route,
         read_at AS readAt, created_at AS createdAt
       FROM notifications WHERE user_id = ?
@@ -18,10 +18,10 @@ export function GET(request: NextRequest) {
   }
 }
 
-export function PATCH(request: NextRequest) {
+export async function PATCH(request: NextRequest) {
   try {
-    const { user } = requireAuth(request);
-    database.prepare(`
+    const { user } = await requireAuth(request);
+    await database.prepare(`
       UPDATE notifications SET read_at = COALESCE(read_at, ?)
       WHERE user_id = ?
     `).run(new Date().toISOString(), user.id);

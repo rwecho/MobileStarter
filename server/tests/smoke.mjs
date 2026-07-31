@@ -1,9 +1,9 @@
 // Live HTTP smoke trace for the account-security flow. Run against a freshly
 // started server (e.g. `next start --port 3310`). Not part of `npm test`.
-import { DatabaseSync } from 'node:sqlite';
+import pg from 'pg';
 
 const BASE = process.env.SMOKE_BASE ?? 'http://127.0.0.1:3310';
-const H = { 'content-type': 'application/json', 'x-app-id': 'mobileui', 'x-app-environment': 'development' };
+const H = { 'content-type': 'application/json', 'x-app-id': 'zhongbei', 'x-app-environment': 'development' };
 const stamp = Date.now();
 const email = `smoke-${stamp}@test.local`;
 let pass = 0;
@@ -19,7 +19,7 @@ async function req(path, body) {
 }
 
 console.log('1. passwordPolicy published in bootstrap');
-const boot = await (await fetch(`${BASE}/api/v1/bootstrap`, { headers: { 'x-app-id': 'mobileui' } })).json();
+const boot = await (await fetch(`${BASE}/api/v1/bootstrap`, { headers: { 'x-app-id': 'zhongbei' } })).json();
 check('config.auth.passwordPolicy present', !!boot?.data?.config?.auth?.passwordPolicy?.minLength);
 
 console.log('2. sign-up WITHOUT consent rejected (400 VALIDATION_ERROR)');
@@ -36,8 +36,14 @@ check('consentVersion recorded', signUp.json?.data?.user?.consentVersion === '20
 const refreshToken = signUp.json?.data?.refreshToken;
 
 console.log('4. email verification via code read from DB');
-const db = new DatabaseSync('data/smoke.db');
-const row = db.prepare("SELECT payload FROM outbound_messages WHERE template='email_verification_code' AND recipient=? ORDER BY created_at DESC LIMIT 1").get(email);
+const pool = new pg.Pool({
+  connectionString: process.env.MOBILEUI_DATABASE_URL ?? process.env.DATABASE_URL,
+});
+const result = await pool.query(
+  "SELECT payload FROM outbound_messages WHERE template='email_verification_code' AND recipient=$1 ORDER BY created_at DESC LIMIT 1",
+  [email],
+);
+const row = result.rows[0];
 const code = row ? JSON.parse(row.payload).code : null;
 check('verification code delivered to outbound_messages', !!code);
 const verify = await req('/api/v1/auth/verify-email', { email, code });
@@ -65,7 +71,7 @@ const locked = await req('/api/v1/auth/sign-in', { identifier: lockEmail, passwo
 check('locked -> SIGN_IN_LOCKED with retryAfterSeconds', locked.status === 429 && locked.json?.error?.code === 'SIGN_IN_LOCKED' && !!locked.json?.error?.retryAfterSeconds);
 
 console.log('8. public legal API (no auth)');
-const publicLegal = await fetch(`${BASE}/api/v1/public/legal?app=mobileui&type=privacy`);
+const publicLegal = await fetch(`${BASE}/api/v1/public/legal?app=zhongbei&type=privacy`);
 check('public legal 200 + has docs', publicLegal.status === 200);
 const legalBody = await publicLegal.json();
 check('doc title contains 隐私', legalBody?.data?.docs?.[0]?.title?.includes('隐私'));
@@ -73,19 +79,19 @@ const legalNoApp = await fetch(`${BASE}/api/v1/public/legal?type=privacy`);
 check('missing app -> 400 VALIDATION_ERROR', legalNoApp.status === 400);
 
 console.log('9. public legal page (HTML for App Store)');
-const legalPage = await fetch(`${BASE}/legal/privacy?app=mobileui`);
+const legalPage = await fetch(`${BASE}/legal/privacy?app=zhongbei`);
 check('page 200', legalPage.status === 200);
 check('page contains 隐私', (await legalPage.text()).includes('隐私'));
 
 console.log('10. GDPR data export (/api/v1/me/export)');
-const exH = { authorization: `Bearer ${signIn.json.data.token}`, 'x-app-id': 'mobileui' };
+const exH = { authorization: `Bearer ${signIn.json.data.token}`, 'x-app-id': 'zhongbei' };
 const exportRes = await fetch(`${BASE}/api/v1/me/export`, { headers: exH });
 check('export 200', exportRes.status === 200);
 const ex = await exportRes.json();
 check('export has profile.email', !!ex?.data?.profile?.email);
 check('export has sessions[]', Array.isArray(ex?.data?.sessions));
 check('export has telemetry[]', Array.isArray(ex?.data?.telemetry));
-const exportNoAuth = await fetch(`${BASE}/api/v1/me/export`, { headers: { 'x-app-id': 'mobileui' } });
+const exportNoAuth = await fetch(`${BASE}/api/v1/me/export`, { headers: { 'x-app-id': 'zhongbei' } });
 check('unauth export -> 401', exportNoAuth.status === 401);
 
 console.log('11. admin login requires app binding');
@@ -99,10 +105,11 @@ const loginWrongApp = await fetch(`${BASE}/api/v1/admin/auth/login`, {
 check('wrong appId -> 404 APP_NOT_FOUND', loginWrongApp.status === 404
   && (await loginWrongApp.json())?.error?.code === 'APP_NOT_FOUND');
 const loginGood = await fetch(`${BASE}/api/v1/admin/auth/login`, {
-  method: 'POST', headers: H, body: JSON.stringify({ identifier: 'admin', password: 'admin123', appId: 'mobileui' }),
+  method: 'POST', headers: H, body: JSON.stringify({ identifier: 'admin', password: 'admin123', appId: 'zhongbei' }),
 });
 // admin seed requires NODE_ENV !== 'production' (dev default) or env var
 check('good appId (admin dev seed) -> 200', loginGood.status === 200);
 
 console.log(`\n${pass} passed, ${fail.length} failed`);
+await pool.end();
 process.exit(fail.length ? 1 : 0);

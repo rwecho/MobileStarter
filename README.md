@@ -14,7 +14,7 @@ MobileStarter 是一套可继承、可换肤、可替换业务模块的跨端移
 - 三端共享设计令牌、类型化路由和一致的异步状态语义
 - Logo、启动页、认证、首页、会员、个人中心、设置和客户支持流程
 - `idle / loading / success / empty / error / offline / unauthorized` 状态模型
-- Next.js `/api/v1` 后端、SQLite 本地开发数据层和配置控制台
+- Next.js `/api/v1` 后端、PostgreSQL 数据层和配置控制台
 - Toast、确认弹窗、危险操作、离线与错误恢复体验
 - SVG 图标体系，无 Emoji 或图标字体回退
 
@@ -101,7 +101,7 @@ HarmonyOS 完整构建仍需在安装了 DevEco Studio 和 HarmonyOS SDK 的环�
 
 | 工作流 | 产物 | 说明 |
 | --- | --- | --- |
-| `server-publish.yml` | Docker 镜像 | Next.js standalone 镜像，发布到 `ghcr.io/<owner>/mobilestarter-server`；`server/compose.yml` 提供带持久化数据卷的运行示例 |
+| `server-publish.yml` | Docker 镜像 | Next.js standalone 镜像，发布到 `ghcr.io/<owner>/zhongbei-auth`；`server/compose.yml` 提供带持久化数据卷的运行示例 |
 | `flutter-publish.yml` | Flutter release APK | 默认用 debug 签名；配置密钥后用正式 keystore 签名 |
 | `react-native-publish.yml` | React Native release APK | 本地 `expo prebuild` + Gradle 构建；默认 debug 签名 |
 | `arkts-publish.yml` | HarmonyOS `.hap` | 需自建带 DevEco Studio 的 self-hosted runner（标签 `harmonyos`），产出未签名 hap |

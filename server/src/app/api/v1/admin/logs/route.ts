@@ -12,14 +12,14 @@ const querySchema = z.object({
   offset: z.coerce.number().int().min(0).default(0),
 });
 
-export function GET(request: NextRequest) {
+export async function GET(request: NextRequest) {
   try {
-    const { scope } = adminContext(request);
+    const { scope } = await adminContext(request);
     const filters = querySchema.parse(
       Object.fromEntries(request.nextUrl.searchParams),
     );
     return ok({
-      rows: listLogs(scope, {
+      rows: await listLogs(scope, {
         name: filters.name,
         platform: filters.platform,
         sinceMinutes: filters.since,

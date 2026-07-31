@@ -8,13 +8,13 @@ type Context = Readonly<{ params: Promise<{ id: string }> }>;
 
 export async function GET(request: NextRequest, context: Context) {
   try {
-    const identity = getSupportIdentity(request);
+    const identity = await getSupportIdentity(request);
     const client = getClientContext(request);
     const { id } = await context.params;
-    const row = database.prepare(`
+    const row = await database.prepare(`
       SELECT * FROM product_feedback WHERE id = ? AND app_id = ? AND (
-        (? IS NOT NULL AND user_id = ?)
-        OR (? IS NULL AND user_id IS NULL AND installation_id = ?)
+        (?::text IS NOT NULL AND user_id = ?)
+        OR (?::text IS NULL AND user_id IS NULL AND installation_id = ?)
       )
     `).get(
       id,

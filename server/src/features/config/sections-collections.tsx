@@ -27,7 +27,13 @@ type Entitlement = { key: string; label: string; description: string };
 type Tier = { id: string; name: string; summary: string; recommended: boolean; accent: string; entitlements: readonly string[] };
 type Plan = { id: string; tierId: string; name: string; interval: string; priceMinor: number; currency: string; originalPriceMinor?: number; provider: string };
 type LegalDoc = { type: string; locale: string; revision: string; title: string; content: string; requiresReconsent: boolean };
-type SupportShape = {
+type SupportDoc = {
+  enabled: boolean; market: string; dataRegion: string;
+  categories: ReadonlyArray<Readonly<{ id: string; label: string }>>;
+  queues: ReadonlyArray<Readonly<{ id: string; market: string; locales: readonly string[]; categories: readonly string[] }>>;
+  help: ReadonlyArray<Readonly<{ id: string; locale: string; title: string; body: string }>>;
+};
+type SupportEdit = {
   enabled: boolean; market: string; dataRegion: string;
   categories: Array<{ id: string; label: string }>;
   queues: Array<{ id: string; market: string; locales: string[]; categories: string[] }>;
@@ -124,8 +130,8 @@ export function PlansSection({
 export function SupportSection({
   support,
   onChange,
-}: Readonly<{ support: Readonly<SupportShape>; onChange: (next: SupportShape) => void }>) {
-  const set = (patch: Partial<SupportShape>) => onChange({ ...(support as SupportShape), ...patch });
+}: Readonly<{ support: Readonly<SupportDoc>; onChange: (next: SupportEdit) => void }>) {
+  const set = (patch: Partial<SupportEdit>) => onChange({ ...(support as unknown as SupportEdit), ...patch });
   const categoryIds = support.categories.map((c) => c.id);
   return (
     <SectionCard title="客户支持" description="工单分类、分派队列、帮助文章与数据归属区域。">
@@ -136,7 +142,7 @@ export function SupportSection({
       </div>
       <Field label="工单分类" description="用户提交工单时可选的分类。">
         <ListEditor
-          items={support.categories as Array<{ id: string; label: string }>}
+          items={support.categories as unknown as Array<{ id: string; label: string }>}
           onChange={(categories) => set({ categories })}
           create={() => ({ id: `category-${Date.now()}`, label: '新分类' })}
           getKey={(item) => item.id}
@@ -152,7 +158,7 @@ export function SupportSection({
       </Field>
       <Field label="分派队列" description="按市场/语言/分类把工单路由到不同处理队列。">
         <ListEditor
-          items={support.queues as Array<{ id: string; market: string; locales: string[]; categories: string[] }>}
+          items={support.queues as unknown as Array<{ id: string; market: string; locales: string[]; categories: string[] }>}
           onChange={(queues) => set({ queues })}
           create={() => ({ id: `queue-${Date.now()}`, market: 'global', locales: ['zh-CN'], categories: [] })}
           getKey={(item) => item.id}
@@ -172,7 +178,7 @@ export function SupportSection({
       </Field>
       <Field label="帮助文章" description="应用内帮助中心的常见问题。">
         <ListEditor
-          items={support.help as Array<{ id: string; locale: string; title: string; body: string }>}
+          items={support.help as unknown as Array<{ id: string; locale: string; title: string; body: string }>}
           onChange={(help) => set({ help })}
           create={() => ({ id: `help-${Date.now()}`, locale: 'zh-CN', title: '新帮助', body: '' })}
           getKey={(item) => item.id}

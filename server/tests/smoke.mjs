@@ -3,7 +3,7 @@
 import { DatabaseSync } from 'node:sqlite';
 
 const BASE = process.env.SMOKE_BASE ?? 'http://127.0.0.1:3310';
-const H = { 'content-type': 'application/json', 'x-app-id': 'mobileui' };
+const H = { 'content-type': 'application/json', 'x-app-id': 'mobileui', 'x-app-environment': 'development' };
 const stamp = Date.now();
 const email = `smoke-${stamp}@test.local`;
 let pass = 0;
@@ -63,6 +63,46 @@ await req('/api/v1/auth/sign-up', { email: lockEmail, password: 'Test1234', user
 for (let i = 0; i < 5; i += 1) await req('/api/v1/auth/sign-in', { identifier: lockEmail, password: 'Wrong-Pass-1', deviceName: 'smoke' });
 const locked = await req('/api/v1/auth/sign-in', { identifier: lockEmail, password: 'Test1234', deviceName: 'smoke' });
 check('locked -> SIGN_IN_LOCKED with retryAfterSeconds', locked.status === 429 && locked.json?.error?.code === 'SIGN_IN_LOCKED' && !!locked.json?.error?.retryAfterSeconds);
+
+console.log('8. public legal API (no auth)');
+const publicLegal = await fetch(`${BASE}/api/v1/public/legal?app=mobileui&type=privacy`);
+check('public legal 200 + has docs', publicLegal.status === 200);
+const legalBody = await publicLegal.json();
+check('doc title contains 隐私', legalBody?.data?.docs?.[0]?.title?.includes('隐私'));
+const legalNoApp = await fetch(`${BASE}/api/v1/public/legal?type=privacy`);
+check('missing app -> 400 VALIDATION_ERROR', legalNoApp.status === 400);
+
+console.log('9. public legal page (HTML for App Store)');
+const legalPage = await fetch(`${BASE}/legal/privacy?app=mobileui`);
+check('page 200', legalPage.status === 200);
+check('page contains 隐私', (await legalPage.text()).includes('隐私'));
+
+console.log('10. GDPR data export (/api/v1/me/export)');
+const exH = { authorization: `Bearer ${signIn.json.data.token}`, 'x-app-id': 'mobileui' };
+const exportRes = await fetch(`${BASE}/api/v1/me/export`, { headers: exH });
+check('export 200', exportRes.status === 200);
+const ex = await exportRes.json();
+check('export has profile.email', !!ex?.data?.profile?.email);
+check('export has sessions[]', Array.isArray(ex?.data?.sessions));
+check('export has telemetry[]', Array.isArray(ex?.data?.telemetry));
+const exportNoAuth = await fetch(`${BASE}/api/v1/me/export`, { headers: { 'x-app-id': 'mobileui' } });
+check('unauth export -> 401', exportNoAuth.status === 401);
+
+console.log('11. admin login requires app binding');
+const loginNoApp = await fetch(`${BASE}/api/v1/admin/auth/login`, {
+  method: 'POST', headers: H, body: JSON.stringify({ identifier: 'admin', password: 'admin123' }),
+});
+check('missing appId -> 400', loginNoApp.status === 400);
+const loginWrongApp = await fetch(`${BASE}/api/v1/admin/auth/login`, {
+  method: 'POST', headers: H, body: JSON.stringify({ identifier: 'admin', password: 'admin123', appId: 'no-such-app' }),
+});
+check('wrong appId -> 404 APP_NOT_FOUND', loginWrongApp.status === 404
+  && (await loginWrongApp.json())?.error?.code === 'APP_NOT_FOUND');
+const loginGood = await fetch(`${BASE}/api/v1/admin/auth/login`, {
+  method: 'POST', headers: H, body: JSON.stringify({ identifier: 'admin', password: 'admin123', appId: 'mobileui' }),
+});
+// admin seed requires NODE_ENV !== 'production' (dev default) or env var
+check('good appId (admin dev seed) -> 200', loginGood.status === 200);
 
 console.log(`\n${pass} passed, ${fail.length} failed`);
 process.exit(fail.length ? 1 : 0);

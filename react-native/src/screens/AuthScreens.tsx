@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { AppButton, PageHeader } from '../design-system/components';
 import { useApp } from '../state/AppStore';
-import { spacing } from '../theme/tokens';
+import { colors, spacing } from '../theme/tokens';
 import { styles } from '../theme/styles';
 import { useAuthRecovery } from '../auth/AuthRecoveryStore';
 import { SocialAuthButtons } from '../auth/SocialAuthButtons';
@@ -66,15 +66,18 @@ export function AuthScreen({ mode }: Readonly<{ mode: AuthMode }>) {
       await verifyPhoneCode(phone, code);
       return;
     }
+    if ((mode === 'signIn' || mode === 'signUp') && !ensureConsent()) return;
     if (mode === 'signUp') {
-      if (!agreed) {
-        showToast('请先阅读并同意用户协议与隐私政策', 'info');
-        return;
-      }
       await signUp({ email, password, username, consentVersion: termsRevision });
     } else {
       await signIn({ email, password });
     }
+  };
+
+  const ensureConsent = () => {
+    if (agreed) return true;
+    showToast('请先阅读并同意用户协议与隐私政策', 'info');
+    return false;
   };
 
   return (
@@ -152,13 +155,13 @@ export function AuthScreen({ mode }: Readonly<{ mode: AuthMode }>) {
           />
         ) : null}
         <AppButton
-          disabled={busy || !isValid({ mode, email, password, username, code, phone, phoneCodeSent }) || (mode === 'signUp' && !agreed)}
+          disabled={busy || !isValid({ mode, email, password, username, code, phone, phoneCodeSent })}
           label={busy ? '正在处理…' : mode === 'phone' && phoneCodeSent ? '验证并登录' : copy.action}
           onPress={() => void submit()}
         />
         {mode === 'signIn' ? (
           <>
-            <SocialAuthButtons />
+            <SocialAuthButtons onBeforeAuthenticate={ensureConsent} />
             <AppButton
               label="忘记密码"
               variant="secondary"
@@ -171,27 +174,34 @@ export function AuthScreen({ mode }: Readonly<{ mode: AuthMode }>) {
             />
           </>
         ) : null}
-        {mode === 'signUp' ? (
-          <Pressable
-            accessibilityRole="checkbox"
-            accessibilityState={{ checked: agreed }}
-            accessibilityLabel="同意用户协议与隐私政策"
-            onPress={() => setAgreed((value) => !value)}
-            style={authStyles.consentRow}
-          >
-            <View style={[styles.checkbox, agreed && styles.checkboxChecked]}>
-              {agreed ? <View style={styles.checkboxMark} /> : null}
-            </View>
-            <Text style={styles.caption}>
-              我已阅读并同意{config.legal.map((document) => document.title).join('与')}
-            </Text>
-          </Pressable>
-        ) : (
-          <Text style={styles.caption}>
-            继续即表示你同意
-            {config.legal.map((document) => document.title).join('与')}。
-          </Text>
-        )}
+        {mode === 'signIn' || mode === 'signUp' ? (
+          <View style={authStyles.consentRow}>
+            <Pressable
+              accessibilityRole="checkbox"
+              accessibilityState={{ checked: agreed }}
+              accessibilityLabel="同意用户协议与隐私政策"
+              hitSlop={8}
+              onPress={() => setAgreed((value) => !value)}
+              style={authStyles.checkboxTarget}
+            >
+              <View style={[styles.checkbox, agreed && styles.checkboxChecked]}>
+                {agreed ? <View style={styles.checkboxMark} /> : null}
+              </View>
+            </Pressable>
+            <Text style={styles.caption}>我已阅读并同意</Text>
+            <Text
+              accessibilityRole="link"
+              onPress={() => navigate('settings.termsOfService')}
+              style={authStyles.legalLink}
+            >用户协议</Text>
+            <Text style={styles.caption}>与</Text>
+            <Text
+              accessibilityRole="link"
+              onPress={() => navigate('settings.privacyPolicy')}
+              style={authStyles.legalLink}
+            >隐私政策</Text>
+          </View>
+        ) : null}
       </ScrollView>
     </View>
   );
@@ -224,5 +234,13 @@ function isValid(input: AuthInput) {
 const authStyles = StyleSheet.create({
   content: { flexGrow: 1, justifyContent: 'center', padding: spacing.x6, gap: spacing.x4 },
   copy: { gap: spacing.x2, marginBottom: spacing.x3 },
-  consentRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.x2 },
+  consentRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexWrap: 'wrap',
+    gap: spacing.x1,
+  },
+  checkboxTarget: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
+  legalLink: { color: colors.brand, fontSize: 12, minHeight: 44, textAlignVertical: 'center' },
 });

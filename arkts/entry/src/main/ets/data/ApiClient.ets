@@ -1,8 +1,13 @@
 import http from '@ohos.net.http'
-import { TelemetryBatch, TelemetryValue } from '../telemetry/Telemetry'
+import { TelemetryBatch } from '../telemetry/Telemetry'
 import {
-  ApiEnvelope,
-  ApiErrorBody,
+  ApiFailure,
+  ApiRequestBody,
+  ApiTransport,
+  SocialSignInInput
+} from './ApiTransport'
+export { ApiFailure } from './ApiTransport'
+import {
   AppUser,
   AuthPayload,
   BootstrapPayload,
@@ -25,80 +30,29 @@ import {
   UsageSummary
 } from '../domain/Models'
 
-const API_BASE: string = 'http://192.168.20.110:3210'
-// 必须填写本 App 的 app_id（租户），不能为空；未填写时启动即抛错。
-const APP_ID: string = 'mobileui'
-// 必须填写本 App 的 environment（development/staging/production 等），不能为空；未填写时启动即抛错。
-const APP_ENVIRONMENT: string = 'development'
-
-interface SocialSignInInput {
-  provider: string
-  deviceName: string
-  idToken?: string
-  authorizationCode?: string
-  redirectUri?: string
-  codeVerifier?: string
-}
-
-interface TelemetryEventEnvelope {
-  eventId: string
-  name: string
-  screenId: string
-  occurredAt: string
-  configVersion: number
-  properties: Record<string, TelemetryValue>
-}
-
-export class ApiFailure extends Error {
-  readonly code: string
-  readonly status: number
-  readonly retryable: boolean
-
-  constructor(code: string, message: string, status: number, retryable: boolean) {
-    super(message)
-    this.code = code
-    this.status = status
-    this.retryable = retryable
-  }
-}
-
 export class ApiClient {
-  private token: string = ''
-  private refreshToken: string = ''
-  private installationId: string = ''
-  private language: string = 'zh-CN'
-  private refreshInFlight: Promise<boolean> | null = null
-  private sessionExpiredCallback: (() => void) | null = null
-
-  constructor() {
-    if (APP_ID.length === 0) {
-      throw new Error('APP_ID 未配置：请在 ApiClient.ets 顶部填写本 App 的 app_id（租户）后再启动。')
-    }
-    if (APP_ENVIRONMENT.length === 0) {
-      throw new Error('APP_ENVIRONMENT 未配置：请在 ApiClient.ets 顶部填写本 App 的 environment 后再启动。')
-    }
-  }
+  private transport: ApiTransport = new ApiTransport()
 
   setToken(token: string): void {
-    this.token = token
+    this.transport.setToken(token)
   }
 
   setRefreshToken(token: string): void {
-    this.refreshToken = token
+    this.transport.setRefreshToken(token)
   }
 
   setInstallationId(value: string): void {
-    this.installationId = value
+    this.transport.setInstallationId(value)
   }
 
   setLanguage(value: string): void {
-    this.language = value
+    this.transport.setLanguage(value)
   }
 
   // Set by AppStore so an unrecoverable session expiry clears the user and
   // returns to the sign-in guard instead of looping on failing requests.
   setSessionExpiredCallback(callback: (() => void) | null): void {
-    this.sessionExpiredCallback = callback
+    this.transport.setSessionExpiredCallback(callback)
   }
 
   bootstrap(): Promise<BootstrapPayload> {
@@ -338,141 +292,16 @@ export class ApiClient {
     ).then(result => result['deleted'] === true)
   }
 
-  // Telemetry is fire-and-forget and must NOT participate in the 401 refresh /
-  // session-expiry loop, so it uses its own request instead of this.request.
-  async telemetry(batch: TelemetryBatch): Promise<boolean> {
-    const payload = JSON.stringify({
-      anonymousId: batch.anonymousId,
-      sessionId: batch.sessionId,
-      events: batch.events.map((event): TelemetryEventEnvelope => ({
-        eventId: event.eventId,
-        name: event.name,
-        screenId: event.screenId,
-        occurredAt: event.occurredAt,
-        configVersion: event.configVersion,
-        properties: this.toRecord(event.properties)
-      }))
-    })
-    const client = http.createHttp()
-    try {
-      const response = await client.request(`${API_BASE}/api/v1/telemetry/events`, {
-        method: http.RequestMethod.POST,
-        header: this.headers(),
-        extraData: payload,
-        expectDataType: http.HttpDataType.STRING,
-        connectTimeout: 5000,
-        readTimeout: 5000
-      })
-      return response.responseCode >= 200 && response.responseCode < 300
-    } catch (error) {
-      return false
-    } finally {
-      client.destroy()
-    }
-  }
-
-  // Map does not survive JSON.stringify, so flatten it to a plain record first.
-  private toRecord(map: Map<string, TelemetryValue>): Record<string, TelemetryValue> {
-    const record: Record<string, TelemetryValue> = {}
-    map.forEach((value, key) => { record[key] = value })
-    return record
+  telemetry(batch: TelemetryBatch): Promise<boolean> {
+    return this.transport.telemetry(batch)
   }
 
   private async request<T>(
     path: string,
     method: http.RequestMethod,
-    body?: Record<string, string | number | boolean> |
-      SignInInput | SignUpInput | DeleteAccountInput
-      | PhoneCodeInput | PhoneVerifyInput | FeedbackInput | CreateTicketInput
-      | SocialSignInInput,
-    retried: boolean = false
+    body?: ApiRequestBody
   ): Promise<T> {
-    const client = http.createHttp()
-    try {
-      const response = await client.request(`${API_BASE}${path}`, {
-        method,
-        header: this.headers(),
-        extraData: body === undefined ? undefined : JSON.stringify(body),
-        expectDataType: http.HttpDataType.STRING,
-        connectTimeout: 5000,
-        readTimeout: 5000
-      })
-      const text = String(response.result)
-      if (response.responseCode === 401 && !retried && await this.refreshSession()) {
-        return this.request<T>(path, method, body, true)
-      }
-      if (response.responseCode < 200 || response.responseCode >= 300) {
-        if (response.responseCode === 401 && !retried) {
-          this.sessionExpiredCallback?.()
-        }
-        const failure = JSON.parse(text) as ApiErrorBody
-        throw new ApiFailure(
-          failure.error.code,
-          failure.error.message,
-          response.responseCode,
-          failure.error.retryable
-        )
-      }
-      return (JSON.parse(text) as ApiEnvelope<T>).data
-    } finally {
-      client.destroy()
-    }
-  }
-
-  private async refreshSession(): Promise<boolean> {
-    if (this.refreshInFlight === null) {
-      this.refreshInFlight = this.performRefresh()
-    }
-    const current = this.refreshInFlight
-    try {
-      return await current
-    } finally {
-      this.refreshInFlight = null
-    }
-  }
-
-  private async performRefresh(): Promise<boolean> {
-    if (this.refreshToken.length === 0) return false
-    const client = http.createHttp()
-    try {
-      const response = await client.request(`${API_BASE}/api/v1/auth/refresh`, {
-        method: http.RequestMethod.POST,
-        header: this.headers(),
-        extraData: JSON.stringify({ refreshToken: this.refreshToken }),
-        expectDataType: http.HttpDataType.STRING,
-        connectTimeout: 5000,
-        readTimeout: 5000
-      })
-      if (response.responseCode < 200 || response.responseCode >= 300) return false
-      const payload = JSON.parse(String(response.result)) as ApiEnvelope<AuthPayload>
-      const data = payload.data
-      if (!data.token || !data.refreshToken) return false
-      this.token = data.token
-      this.refreshToken = data.refreshToken
-      return true
-    } catch (error) {
-      return false
-    } finally {
-      client.destroy()
-    }
-  }
-
-  private headers(): Record<string, string> {
-    const values: Record<string, string> = {
-      'content-type': 'application/json',
-      'accept-language': this.language,
-      'x-app-id': APP_ID,
-      'x-app-environment': APP_ENVIRONMENT,
-      'x-platform': 'harmonyos',
-      'x-app-version': '1.0.0'
-    }
-    if (this.token.length > 0) {
-      values['authorization'] = `Bearer ${this.token}`
-    }
-    if (this.installationId.length > 0) {
-      values['x-installation-id'] = this.installationId
-    }
-    return values
+    return this.transport.request<T>(path, method, body)
   }
 }
 

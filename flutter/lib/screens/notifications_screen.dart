@@ -23,7 +23,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     super.didChangeDependencies();
     if (!requested) {
       requested = true;
-      _load();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _load();
+      });
     }
   }
 

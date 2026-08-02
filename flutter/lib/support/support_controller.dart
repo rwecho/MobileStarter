@@ -25,8 +25,10 @@ final class SupportController extends ChangeNotifier {
     try {
       final articles = await _repository.help();
       help = articles.isEmpty ? const Empty() : Success(articles);
+    } on SupportApiException catch (error) {
+      help = Failure(error.message);
     } catch (_) {
-      help = const Failure('常见问题暂时无法加载，请稍后重试');
+      help = const Offline();
     }
   }
 
@@ -34,8 +36,12 @@ final class SupportController extends ChangeNotifier {
     try {
       final items = await _repository.tickets();
       tickets = items.isEmpty ? const Empty() : Success(items);
+    } on SupportApiException catch (error) {
+      tickets = error.status == 401
+          ? const Unauthorized()
+          : Failure(error.message);
     } catch (_) {
-      tickets = const Failure('工单暂时无法加载，请稍后重试');
+      tickets = const Offline();
     }
   }
 
@@ -61,8 +67,12 @@ final class SupportController extends ChangeNotifier {
     notifyListeners();
     try {
       detail = Success(await _repository.ticket(id));
+    } on SupportApiException catch (error) {
+      detail = error.status == 401
+          ? const Unauthorized()
+          : Failure(error.message);
     } catch (_) {
-      detail = const Failure('工单详情暂时无法加载，请稍后重试');
+      detail = const Offline();
     }
     notifyListeners();
   }
@@ -105,8 +115,11 @@ final class SupportController extends ChangeNotifier {
     try {
       await operation();
       return true;
+    } on SupportApiException catch (error) {
+      lastError = error.message;
+      return false;
     } catch (_) {
-      lastError = '提交失败，请检查网络后重试';
+      lastError = '网络不可用，请检查连接后重试';
       return false;
     } finally {
       busy = false;

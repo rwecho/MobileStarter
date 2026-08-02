@@ -1,5 +1,28 @@
 # MobileStarter
 
+## MobileUI CLI
+
+新产品不要手工复制平台目录。使用仓库内的 `mobileui` CLI 生成独立产品 Repo：
+
+```powershell
+C:\f3445\bin\dart.bat run tool/mobileui/bin/mobileui.dart create app-example `
+  --output D:\workspace `
+  --profile flutter `
+  --display-name "Example" `
+  --organization tech.zhongbei `
+  --app-id example
+```
+
+生成后执行结构和产品身份检查：
+
+```powershell
+C:\f3445\bin\dart.bat run tool/mobileui/bin/mobileui.dart doctor `
+  --project D:\workspace\app-example
+```
+
+当前正式支持 `flutter` Profile。完整说明见
+[`docs/MOBILEUI_CLI.md`](docs/MOBILEUI_CLI.md)。
+
 MobileStarter 是一套可继承、可换肤、可替换业务模块的跨端移动应用起步项目，包含：
 
 - `server/` — Next.js App Router 后端与运营控制台

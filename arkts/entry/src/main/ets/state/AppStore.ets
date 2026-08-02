@@ -26,7 +26,9 @@ export class AppStore {
     'NotificationSettings': AppRoute.NotificationSettings, 'Privacy': AppRoute.Privacy,
     'General': AppRoute.General, 'Appearance': AppRoute.Appearance, 'Language': AppRoute.Language,
     'TextSize': AppRoute.TextSize, 'Storage': AppRoute.Storage, 'Permissions': AppRoute.Permissions,
-    'HelpFeedback': AppRoute.HelpFeedback, 'Legal': AppRoute.Legal, 'About': AppRoute.About,
+    'HelpFeedback': AppRoute.HelpFeedback, 'Legal': AppRoute.Legal,
+    'TermsOfService': AppRoute.TermsOfService, 'PrivacyPolicy': AppRoute.PrivacyPolicy,
+    'About': AppRoute.About,
     'DeleteAccount': AppRoute.DeleteAccount, 'NotificationCenter': AppRoute.NotificationCenter,
     'StateGallery': AppRoute.StateGallery, 'SupportTicket': AppRoute.SupportTicket,
     'NewSupportTicket': AppRoute.NewSupportTicket, 'ProductFeedback': AppRoute.ProductFeedback,
@@ -43,6 +45,8 @@ export class AppStore {
     'settings.textSize': AppRoute.TextSize, 'settings.storage': AppRoute.Storage,
     'settings.permissions': AppRoute.Permissions,
     'settings.helpFeedback': AppRoute.HelpFeedback, 'settings.legal': AppRoute.Legal,
+    'settings.termsOfService': AppRoute.TermsOfService,
+    'settings.privacyPolicy': AppRoute.PrivacyPolicy,
     'settings.about': AppRoute.About, 'support.home': AppRoute.HelpFeedback,
     'support.newTicket': AppRoute.NewSupportTicket
   }
@@ -214,7 +218,7 @@ export class AppStore {
   }
 
   completeAuthentication(): void {
-    const target = this.pendingRoute ?? AppRoute.Profile
+    const target = this.pendingRoute ?? AppRoute.Home
     this.pendingRoute = null
     this.replaceTop(target)
   }

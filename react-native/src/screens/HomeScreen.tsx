@@ -1,6 +1,7 @@
 import React from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { AppIcon, IconName } from '../design-system/AppIcon';
+import { PrimaryTabs } from '../navigation/PrimaryTabs';
 import { AppCard, IconButton, OfflineBanner } from '../design-system/components';
 import { AppRoute } from '../navigation/routes';
 import { useApp } from '../state/AppStore';
@@ -21,7 +22,7 @@ const quickActions: ReadonlyArray<Readonly<{
 ];
 
 export function HomeScreen() {
-  const { navigate, replace, config, user } = useApp();
+  const { navigate, config, user } = useApp();
   const { palette } = usePreferences();
   const tier = config.tiers.find((item) => item.id === user?.tierId);
   return (
@@ -74,33 +75,8 @@ export function HomeScreen() {
           </Pressable>
         </AppCard>
       </ScrollView>
-      <View
-        style={[
-          homeStyles.tabBar,
-          { backgroundColor: palette.surface, borderTopColor: palette.border },
-        ]}
-      >
-        <TabItem active icon="home" label="首页" onPress={() => replace('home')} />
-        <TabItem icon="crown" label="会员" onPress={() => navigate('membership.home')} />
-        <TabItem icon="user" label="我的" onPress={() => navigate('profile.home')} />
-      </View>
+      <PrimaryTabs active="home" />
     </View>
-  );
-}
-
-function TabItem({
-  active = false,
-  icon,
-  label,
-  onPress,
-}: Readonly<{ active?: boolean; icon: IconName; label: string; onPress: () => void }>) {
-  const { palette } = usePreferences();
-  const color = active ? palette.brand : palette.textSecondary;
-  return (
-    <Pressable onPress={onPress} style={homeStyles.tab}>
-      <AppIcon name={icon} color={color} size={22} />
-      <Text style={[homeStyles.tabLabel, { color }]}>{label}</Text>
-    </Pressable>
   );
 }
 
@@ -135,13 +111,4 @@ const homeStyles = StyleSheet.create({
   },
   textAction: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: spacing.x1 },
   textActionLabel: { color: colors.brand, fontWeight: '700' },
-  tabBar: {
-    height: 66,
-    flexDirection: 'row',
-    borderTopColor: colors.border,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    backgroundColor: colors.surface,
-  },
-  tab: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.x1 },
-  tabLabel: { fontSize: 12, fontWeight: '600' },
 });

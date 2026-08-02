@@ -1,0 +1,28 @@
+{
+  "id": "react-native",
+  "version": "0.2.0",
+  "source": "react-native",
+  "platforms": ["ios", "android", "web"],
+  "features": [
+    "auth",
+    "membership",
+    "billing",
+    "notifications",
+    "settings",
+    "support",
+    "telemetry"
+  ],
+  "workflows": [
+    "react-native-ci.yml",
+    "react-native-publish.yml"
+  ],
+  "excludedDirectories": [
+    ".expo",
+    "dist",
+    "dist-final",
+    "dist-verify",
+    "node_modules",
+    "node_modules.incomplete-20260729",
+    "AGENTS.md"
+  ]
+}

@@ -5,10 +5,12 @@ import { BillingPlan, MembershipTier } from '../domain/models';
 import { useApp } from '../state/AppStore';
 import { colors, membershipAccents, radii, spacing } from '../theme/tokens';
 import { styles } from '../theme/styles';
+import { PrimaryTabs } from '../navigation/PrimaryTabs';
 
 export function MembershipScreen() {
   const { config, user, navigate, purchase, busy, showToast } = useApp();
   const [selected, setSelected] = useState(config.plans[0]?.id ?? '');
+  const selectedPlan = config.plans.find((plan) => plan.id === selected);
   const buy = async () => {
     if (!user) {
       navigate('auth.signIn');
@@ -36,15 +38,29 @@ export function MembershipScreen() {
           />
         ))}
         {config.plans.length ? (
-          <AppButton
-            disabled={busy}
-            label={busy ? '正在确认…' : user ? '确认订阅' : '登录后订阅'}
-            icon="crown"
-            onPress={() => void buy()}
-          />
+          <>
+            {selectedPlan?.provider === 'mock' ? (
+              <AppCard>
+                <Text style={styles.secondary}>当前为演示支付，不会调用真实商店或支付渠道。</Text>
+              </AppCard>
+            ) : null}
+            <AppButton
+              disabled={busy}
+              label={busy
+                ? '正在确认…'
+                : !user
+                  ? '登录后订阅'
+                  : selectedPlan?.provider === 'mock'
+                    ? '演示下单（非真实支付）'
+                    : '确认订阅'}
+              icon="crown"
+              onPress={() => void buy()}
+            />
+          </>
         ) : <Text style={styles.secondary}>当前 App 暂未配置可售方案。</Text>}
         <ListRow label="查看订单记录" route="membership.orders" icon="gift" />
       </ScrollView>
+      <PrimaryTabs active="membership" />
     </View>
   );
 }

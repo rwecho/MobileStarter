@@ -27,6 +27,9 @@ flutter/android/app/google-services.json
 flutter/ios/Runner/GoogleService-Info.plist
 flutter/lib/firebase_options.dart
 
+# MobileUI CLI
+tool/mobileui/.dart_tool/
+
 # HarmonyOS
 arkts/oh_modules/
 arkts/build/

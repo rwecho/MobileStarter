@@ -8,6 +8,8 @@ import '../telemetry/telemetry.dart';
 import 'app_repository.dart';
 import 'runtime_models.dart';
 
+part 'app_controller_navigation.dart';
+
 final class AppController extends ChangeNotifier {
   AppController(this._repository) {
     _repository.onSessionExpired = _handleSessionExpired;
@@ -39,6 +41,21 @@ final class AppController extends ChangeNotifier {
   RuntimeConfig? get config => _config;
   AppUser? get user => _user;
 
+  void openEntryName(String? name, {required bool cold}) =>
+      _openEntryName(name, cold: cold);
+
+  void navigate(AppRoute route) => _navigate(route);
+
+  void replaceAll(AppRoute route) => _replaceAll(route);
+
+  void replaceTop(AppRoute route) => _replaceTop(route);
+
+  void completeAuthentication() => _completeAuthentication();
+
+  void back() => _back();
+
+  void _changed() => notifyListeners();
+
   Future<void> initialize() async {
     _actionState = const Loading<void>();
     notifyListeners();
@@ -59,66 +76,7 @@ final class AppController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void openEntryName(String? name, {required bool cold}) {
-    final target = appRouteFromName(name);
-    if (target == null) return;
-    final decision = guardRoute(target, signedIn: signedIn, config: _config);
-    _pendingRoute = decision.pending ?? _pendingRoute;
-    final next = decision.route;
-    if (cold) {
-      _stack
-        ..clear()
-        ..add(AppRoute.home);
-      if (next != AppRoute.home) _stack.add(next);
-    } else if (_stack.last != next) {
-      _stack.add(next);
-    }
-    telemetry.screen(next.name);
-    notifyListeners();
-  }
-
   Future<void> resume() => initialize();
-
-  void navigate(AppRoute route) {
-    final decision = guardRoute(route, signedIn: signedIn, config: _config);
-    _pendingRoute = decision.pending ?? _pendingRoute;
-    _stack.add(decision.route);
-    telemetry.screen(decision.route.name);
-    notifyListeners();
-  }
-
-  void replaceAll(AppRoute route) {
-    final decision = guardRoute(route, signedIn: signedIn, config: _config);
-    _pendingRoute = decision.pending ?? _pendingRoute;
-    _stack
-      ..clear()
-      ..add(decision.route);
-    telemetry.screen(decision.route.name);
-    notifyListeners();
-  }
-
-  void replaceTop(AppRoute route) {
-    final decision = guardRoute(route, signedIn: signedIn, config: _config);
-    _pendingRoute = decision.pending ?? _pendingRoute;
-    _stack
-      ..removeLast()
-      ..add(decision.route);
-    telemetry.screen(decision.route.name);
-    notifyListeners();
-  }
-
-  void completeAuthentication() {
-    final target = _pendingRoute ?? AppRoute.profile;
-    _pendingRoute = null;
-    replaceTop(target);
-  }
-
-  void back() {
-    if (!canGoBack) return;
-    _stack.removeLast();
-    telemetry.screen(route.name);
-    notifyListeners();
-  }
 
   Future<bool> signIn(String email, String password) =>
       _authenticate(() => _repository.signIn(email, password));
@@ -128,8 +86,9 @@ final class AppController extends ChangeNotifier {
     String password,
     String username,
     String consentVersion,
-  ) =>
-      _authenticate(() => _repository.signUp(email, password, username, consentVersion));
+  ) => _authenticate(
+    () => _repository.signUp(email, password, username, consentVersion),
+  );
 
   Future<bool> requestPhoneCode(String phone) =>
       _perform(() => _repository.requestPhoneCode(phone));

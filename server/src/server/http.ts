@@ -30,13 +30,14 @@ export function ok<T>(data: T, status = 200) {
 export function handleError(error: unknown) {
   const traceId = crypto.randomUUID();
   if (error instanceof ZodError) {
+    const fieldErrors = error.flatten().fieldErrors;
     return NextResponse.json({
       error: {
         code: 'VALIDATION_ERROR',
-        message: '请检查输入内容',
+        message: validationMessage(fieldErrors),
         traceId,
         retryable: false,
-        fieldErrors: error.flatten().fieldErrors,
+        fieldErrors,
       } satisfies ApiErrorBody,
     }, { status: 400 });
   }
@@ -69,5 +70,12 @@ export function handleError(error: unknown) {
       retryable: true,
     } satisfies ApiErrorBody,
   }, { status: 500 });
+}
+
+export function validationMessage(
+  fieldErrors: Readonly<Record<string, readonly string[] | undefined>>,
+) {
+  const messages = [...new Set(Object.values(fieldErrors).flatMap((items) => items ?? []))];
+  return messages.length ? messages.join('；') : '请检查输入内容';
 }
 

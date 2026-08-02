@@ -7,6 +7,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
   app_settings: ^8.0.3
   firebase_analytics: ^12.4.5
   firebase_core: ^4.12.1

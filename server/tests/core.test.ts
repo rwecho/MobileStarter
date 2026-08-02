@@ -3,6 +3,8 @@ import test from 'node:test';
 import { defaultConfig } from '../src/domain/config.ts';
 import { createSessionToken, hashToken } from '../src/server/ids.ts';
 import { hashPassword, verifyPassword } from '../src/server/passwords.ts';
+import { validationMessage } from '../src/server/http.ts';
+import { paymentProvider } from '../src/server/payment-providers.ts';
 import {
   deletionSchema,
   feedbackSchema,
@@ -32,6 +34,15 @@ test('session tokens are random and persisted only as hashes', () => {
   assert.notEqual(hashToken(first), first);
 });
 
+test('production rejects mock payment while development keeps the demo provider', () => {
+  assert.throws(
+    () => paymentProvider('mock', 'production'),
+    (error: unknown) => error instanceof Error &&
+      'code' in error && error.code === 'MOCK_PAYMENT_FORBIDDEN',
+  );
+  assert.equal(paymentProvider('mock', 'development').id, 'mock');
+});
+
 test('account and settings schemas reject unsafe input', () => {
   assert.equal(signUpSchema.safeParse({
     email: 'invalid',
@@ -43,6 +54,19 @@ test('account and settings schemas reject unsafe input', () => {
     password: 'secret',
     confirmation: 'NO',
   }).success, false);
+});
+
+test('validation responses expose specific top-level and field errors', () => {
+  const parsed = signUpSchema.safeParse({
+    email: 'invalid',
+    password: 'short',
+    username: 'x',
+  });
+  assert.equal(parsed.success, false);
+  if (parsed.success) return;
+  const fieldErrors = parsed.error.flatten().fieldErrors;
+  assert.match(validationMessage(fieldErrors), /邮箱格式不正确/);
+  assert.deepEqual(fieldErrors.email, ['邮箱格式不正确']);
 });
 
 test('sign-in accepts username, email, and international phone identifiers', () => {

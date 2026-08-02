@@ -19,7 +19,9 @@ const googleDiscovery = {
   tokenEndpoint: 'https://oauth2.googleapis.com/token',
 };
 
-export function SocialAuthButtons() {
+export function SocialAuthButtons({
+  onBeforeAuthenticate,
+}: Readonly<{ onBeforeAuthenticate?: () => boolean }>) {
   const {
     authProviders,
     authProviderPolicy,
@@ -78,6 +80,7 @@ export function SocialAuthButtons() {
   }, [googleResponse, showToast, socialSignIn]);
 
   const signInWithApple = async () => {
+    if (onBeforeAuthenticate && !onBeforeAuthenticate()) return;
     try {
       const result = await AppleAuthentication.signInAsync({
         nonce,
@@ -122,7 +125,9 @@ export function SocialAuthButtons() {
           enabled={authProviders.google}
           label="Google"
           name="google"
-          onPress={() => void promptGoogle()}
+          onPress={() => {
+            if (!onBeforeAuthenticate || onBeforeAuthenticate()) void promptGoogle();
+          }}
         />
       ) : null}
       {authProviderPolicy.github ? (
@@ -130,7 +135,9 @@ export function SocialAuthButtons() {
           enabled={authProviders.github}
           label="GitHub"
           name="github"
-          onPress={() => void promptGitHub()}
+          onPress={() => {
+            if (!onBeforeAuthenticate || onBeforeAuthenticate()) void promptGitHub();
+          }}
         />
       ) : null}
       {authProviderPolicy.phone ? (
@@ -138,7 +145,9 @@ export function SocialAuthButtons() {
           enabled={authProviders.phone}
           label="手机号"
           name="phone"
-          onPress={() => navigate('auth.phone')}
+          onPress={() => {
+            if (!onBeforeAuthenticate || onBeforeAuthenticate()) navigate('auth.phone');
+          }}
         />
       ) : null}
       </View>

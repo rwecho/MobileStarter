@@ -21,7 +21,9 @@ class _OrdersScreenState extends State<OrdersScreen> {
     super.didChangeDependencies();
     if (!requested) {
       requested = true;
-      _load();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _load();
+      });
     }
   }
 

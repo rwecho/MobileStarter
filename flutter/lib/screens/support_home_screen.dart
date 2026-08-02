@@ -22,7 +22,10 @@ class _SupportHomeScreenState extends State<SupportHomeScreen> {
     super.didChangeDependencies();
     if (loaded) return;
     loaded = true;
-    SupportScope.of(context).loadHome();
+    final controller = SupportScope.of(context);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) controller.loadHome();
+    });
   }
 
   @override

@@ -1,13 +1,13 @@
 import { StyleSheet } from 'react-native';
 import { colors, radii, spacing, ThemeColors } from './tokens';
 
-export let styles = createStyles(colors);
+export let styles = createStyles(colors, 1);
 
-export function applyTheme(palette: ThemeColors) {
-  styles = createStyles(palette);
+export function applyTheme(palette: ThemeColors, textScale: number) {
+  styles = createStyles(palette, textScale);
 }
 
-function createStyles(palette: ThemeColors) {
+function createStyles(palette: ThemeColors, textScale: number) {
   return StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: palette.background },
   page: { flex: 1, backgroundColor: palette.background },
@@ -19,11 +19,11 @@ function createStyles(palette: ThemeColors) {
     padding: spacing.x6,
     gap: spacing.x4,
   },
-  title: { color: palette.text, fontSize: 28, fontWeight: '700' },
-  heading: { color: palette.text, fontSize: 20, fontWeight: '700' },
-  body: { color: palette.text, fontSize: 16 },
-  secondary: { color: palette.textSecondary, fontSize: 14 },
-  caption: { color: palette.textSecondary, fontSize: 12 },
+  title: { color: palette.text, fontSize: 28 * textScale, fontWeight: '700' },
+  heading: { color: palette.text, fontSize: 20 * textScale, fontWeight: '700' },
+  body: { color: palette.text, fontSize: 16 * textScale },
+  secondary: { color: palette.textSecondary, fontSize: 14 * textScale },
+  caption: { color: palette.textSecondary, fontSize: 12 * textScale },
   card: {
     backgroundColor: palette.surface,
     borderColor: palette.border,
@@ -34,7 +34,7 @@ function createStyles(palette: ThemeColors) {
   },
   sectionLabel: {
     color: palette.textSecondary,
-    fontSize: 13,
+    fontSize: 13 * textScale,
     fontWeight: '600',
     marginLeft: spacing.x1,
   },
@@ -47,7 +47,7 @@ function createStyles(palette: ThemeColors) {
     borderBottomColor: palette.border,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  rowText: { flex: 1, color: palette.text, fontSize: 16 },
+  rowText: { flex: 1, color: palette.text, fontSize: 16 * textScale },
   input: {
     minHeight: 52,
     borderWidth: 1,
@@ -56,7 +56,7 @@ function createStyles(palette: ThemeColors) {
     backgroundColor: palette.surface,
     paddingHorizontal: spacing.x4,
     color: palette.text,
-    fontSize: 16,
+    fontSize: 16 * textScale,
   },
   checkbox: {
     width: 20,

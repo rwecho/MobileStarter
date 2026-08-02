@@ -6,7 +6,7 @@ import React, {
   useMemo,
   useState,
 } from 'react';
-import { apiClient } from '../data/apiClient';
+import { apiClient, ApiClientError } from '../data/apiClient';
 import {
   HelpArticle,
   SupportTicket,
@@ -156,7 +156,9 @@ export function SupportProvider({ children }: Readonly<{ children: ReactNode }>)
 
 function errorState<T>(error: unknown): AsyncState<T> {
   const message = errorMessage(error);
-  return message.includes('登录') ? { status: 'unauthorized' } : { status: 'error', message };
+  return error instanceof ApiClientError && error.status === 401
+    ? { status: 'unauthorized' }
+    : { status: 'error', message };
 }
 
 function errorMessage(error: unknown) {

@@ -13,6 +13,7 @@ type PreferencesValue = Readonly<{
   mode: ThemeMode;
   dark: boolean;
   palette: ThemeColors;
+  textScale: number;
   text: (key: TranslationKey) => string;
 }>;
 
@@ -25,12 +26,14 @@ export function PreferencesProvider({ children }: Readonly<{ children: ReactNode
   const locale = user?.settings.language === 'en-US' ? 'en-US' : 'zh-CN';
   const dark = mode === 'dark' || (mode === 'system' && systemScheme === 'dark');
   const palette = dark ? darkColors : colors;
-  applyTheme(palette);
+  const textScale = normalizeTextScale(user?.settings.textScale);
+  applyTheme(palette, textScale);
   const value: PreferencesValue = {
     locale,
     mode,
     dark,
     palette,
+    textScale,
     text: (key) => translations[locale][key],
   };
   return (
@@ -49,6 +52,11 @@ export function usePreferences() {
 
 function normalizeTheme(value: unknown): ThemeMode {
   return value === 'light' || value === 'dark' ? value : 'system';
+}
+
+function normalizeTextScale(value: unknown) {
+  if (typeof value !== 'number') return 1;
+  return Math.min(1.3, Math.max(0.9, value));
 }
 
 const translations = {

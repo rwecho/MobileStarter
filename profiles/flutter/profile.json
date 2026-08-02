@@ -1,0 +1,25 @@
+{
+  "id": "flutter",
+  "version": "0.2.0",
+  "source": "flutter",
+  "platforms": ["ios", "android", "web"],
+  "features": [
+    "auth",
+    "membership",
+    "billing",
+    "notifications",
+    "settings",
+    "support",
+    "telemetry"
+  ],
+  "workflows": [
+    "flutter-ci.yml",
+    "flutter-publish.yml"
+  ],
+  "excludedDirectories": [
+    ".dart_tool",
+    ".idea",
+    "build",
+    "AGENTS.md"
+  ]
+}

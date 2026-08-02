@@ -74,6 +74,8 @@ abstract final class AppRouter {
       AppRoute.supportTicket => const SupportTicketScreen(),
       AppRoute.supportFeedback => const ProductFeedbackScreen(),
       AppRoute.legal => const LegalScreen(),
+      AppRoute.termsOfService => const LegalDocumentScreen(type: 'terms'),
+      AppRoute.privacyPolicy => const LegalDocumentScreen(type: 'privacy'),
       AppRoute.about => const SettingsUtilityScreen(
         kind: SettingsUtilityKind.about,
       ),

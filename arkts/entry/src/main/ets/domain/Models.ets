@@ -222,6 +222,8 @@ export interface ApiError {
   message: string
   retryable: boolean
   traceId: string
+  fieldErrors?: Record<string, string[]>
+  retryAfterSeconds?: number
 }
 
 export interface SignInInput {

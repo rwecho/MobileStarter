@@ -1,0 +1,10 @@
+name: mobileui_cli
+description: MobileUI product repository scaffolding and validation CLI.
+publish_to: none
+version: 0.2.0
+
+environment:
+  sdk: ">=3.9.0 <4.0.0"
+
+executables:
+  mobileui: mobileui

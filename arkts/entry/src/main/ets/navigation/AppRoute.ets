@@ -31,6 +31,8 @@ export enum AppRoute {
   Permissions,
   HelpFeedback,
   Legal,
+  TermsOfService,
+  PrivacyPolicy,
   About,
   DeleteAccount,
   NotificationCenter,
@@ -61,6 +63,8 @@ export function routeTitle(route: AppRoute): string {
     case AppRoute.Permissions: return '权限管理'
     case AppRoute.HelpFeedback: return '帮助与反馈'
     case AppRoute.Legal: return '协议与政策'
+    case AppRoute.TermsOfService: return '用户协议'
+    case AppRoute.PrivacyPolicy: return '隐私政策'
     case AppRoute.About: return '关于与版本'
     case AppRoute.NotificationCenter: return '通知中心'
     case AppRoute.StateGallery: return '状态库'

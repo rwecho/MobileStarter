@@ -243,7 +243,7 @@ async function sendRequest<T>(
     if (response.status === 401 && !retried) sessionExpiredHandler?.();
     throw new ApiClientError(
       error.code,
-      error.message,
+      specificErrorMessage(error.message, error.fieldErrors),
       response.status,
       error.retryable,
       error.retryAfterSeconds,
@@ -251,6 +251,15 @@ async function sendRequest<T>(
     );
   }
   return body.data;
+}
+
+export function specificErrorMessage(
+  fallback: string,
+  fieldErrors?: Readonly<Record<string, readonly string[]>>,
+) {
+  if (!fieldErrors) return fallback;
+  const messages = [...new Set(Object.values(fieldErrors).flat().filter(Boolean))];
+  return messages.length ? messages.join('；') : fallback;
 }
 
 async function refreshSession(): Promise<boolean> {

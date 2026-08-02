@@ -1,4 +1,4 @@
-import { RuntimeConfig } from '@/domain/config';
+import type { RuntimeConfig } from '@/domain/config';
 import { ApiError } from './http';
 
 type BillingPlan = RuntimeConfig['plans'][number];
@@ -39,8 +39,21 @@ const unavailableProviders = new Map<string, PaymentProviderPort>(
   }]),
 );
 
-export function paymentProvider(id: BillingPlan['provider']) {
-  if (id === 'mock') return mockProvider;
+export function paymentProvider(
+  id: BillingPlan['provider'],
+  environment: string,
+) {
+  if (id === 'mock') {
+    if (environment === 'production') {
+      throw new ApiError(
+        503,
+        'MOCK_PAYMENT_FORBIDDEN',
+        '生产环境禁止使用模拟支付',
+        true,
+      );
+    }
+    return mockProvider;
+  }
   const provider = unavailableProviders.get(id);
   if (!provider) {
     throw new ApiError(400, 'PAYMENT_PROVIDER_UNSUPPORTED', '不支持的支付渠道');

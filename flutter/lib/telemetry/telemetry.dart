@@ -54,7 +54,9 @@ final class Telemetry {
   }
 
   // environment（development/staging/production 等）同样必须显式配置，未配置即报错。
-  static const _appEnvironmentValue = String.fromEnvironment('MOBILEUI_APP_ENVIRONMENT');
+  static const _appEnvironmentValue = String.fromEnvironment(
+    'MOBILEUI_APP_ENVIRONMENT',
+  );
   static String get _appEnvironment {
     if (_appEnvironmentValue.isEmpty) {
       throw StateError(
@@ -139,10 +141,7 @@ final class Telemetry {
     final stackText = stack?.toString() ?? '';
     track('app_error', {
       'error_name': error.runtimeType.toString(),
-      'error_message': message.substring(
-        0,
-        min(200, message.length),
-      ),
+      'error_message': message.substring(0, min(200, message.length)),
       if (stackText.isNotEmpty)
         'error_stack': stackText.substring(0, min(200, stackText.length)),
     });

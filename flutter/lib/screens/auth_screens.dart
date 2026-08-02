@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import '../app/app_controller.dart';
 import '../app/app_scope.dart';
 import '../design_system/components.dart';
 import '../design_system/feedback.dart';
 import '../navigation/app_route.dart';
 import '../theme/app_tokens.dart';
+import 'auth_consent.dart';
+import 'auth_provider_row.dart';
 
 enum AuthMode { signIn, signUp, phone, forgot, verify, reset }
 
@@ -23,6 +24,9 @@ class _AuthScreenState extends State<AuthScreen> {
   final usernameController = TextEditingController();
   bool phoneCodeSent = false;
   bool consentAgreed = false;
+  String? accountError;
+  String? passwordError;
+  String? usernameError;
 
   @override
   void dispose() {
@@ -35,6 +39,7 @@ class _AuthScreenState extends State<AuthScreen> {
   Future<void> submit() async {
     final controller = AppScope.of(context);
     if (controller.busy) return;
+    if (!_validateSubmission()) return;
     var success = false;
     switch (widget.mode) {
       case AuthMode.forgot:
@@ -69,10 +74,6 @@ class _AuthScreenState extends State<AuthScreen> {
         if (success) controller.completeAuthentication();
         break;
       case AuthMode.signUp:
-        if (!consentAgreed) {
-          if (mounted) showAppToast(context, '请先阅读并同意用户协议与隐私政策');
-          return;
-        }
         success = await controller.signUp(
           emailController.text,
           passwordController.text,
@@ -86,6 +87,41 @@ class _AuthScreenState extends State<AuthScreen> {
       showAppToast(context, controller.consumeError() ?? '操作失败');
     }
   }
+
+  bool _validateSubmission() {
+    final isSignUp = widget.mode == AuthMode.signUp;
+    final isSignIn = widget.mode == AuthMode.signIn;
+    if (!isSignUp && !isSignIn) return true;
+    final account = emailController.text.trim();
+    final username = usernameController.text.trim();
+    final password = passwordController.text;
+    setState(() {
+      accountError = account.isEmpty
+          ? (isSignIn ? '请输入用户名、邮箱或手机号' : '请输入邮箱')
+          : isSignUp && !_isEmail(account)
+          ? '邮箱格式不正确'
+          : null;
+      usernameError = isSignUp && username.length < 2 ? '用户名至少 2 个字符' : null;
+      passwordError = password.isEmpty
+          ? '请输入密码'
+          : isSignUp && password.length < 8
+          ? '密码至少 8 位'
+          : null;
+    });
+    final valid =
+        accountError == null && usernameError == null && passwordError == null;
+    if (!valid) return false;
+    return _ensureConsent();
+  }
+
+  bool _ensureConsent() {
+    if (consentAgreed) return true;
+    showAppToast(context, '请先阅读并同意用户协议与隐私政策');
+    return false;
+  }
+
+  bool _isEmail(String value) =>
+      RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(value);
 
   @override
   Widget build(BuildContext context) {
@@ -109,25 +145,17 @@ class _AuthScreenState extends State<AuthScreen> {
                 ? TextInputType.phone
                 : TextInputType.emailAddress,
             decoration: InputDecoration(
-              labelText: widget.mode == AuthMode.phone ? '手机号' : '邮箱',
+              labelText: _accountLabel(),
+              errorText: accountError,
             ),
           ),
           if (widget.mode == AuthMode.signUp) ...[
             const SizedBox(height: AppSpacing.x3),
             TextField(
               controller: usernameController,
-              decoration: const InputDecoration(labelText: '用户名'),
-            ),
-            const SizedBox(height: AppSpacing.x2),
-            CheckboxListTile(
-              value: consentAgreed,
-              onChanged: (value) => setState(() => consentAgreed = value ?? false),
-              controlAffinity: ListTileControlAffinity.leading,
-              contentPadding: EdgeInsets.zero,
-              dense: true,
-              title: Text(
-                '我已阅读并同意用户协议与隐私政策',
-                style: Theme.of(context).textTheme.bodySmall,
+              decoration: InputDecoration(
+                labelText: '用户名',
+                errorText: usernameError,
               ),
             ),
           ],
@@ -143,6 +171,7 @@ class _AuthScreenState extends State<AuthScreen> {
                         widget.mode == AuthMode.phone
                     ? '验证码'
                     : '密码',
+                errorText: passwordError,
               ),
             ),
             const SizedBox(height: AppSpacing.x4),
@@ -153,9 +182,9 @@ class _AuthScreenState extends State<AuthScreen> {
           ),
           if (widget.mode == AuthMode.signIn) ...[
             const SizedBox(height: AppSpacing.x5),
-            const _ProviderDivider(),
+            const AuthProviderDivider(),
             const SizedBox(height: AppSpacing.x3),
-            const _ProviderRow(),
+            AuthProviderRow(onPressed: _socialSignIn),
             TextButton(
               onPressed: () =>
                   AppScope.of(context).navigate(AppRoute.forgotPassword),
@@ -166,9 +195,32 @@ class _AuthScreenState extends State<AuthScreen> {
               child: const Text('创建账号'),
             ),
           ],
+          if (_requiresConsent) ...[
+            const SizedBox(height: AppSpacing.x4),
+            AuthConsent(
+              value: consentAgreed,
+              onChanged: (value) => setState(() => consentAgreed = value),
+            ),
+          ],
         ],
       ),
     );
+  }
+
+  bool get _requiresConsent =>
+      widget.mode == AuthMode.signIn || widget.mode == AuthMode.signUp;
+
+  String _accountLabel() => switch (widget.mode) {
+    AuthMode.phone => '手机号',
+    AuthMode.signIn => '用户名、邮箱或手机号',
+    _ => '邮箱',
+  };
+
+  Future<void> _socialSignIn(String provider) async {
+    if (!_ensureConsent()) return;
+    final controller = AppScope.of(context);
+    final success = await controller.socialSignIn(provider);
+    if (success) controller.completeAuthentication();
   }
 
   String _termsRevision(AppController controller) {
@@ -187,107 +239,4 @@ class _AuthScreenState extends State<AuthScreen> {
       AuthMode.reset => ('设置新密码', '确认修改'),
     };
   }
-}
-
-class _ProviderDivider extends StatelessWidget {
-  const _ProviderDivider();
-
-  @override
-  Widget build(BuildContext context) {
-    return const Row(
-      children: [
-        Expanded(child: Divider()),
-        Padding(
-          padding: EdgeInsets.symmetric(horizontal: AppSpacing.x3),
-          child: Text('其他登录方式'),
-        ),
-        Expanded(child: Divider()),
-      ],
-    );
-  }
-}
-
-class _ProviderRow extends StatelessWidget {
-  const _ProviderRow();
-
-  @override
-  Widget build(BuildContext context) {
-    final controller = AppScope.of(context);
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        _ProviderButton(
-          asset: 'assets/icons/apple.svg',
-          label: 'Apple',
-          enabled: controller.authProviders['apple'] == true,
-          onPressed: () => _signInWith(controller, 'apple'),
-        ),
-        _ProviderButton(
-          asset: 'assets/icons/google.svg',
-          label: 'Google',
-          enabled: controller.authProviders['google'] == true,
-          onPressed: () => _signInWith(controller, 'google'),
-        ),
-        _ProviderButton(
-          asset: 'assets/icons/github.svg',
-          label: 'GitHub',
-          enabled: controller.authProviders['github'] == true,
-          onPressed: () => _signInWith(controller, 'github'),
-        ),
-        _ProviderButton(
-          asset: 'assets/icons/phone.svg',
-          label: '手机号',
-          enabled: controller.authProviders['phone'] == true,
-          onPressed: () => AppScope.of(context).navigate(AppRoute.phoneSignIn),
-        ),
-      ],
-    );
-  }
-}
-
-class _ProviderButton extends StatelessWidget {
-  const _ProviderButton({
-    required this.asset,
-    required this.label,
-    required this.onPressed,
-    this.enabled = true,
-  });
-
-  final String asset;
-  final String label;
-  final VoidCallback? onPressed;
-  final bool enabled;
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: Semantics(
-        button: true,
-        enabled: enabled,
-        label: '$label 登录',
-        child: InkWell(
-          borderRadius: BorderRadius.circular(999),
-          onTap: enabled ? onPressed : null,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: AppSpacing.x2),
-            child: Column(
-              children: [
-                Opacity(
-                  opacity: enabled ? 1 : .38,
-                  child: SvgPicture.asset(asset, width: 24, height: 24),
-                ),
-                const SizedBox(height: AppSpacing.x1),
-                Text(label, style: Theme.of(context).textTheme.labelSmall),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-Future<void> _signInWith(AppController controller, String provider) async {
-  final success = await controller.socialSignIn(provider);
-  if (success) controller.completeAuthentication();
 }

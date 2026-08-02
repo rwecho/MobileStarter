@@ -101,7 +101,7 @@ export struct HomePage {
         .padding(AppSpacing.x4)
       }
       .layoutWeight(1)
-      BottomTabs({ store: this.store })
+      BottomTabs({ store: this.store, selected: AppRoute.Home })
     }
     .width('100%')
     .height('100%')
@@ -172,22 +172,26 @@ struct QuickAction {
 }
 
 @Component
-struct BottomTabs {
+export struct BottomTabs {
   @ObjectLink store: AppStore
+  @Prop selected: AppRoute
 
   build() {
     Row() {
       TabItem({ label: localized('首页', 'Home', this.store.language),
-        icon: AppIconName.Home, active: true })
+        icon: AppIconName.Home, active: this.selected === AppRoute.Home,
+        onTap: () => this.store.replaceAll(AppRoute.Home) })
       TabItem({
         label: localized('会员', 'Membership', this.store.language),
         icon: AppIconName.Crown,
-        onTap: () => this.store.navigate(AppRoute.Membership)
+        active: this.selected === AppRoute.Membership,
+        onTap: () => this.store.replaceAll(AppRoute.Membership)
       })
       TabItem({
         label: localized('我的', 'Profile', this.store.language),
         icon: AppIconName.User,
-        onTap: () => this.store.navigate(AppRoute.Profile)
+        active: this.selected === AppRoute.Profile,
+        onTap: () => this.store.replaceAll(AppRoute.Profile)
       })
     }
     .height(66)

@@ -8,6 +8,17 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'support_models.dart';
 
+final class SupportApiException implements Exception {
+  const SupportApiException(this.code, this.message, this.status);
+
+  final String code;
+  final String message;
+  final int status;
+
+  @override
+  String toString() => message;
+}
+
 final class SupportRepository {
   static const _apiBase = String.fromEnvironment(
     'MOBILEUI_API_URL',
@@ -140,7 +151,11 @@ final class SupportRepository {
     final envelope = _map(jsonDecode(response.body));
     if (response.statusCode < 200 || response.statusCode >= 300) {
       final error = _map(envelope['error']);
-      throw StateError(error['message'] as String? ?? '服务暂时不可用');
+      throw SupportApiException(
+        error['code'] as String? ?? 'HTTP_ERROR',
+        _specificErrorMessage(error),
+        response.statusCode,
+      );
     }
     return envelope['data'];
   }
@@ -162,6 +177,18 @@ final class SupportRepository {
 
   static Map<String, Object?> _map(Object? value) =>
       Map<String, Object?>.from(value! as Map);
+
+  static String _specificErrorMessage(Map<String, Object?> error) {
+    final value = error['fieldErrors'];
+    if (value is Map) {
+      final messages = value.values
+          .whereType<List>()
+          .expand((items) => items.whereType<String>())
+          .toSet();
+      if (messages.isNotEmpty) return messages.join('；');
+    }
+    return error['message'] as String? ?? '服务暂时不可用';
+  }
 }
 
 String _platformName() {

@@ -5,10 +5,16 @@ import '../theme/app_tokens.dart';
 import 'app_icon.dart';
 
 class AppPage extends StatelessWidget {
-  const AppPage({required this.title, required this.child, super.key});
+  const AppPage({
+    required this.title,
+    required this.child,
+    this.bottomNavigationBar,
+    super.key,
+  });
 
   final String title;
   final Widget child;
+  final Widget? bottomNavigationBar;
 
   @override
   Widget build(BuildContext context) {
@@ -26,6 +32,7 @@ class AppPage extends StatelessWidget {
             : const SizedBox.shrink(),
       ),
       body: child,
+      bottomNavigationBar: bottomNavigationBar,
     );
   }
 }

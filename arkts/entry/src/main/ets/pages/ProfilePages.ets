@@ -5,6 +5,7 @@ import { AppButton, AppListRow, PageHeader } from '../design_system/Components'
 import { AppColors, AppRadii, AppSpacing } from '../theme/AppTokens'
 import { MembershipTier } from '../domain/Models'
 import { appString, AppString } from '../localization/AppStrings'
+import { BottomTabs } from './HomePage'
 
 @Component
 export struct ProfilePage {
@@ -98,6 +99,7 @@ export struct ProfilePage {
         }
         .layoutWeight(1)
       }
+      BottomTabs({ store: this.store, selected: AppRoute.Profile })
     }
     .width('100%')
     .height('100%')
@@ -218,6 +220,7 @@ export struct MembershipPage {
         .padding(AppSpacing.x4)
       }
       .layoutWeight(1)
+      BottomTabs({ store: this.store, selected: AppRoute.Membership })
     }
     .width('100%')
     .height('100%')

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import '../theme/app_theme.dart';
 import 'app_controller.dart';
 import 'app_repository.dart';
@@ -17,8 +18,7 @@ class MobileUiApp extends StatefulWidget {
   State<MobileUiApp> createState() => _MobileUiAppState();
 }
 
-class _MobileUiAppState extends State<MobileUiApp>
-    with WidgetsBindingObserver {
+class _MobileUiAppState extends State<MobileUiApp> with WidgetsBindingObserver {
   late final AppController controller;
   final supportController = SupportController(SupportRepository());
 
@@ -39,7 +39,9 @@ class _MobileUiAppState extends State<MobileUiApp>
   }
 
   @override
-  Future<bool> didPushRouteInformation(RouteInformation routeInformation) async {
+  Future<bool> didPushRouteInformation(
+    RouteInformation routeInformation,
+  ) async {
     controller.openEntryName(
       _routeName(routeInformation.uri.toString()),
       cold: false,
@@ -82,6 +84,18 @@ class _MobileUiAppState extends State<MobileUiApp>
             theme: AppTheme.light,
             darkTheme: AppTheme.dark,
             themeMode: _themeModeOf(controller),
+            locale: _localeOf(controller),
+            supportedLocales: const [Locale('zh', 'CN'), Locale('en', 'US')],
+            localizationsDelegates: GlobalMaterialLocalizations.delegates,
+            builder: (context, child) {
+              final mediaQuery = MediaQuery.of(context);
+              return MediaQuery(
+                data: mediaQuery.copyWith(
+                  textScaler: TextScaler.linear(_textScaleOf(controller)),
+                ),
+                child: child ?? const SizedBox.shrink(),
+              );
+            },
             home: AppRouter.screenFor(controller.route),
           ),
         ),
@@ -94,5 +108,16 @@ class _MobileUiAppState extends State<MobileUiApp>
     if (value == 'dark') return ThemeMode.dark;
     if (value == 'light') return ThemeMode.light;
     return ThemeMode.system;
+  }
+
+  static Locale _localeOf(AppController controller) {
+    return controller.user?.settings['language'] == 'en-US'
+        ? const Locale('en', 'US')
+        : const Locale('zh', 'CN');
+  }
+
+  static double _textScaleOf(AppController controller) {
+    final value = controller.user?.settings['textScale'];
+    return value is num ? value.toDouble().clamp(0.9, 1.3) : 1;
   }
 }

@@ -39,7 +39,7 @@ export struct AuthPage {
           .width('100%')
         if (this.mode !== AuthMode.Verify && this.mode !== AuthMode.Reset) {
           TextInput({
-            placeholder: this.mode === AuthMode.Phone ? '+86 13800000000' : '邮箱',
+            placeholder: this.accountPlaceholder(),
             text: this.email
           })
             .height(52)
@@ -72,16 +72,6 @@ export struct AuthPage {
             .backgroundColor(AppColors.surface)
             .borderRadius(AppRadii.control)
             .onChange(value => this.username = value)
-          Row({ space: AppSpacing.x2 }) {
-            Checkbox()
-              .select(this.consentAgreed)
-              .onChange((value: boolean) => { this.consentAgreed = value })
-            Text('我已阅读并同意用户协议与隐私政策')
-              .fontSize(12)
-              .fontColor(AppColors.textSecondary)
-              .layoutWeight(1)
-          }
-          .width('100%')
         }
         AppButton({
           label: this.store.busy ? '正在处理…' : this.action(),
@@ -98,6 +88,23 @@ export struct AuthPage {
           Text('创建账号')
             .fontColor(AppColors.brand)
             .onClick(() => this.store.navigate(AppRoute.SignUp))
+        }
+        if (this.requiresConsent()) {
+          Row({ space: AppSpacing.x1 }) {
+            Checkbox()
+              .select(this.consentAgreed)
+              .onChange((value: boolean) => { this.consentAgreed = value })
+            Text('我已阅读并同意').fontSize(12).fontColor(AppColors.textSecondary)
+            Text('用户协议')
+              .fontSize(12).fontColor(AppColors.brand)
+              .onClick(() => this.store.navigate(AppRoute.TermsOfService))
+            Text('与').fontSize(12).fontColor(AppColors.textSecondary)
+            Text('隐私政策')
+              .fontSize(12).fontColor(AppColors.brand)
+              .onClick(() => this.store.navigate(AppRoute.PrivacyPolicy))
+          }
+          .justifyContent(FlexAlign.Center)
+          .width('100%')
         }
       }
       .padding(AppSpacing.x6)
@@ -117,6 +124,11 @@ export struct AuthPage {
   }
 
   private beginSocial(provider: string): void {
+    if (!this.ensureConsent()) return
+    if (provider === 'phone') {
+      this.store.navigate(AppRoute.PhoneSignIn)
+      return
+    }
     if (provider === 'apple') {
       this.store.showToast('HarmonyOS 暂不支持 Apple 登录', true)
       return
@@ -159,10 +171,7 @@ export struct AuthPage {
         }
         return
       case AuthMode.SignUp:
-        if (!this.consentAgreed) {
-          this.store.showToast('请先阅读并同意用户协议与隐私政策', true)
-          return
-        }
+        if (!this.ensureConsent()) return
         if (!await this.store.signUp(this.email, this.password, this.username, this.termsRevision())) {
           return
         }
@@ -170,12 +179,29 @@ export struct AuthPage {
         this.store.completeAuthentication()
         return
       case AuthMode.SignIn:
+        if (!this.ensureConsent()) return
         if (!await this.store.signIn(this.email, this.password)) {
           return
         }
         this.store.showToast('登录成功')
         this.store.completeAuthentication()
     }
+  }
+
+  private ensureConsent(): boolean {
+    if (this.consentAgreed) return true
+    this.store.showToast('请先阅读并同意用户协议与隐私政策', true)
+    return false
+  }
+
+  private requiresConsent(): boolean {
+    return this.mode === AuthMode.SignIn || this.mode === AuthMode.SignUp
+  }
+
+  private accountPlaceholder(): string {
+    if (this.mode === AuthMode.Phone) return '+86 13800000000'
+    if (this.mode === AuthMode.SignIn) return '用户名、邮箱或手机号'
+    return '邮箱'
   }
 
   private termsRevision(): string {
@@ -242,7 +268,7 @@ struct AuthProviderRow {
         icon: $r('app.media.phone'),
         iconStyle: AuthIconStyle.Monochrome,
         isEnabled: this.store.authProviders['phone'] === true,
-        onTap: () => this.store.navigate(AppRoute.PhoneSignIn)
+        onTap: () => this.onSocial('phone')
       })
     }
     .justifyContent(FlexAlign.Center)

@@ -11,7 +11,7 @@ import { OrdersPage, SessionsPage } from './AccountDataPages'
 import { NotificationPage } from './NotificationPage'
 import {
   AboutPage, AccountSecurityPage, ChoicePreferencePage,
-  LegalPage, ProfileEditPage
+  LegalDocumentPage, LegalPage, ProfileEditPage
 } from './SettingsActionPages'
 import { HomePage } from './HomePage'
 import { LogoPage, OnboardingPage, PromoPage } from './LaunchPages'
@@ -134,6 +134,10 @@ struct SettingsHost {
       ChoicePreferencePage({ store: this.store, route: this.store.route })
     } else if (this.store.route === AppRoute.Legal) {
       LegalPage({ store: this.store })
+    } else if (this.store.route === AppRoute.TermsOfService) {
+      LegalDocumentPage({ store: this.store, type: 'terms' })
+    } else if (this.store.route === AppRoute.PrivacyPolicy) {
+      LegalDocumentPage({ store: this.store, type: 'privacy' })
     } else if (this.store.route === AppRoute.About) {
       AboutPage({ store: this.store })
     } else if (this.store.route === AppRoute.Storage ||

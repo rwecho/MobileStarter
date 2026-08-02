@@ -25,7 +25,9 @@ class _InviteScreenState extends State<InviteScreen> {
     super.didChangeDependencies();
     if (requested) return;
     requested = true;
-    _load();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _load();
+    });
   }
 
   @override

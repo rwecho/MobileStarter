@@ -21,7 +21,7 @@ export async function createOrder(input: CreateOrderInput) {
   if (existing) return existing;
   const plan = input.config.plans.find((item) => item.id === input.planId);
   if (!plan) throw new ApiError(404, 'PLAN_NOT_FOUND', '订阅方案不存在');
-  const start = await paymentProvider(plan.provider).start({
+  const start = await paymentProvider(plan.provider, input.environment).start({
     appId: input.appId,
     environment: input.environment,
     userId: input.userId,

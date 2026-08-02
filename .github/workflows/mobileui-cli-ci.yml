@@ -1,0 +1,33 @@
+name: MobileUI CLI CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "tool/mobileui/**"
+      - "profiles/**"
+      - "flutter/**"
+      - ".github/workflows/mobileui-cli-ci.yml"
+  pull_request:
+    paths:
+      - "tool/mobileui/**"
+      - "profiles/**"
+      - "flutter/**"
+      - ".github/workflows/mobileui-cli-ci.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: dart format --output=none --set-exit-if-changed tool/mobileui
+      - run: dart analyze tool/mobileui
+      - run: dart run test/smoke_test.dart
+        working-directory: tool/mobileui

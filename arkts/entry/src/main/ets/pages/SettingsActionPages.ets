@@ -160,6 +160,40 @@ export struct LegalPage {
 }
 
 @Component
+export struct LegalDocumentPage {
+  @ObjectLink store: AppStore
+  @Prop type: string
+
+  build() {
+    Column() {
+      PageHeader({ store: this.store, title: this.title() })
+      Scroll() {
+        Column({ space: AppSpacing.x3 }) {
+          if (this.document() === undefined) {
+            Text('当前 App 尚未配置该协议文档。').fontColor(AppColors.textSecondary)
+          } else {
+            Text(`版本 ${this.document()?.revision ?? ''}`).fontColor(AppColors.textSecondary)
+            Text(this.document()?.content ?? '').fontColor(AppColors.text)
+          }
+        }.alignItems(HorizontalAlign.Start).padding(AppSpacing.x4)
+      }.layoutWeight(1)
+    }.width('100%').height('100%')
+  }
+
+  private document(): LegalDocument | undefined {
+    const documents = this.store.config?.legal ?? []
+    for (let i = 0; i < documents.length; i++) {
+      if (documents[i].type === this.type) return documents[i]
+    }
+    return undefined
+  }
+
+  private title(): string {
+    return this.document()?.title ?? (this.type === 'privacy' ? '隐私政策' : '用户协议')
+  }
+}
+
+@Component
 export struct AboutPage {
   @ObjectLink store: AppStore
   build() {

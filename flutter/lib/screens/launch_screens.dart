@@ -76,7 +76,7 @@ class PromoScreen extends StatefulWidget {
 }
 
 class _PromoScreenState extends State<PromoScreen> {
-  late final AppController _controller;
+  late AppController _controller;
   Timer? _timer;
   int _countdown = 3;
   bool _entered = false;

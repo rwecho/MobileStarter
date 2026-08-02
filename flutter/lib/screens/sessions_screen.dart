@@ -23,7 +23,9 @@ class _SessionsScreenState extends State<SessionsScreen> {
     super.didChangeDependencies();
     if (requested) return;
     requested = true;
-    _load();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _load();
+    });
   }
 
   @override

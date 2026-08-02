@@ -5,6 +5,7 @@ import '../app/runtime_models.dart';
 import '../design_system/app_icon.dart';
 import '../design_system/components.dart';
 import '../design_system/feedback.dart';
+import '../design_system/primary_navigation.dart';
 import '../navigation/app_route.dart';
 import '../theme/app_tokens.dart';
 
@@ -17,6 +18,7 @@ class ProfileScreen extends StatelessWidget {
     if (!controller.signedIn) return const _SignedOutProfile();
     return AppPage(
       title: '我的',
+      bottomNavigationBar: const PrimaryNavigation(selectedIndex: 2),
       child: ListView(
         padding: const EdgeInsets.all(AppSpacing.x4),
         children: [
@@ -105,6 +107,7 @@ class _SignedOutProfile extends StatelessWidget {
   Widget build(BuildContext context) {
     return AppPage(
       title: '我的',
+      bottomNavigationBar: const PrimaryNavigation(selectedIndex: 2),
       child: Center(
         child: Padding(
           padding: const EdgeInsets.all(AppSpacing.x6),
@@ -155,8 +158,12 @@ class _MembershipScreenState extends State<MembershipScreen> {
       );
     }
     final effectivePlan = _effectivePlan(config.plans);
+    final effectivePlanView = config.plans
+        .where((plan) => plan.id == effectivePlan)
+        .firstOrNull;
     return AppPage(
       title: '会员中心',
+      bottomNavigationBar: const PrimaryNavigation(selectedIndex: 1),
       child: ListView(
         padding: const EdgeInsets.all(AppSpacing.x4),
         children: [
@@ -235,8 +242,21 @@ class _MembershipScreenState extends State<MembershipScreen> {
               ),
             ),
             const SizedBox(height: AppSpacing.x4),
+            if (effectivePlanView?.provider == 'mock') ...[
+              const AppCard(
+                child: Padding(
+                  padding: EdgeInsets.all(AppSpacing.x4),
+                  child: Text('当前为演示支付，不会调用真实商店或支付渠道。'),
+                ),
+              ),
+              const SizedBox(height: AppSpacing.x3),
+            ],
             AppButton(
-              label: controller.signedIn ? '确认订阅' : '登录后订阅',
+              label: !controller.signedIn
+                  ? '登录后订阅'
+                  : effectivePlanView?.provider == 'mock'
+                  ? '演示下单（非真实支付）'
+                  : '确认订阅',
               icon: AppIconName.crown,
               onPressed: () => _purchase(controller),
             ),

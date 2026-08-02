@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import '../app/app_scope.dart';
 import '../design_system/app_icon.dart';
 import '../design_system/components.dart';
+import '../design_system/primary_navigation.dart';
 import '../navigation/app_route.dart';
+import '../l10n/localized_text.dart';
 import '../theme/app_tokens.dart';
 
 class HomeScreen extends StatelessWidget {
@@ -19,7 +21,10 @@ class HomeScreen extends StatelessWidget {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('欢迎回来', style: TextStyle(fontSize: 13)),
+            Text(
+              localizedText(context, '欢迎回来', 'Welcome back'),
+              style: const TextStyle(fontSize: 13),
+            ),
             Text(appName),
           ],
         ),
@@ -42,7 +47,10 @@ class HomeScreen extends StatelessWidget {
           ],
           _QuickActions(features: controller.config?.features ?? const {}),
           const SizedBox(height: AppSpacing.x6),
-          Text('最近动态', style: Theme.of(context).textTheme.titleLarge),
+          Text(
+            localizedText(context, '最近动态', 'Recent activity'),
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
           const SizedBox(height: AppSpacing.x3),
           const AppCard(
             child: Padding(
@@ -65,18 +73,7 @@ class HomeScreen extends StatelessWidget {
           ),
         ],
       ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: 0,
-        destinations: const [
-          NavigationDestination(icon: AppIcon(AppIconName.home), label: '首页'),
-          NavigationDestination(icon: AppIcon(AppIconName.crown), label: '会员'),
-          NavigationDestination(icon: AppIcon(AppIconName.user), label: '我的'),
-        ],
-        onDestinationSelected: (index) {
-          if (index == 1) controller.navigate(AppRoute.membership);
-          if (index == 2) controller.navigate(AppRoute.profile);
-        },
-      ),
+      bottomNavigationBar: const PrimaryNavigation(selectedIndex: 0),
     );
   }
 }

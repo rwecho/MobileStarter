@@ -22,7 +22,9 @@ class _CouponsScreenState extends State<CouponsScreen> {
     super.didChangeDependencies();
     if (requested) return;
     requested = true;
-    _load();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _load();
+    });
   }
 
   @override

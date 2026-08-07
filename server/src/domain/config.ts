@@ -5,6 +5,8 @@ export type SplashCampaign = Readonly<{
   badge: string;
   actionLabel: string;
   imageUrl: string | null;
+  videoUrl: string | null;
+  linkUrl: string | null;
   skippable: boolean;
   durationSeconds: number;
 }>;
@@ -71,7 +73,7 @@ export type RuntimeConfig = Readonly<{
     tagline: string;
     primaryColor: string;
   }>;
-  splash: SplashCampaign;
+  splash: SplashCampaign | null;
   cacheTtlSeconds: number;
   telemetry: Readonly<{
     enabled: boolean;
@@ -123,6 +125,8 @@ export const defaultConfig: RuntimeConfig = {
     badge: '本周精选',
     actionLabel: '开始探索',
     imageUrl: null,
+    videoUrl: null,
+    linkUrl: null,
     skippable: true,
     durationSeconds: 5,
   },

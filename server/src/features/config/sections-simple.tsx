@@ -80,28 +80,64 @@ export function BrandSection({
   );
 }
 
+type SplashShape = Readonly<{
+  id: string;
+  title: string;
+  description: string;
+  badge: string;
+  actionLabel: string;
+  imageUrl: string | null;
+  videoUrl: string | null;
+  linkUrl: string | null;
+  skippable: boolean;
+  durationSeconds: number;
+}>;
+
+const DEFAULT_SPLASH: SplashShape = {
+  id: 'splash',
+  title: '',
+  description: '',
+  badge: '',
+  actionLabel: '开始探索',
+  imageUrl: null,
+  videoUrl: null,
+  linkUrl: null,
+  skippable: true,
+  durationSeconds: 5,
+};
+
 export function SplashSection({
   splash,
   onChange,
 }: Readonly<{
-  splash: Readonly<{ id: string; title: string; description: string; badge: string; actionLabel: string; imageUrl: string | null; skippable: boolean; durationSeconds: number }>;
-  onChange: (next: { id: string; title: string; description: string; badge: string; actionLabel: string; imageUrl: string | null; skippable: boolean; durationSeconds: number }) => void;
+  splash: SplashShape | null;
+  onChange: (next: SplashShape | null) => void;
 }>) {
-  const set = (patch: Partial<{ id: string; title: string; description: string; badge: string; actionLabel: string; imageUrl: string | null; skippable: boolean; durationSeconds: number }>) => onChange({ ...splash, ...patch });
+  const set = (patch: Partial<SplashShape>) => onChange({ ...(splash ?? DEFAULT_SPLASH), ...patch });
+  const enabled = splash !== null;
   return (
-    <SectionCard title="启动页活动" description="App 启动时的闪屏活动卡片内容与展示时长。">
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="活动 ID" htmlFor="splashId" description="活动唯一标识，用于上报与下线。"><TextInput id="splashId" value={splash.id} onChange={(v) => set({ id: v })} /></Field>
-        <Field label="角标" htmlFor="splashBadge" description="左上角小标签，如“本周精选”。"><TextInput id="splashBadge" value={splash.badge} onChange={(v) => set({ badge: v })} /></Field>
-      </div>
-      <Field label="标题" htmlFor="splashTitle" description="活动主标题。"><TextInput id="splashTitle" value={splash.title} onChange={(v) => set({ title: v })} /></Field>
-      <Field label="描述" htmlFor="splashDesc" description="活动正文说明。"><TextInput id="splashDesc" value={splash.description} onChange={(v) => set({ description: v })} /></Field>
-      <div className="grid gap-4 sm:grid-cols-3">
-        <Field label="按钮文案" htmlFor="splashAction" description="主行动按钮的文字。"><TextInput id="splashAction" value={splash.actionLabel} onChange={(v) => set({ actionLabel: v })} /></Field>
-        <Field label="展示时长（秒）" htmlFor="splashDur" description="自动消失前展示的秒数。"><NumberInput id="splashDur" value={splash.durationSeconds} onChange={(v) => set({ durationSeconds: v })} /></Field>
-        <Field label="可跳过" description="允许用户点击跳过闪屏。"><SwitchInput checked={splash.skippable} onChange={(v) => set({ skippable: v })} /></Field>
-      </div>
-      <Field label="图片 URL" htmlFor="splashImg" description="活动配图地址，留空则不显示图片。"><TextInput id="splashImg" value={splash.imageUrl ?? ''} onChange={(v) => set({ imageUrl: v || null })} /></Field>
+    <SectionCard title="启动页活动" description="App 启动时的闪屏活动卡片内容与展示时长。关闭则客户端 bootstrap 完成直接进首页，不展示闪屏。">
+      <Field label="启用启动页闪屏" description="关闭后客户端拉取配置后直接进入首页。">
+        <SwitchInput checked={enabled} onChange={(v) => onChange(v ? DEFAULT_SPLASH : null)} />
+      </Field>
+      {enabled && splash ? (
+        <>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="活动 ID" htmlFor="splashId" description="活动唯一标识，用于上报与下线。"><TextInput id="splashId" value={splash.id} onChange={(v) => set({ id: v })} /></Field>
+            <Field label="角标" htmlFor="splashBadge" description="左上角小标签，如“本周精选”。"><TextInput id="splashBadge" value={splash.badge} onChange={(v) => set({ badge: v })} /></Field>
+          </div>
+          <Field label="标题" htmlFor="splashTitle" description="活动主标题。"><TextInput id="splashTitle" value={splash.title} onChange={(v) => set({ title: v })} /></Field>
+          <Field label="描述" htmlFor="splashDesc" description="活动正文说明。"><TextInput id="splashDesc" value={splash.description} onChange={(v) => set({ description: v })} /></Field>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <Field label="按钮文案" htmlFor="splashAction" description="主行动按钮的文字。"><TextInput id="splashAction" value={splash.actionLabel} onChange={(v) => set({ actionLabel: v })} /></Field>
+            <Field label="展示时长（秒）" htmlFor="splashDur" description="自动消失前展示的秒数。"><NumberInput id="splashDur" value={splash.durationSeconds} onChange={(v) => set({ durationSeconds: v })} /></Field>
+            <Field label="可跳过" description="允许用户点击跳过闪屏。"><SwitchInput checked={splash.skippable} onChange={(v) => set({ skippable: v })} /></Field>
+          </div>
+          <Field label="图片 URL" htmlFor="splashImg" description="活动配图地址，留空则不显示图片。"><TextInput id="splashImg" value={splash.imageUrl ?? ''} onChange={(v) => set({ imageUrl: v || null })} /></Field>
+          <Field label="视频 URL" htmlFor="splashVideo" description="可选，开屏视频地址（如 mp4），配置后优先于图片。"><TextInput id="splashVideo" value={splash.videoUrl ?? ''} onChange={(v) => set({ videoUrl: v || null })} /></Field>
+          <Field label="落地页 URL" htmlFor="splashLink" description="可选，点击闪屏跳转的落地页；未配置则点击无跳转（合规：仅按钮可点）。"><TextInput id="splashLink" value={splash.linkUrl ?? ''} onChange={(v) => set({ linkUrl: v || null })} /></Field>
+        </>
+      ) : null}
     </SectionCard>
   );
 }

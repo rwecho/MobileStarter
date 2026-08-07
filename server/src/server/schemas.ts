@@ -187,9 +187,11 @@ export const runtimeConfigSchema = z.object({
     badge: z.string().max(30),
     actionLabel: z.string().min(1).max(30),
     imageUrl: z.url().nullable(),
+    videoUrl: z.url().nullable(),
+    linkUrl: z.url().nullable(),
     skippable: z.boolean(),
     durationSeconds: z.number().int().min(1).max(30),
-  }),
+  }).nullable(),
   cacheTtlSeconds: z.number().int().min(60).max(86400),
   telemetry: z.object({
     enabled: z.boolean(),

@@ -205,7 +205,7 @@ function mergeRuntimeConfig(parsed: Partial<RuntimeConfig>): RuntimeConfig {
     ...defaultConfig,
     ...parsed,
     brand: { ...defaultConfig.brand, ...parsed.brand },
-    splash: { ...defaultConfig.splash, ...parsed.splash },
+    splash: parsed.splash === undefined ? defaultConfig.splash : parsed.splash,
     telemetry: { ...defaultConfig.telemetry, ...parsed.telemetry },
     support: parsed.support ?? defaultConfig.support,
     auth: {

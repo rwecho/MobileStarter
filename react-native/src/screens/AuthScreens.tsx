@@ -188,18 +188,25 @@ export function AuthScreen({ mode }: Readonly<{ mode: AuthMode }>) {
                 {agreed ? <View style={styles.checkboxMark} /> : null}
               </View>
             </Pressable>
-            <Text style={styles.caption}>我已阅读并同意</Text>
             <Text
-              accessibilityRole="link"
-              onPress={() => navigate('settings.termsOfService')}
-              style={authStyles.legalLink}
-            >用户协议</Text>
-            <Text style={styles.caption}>与</Text>
-            <Text
-              accessibilityRole="link"
-              onPress={() => navigate('settings.privacyPolicy')}
-              style={authStyles.legalLink}
-            >隐私政策</Text>
+              style={[styles.caption, authStyles.consentText]}
+              accessibilityRole="button"
+              accessibilityLabel="同意用户协议与隐私政策"
+              onPress={() => setAgreed((value) => !value)}
+            >
+              我已阅读并同意{' '}
+              <Text
+                accessibilityRole="link"
+                onPress={() => navigate('settings.termsOfService')}
+                style={authStyles.legalLinkInline}
+              >用户协议</Text>
+              {' '}与{' '}
+              <Text
+                accessibilityRole="link"
+                onPress={() => navigate('settings.privacyPolicy')}
+                style={authStyles.legalLinkInline}
+              >隐私政策</Text>
+            </Text>
           </View>
         ) : null}
       </ScrollView>
@@ -242,5 +249,6 @@ const authStyles = StyleSheet.create({
     gap: spacing.x1,
   },
   checkboxTarget: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
-  legalLink: { color: colors.brand, fontSize: 12, minHeight: 44, textAlignVertical: 'center' },
+  consentText: { flexShrink: 1 },
+  legalLinkInline: { color: colors.brand },
 });

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Animated, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import * as ExpoSplashScreen from 'expo-splash-screen';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { AppButton } from '../design-system/components';
@@ -53,11 +53,16 @@ export function SplashScreen() {
   const ready = minElapsed && bootstrapped;
   useEffect(() => {
     if (!ready || countdown !== null) return;
-    if (config.splash && online) {
-      setCountdown(config.splash.durationSeconds);
-    } else {
+    if (!config.splash || !online) {
       goHome(); // 未配置闪屏或离线 → 直接进首页
+      return;
     }
+    // 进闪屏前预加载图片：远程图首拉 1-2s，在 loading 阶段拉好，
+    // 进入品牌闪屏时图片已就绪、0 等待。失败也照常进闪屏（走 fallback）。
+    const url = config.splash.imageUrl;
+    const enter = () => setCountdown(config.splash!.durationSeconds);
+    if (url) Image.prefetch(url).finally(enter);
+    else enter();
   }, [ready, config.splash, online, countdown, goHome]);
 
   useEffect(() => {
@@ -72,9 +77,9 @@ export function SplashScreen() {
 
   if (countdown === null) {
     // 阶段 loading：logo + appName + tagline + 转圈 + "加载中…"
-    // 背景用白色与原生启动屏一致，隐藏原生 splash 时无缝过渡不闪跳
+    // 背景用 app 主色，原生 splash → loading → 闪屏 → home 全程一致
     return (
-      <View accessibilityLabel="启动中" style={[styles.centered, { backgroundColor: palette.surface }]}>
+      <View accessibilityLabel="启动中" style={[styles.centered, { backgroundColor: palette.background }]}>
         <Image
           source={LogoImage}
           style={launchStyles.logoMark}
@@ -93,14 +98,11 @@ export function SplashScreen() {
   if (!splash) return null;
   const canSkip = splash.skippable !== false;
   return (
-    <View style={launchStyles.splashRoot}>
-      <SplashMedia splash={splash} />
+    <View style={[launchStyles.splashRoot, { backgroundColor: palette.background }]}>
+      <SplashMedia splash={splash} background={palette.background} />
       <View pointerEvents="box-none" style={launchStyles.overlay}>
         <View style={launchStyles.topBar}>
           <SkipCapsule canSkip={canSkip} countdown={Math.max(countdown, 0)} onSkip={goHome} />
-        </View>
-        <View style={launchStyles.bottomBar}>
-          <Text style={launchStyles.caption}>配置版本 v{config.version}</Text>
         </View>
       </View>
     </View>
@@ -129,9 +131,19 @@ function SkipCapsule({
 
 // 全屏媒体背景：视频（videoUrl）> 图片（imageUrl cover）> 品牌 fallback。
 // 视频静音自动循环播放（iOS 自动播放需静音）；加载失败自动回退下一级。
-function SplashMedia({ splash }: Readonly<{ splash: NonNullable<RuntimeConfig['splash']> }>) {
+// 媒体加载期间显示白底 logo 占位，加载完成后淡入，避免等待期黑屏。
+function SplashMedia({
+  splash,
+  background,
+}: Readonly<{ splash: NonNullable<RuntimeConfig['splash']>; background: string }>) {
   const [failed, setFailed] = useState(false);
-  useEffect(() => setFailed(false), [splash.imageUrl, splash.videoUrl]);
+  const [mediaReady, setMediaReady] = useState(false);
+  const fade = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    setFailed(false);
+    setMediaReady(false);
+    fade.setValue(0);
+  }, [splash.imageUrl, splash.videoUrl, fade]);
 
   const player = useVideoPlayer(splash.videoUrl ?? null, (p) => {
     p.loop = true;
@@ -141,38 +153,54 @@ function SplashMedia({ splash }: Readonly<{ splash: NonNullable<RuntimeConfig['s
   useEffect(() => {
     const sub = player.addListener('statusChange', ({ status }) => {
       if (status === 'error') setFailed(true);
+      if (status === 'readyToPlay') setMediaReady(true);
     });
     return () => sub.remove();
   }, [player]);
 
-  if (splash.videoUrl && !failed) {
-    return (
-      <VideoView
-        contentFit="cover"
-        nativeControls={false}
-        player={player}
-        style={StyleSheet.absoluteFill}
-      />
-    );
-  }
-  if (splash.imageUrl && !failed) {
-    return (
-      <Image
-        accessibilityLabel="闪屏图片"
-        onError={() => setFailed(true)}
-        resizeMode="cover"
-        source={{ uri: splash.imageUrl }}
-        style={StyleSheet.absoluteFill}
-      />
-    );
-  }
-  // 无媒体或加载失败 → 品牌 fallback（内置插画 + 活动文案）
+  useEffect(() => {
+    if (mediaReady) {
+      Animated.timing(fade, { toValue: 1, duration: 300, useNativeDriver: true }).start();
+    }
+  }, [mediaReady, fade]);
+
+  const hasMedia = (splash.videoUrl || splash.imageUrl) && !failed;
+
   return (
-    <View style={launchStyles.fallback}>
-      <PromoIllustration />
-      <Text style={launchStyles.badge}>{splash.badge}</Text>
-      <Text style={styles.title}>{splash.title}</Text>
-      <Text style={styles.secondary}>{splash.description}</Text>
+    <View style={[launchStyles.splashMediaRoot, { backgroundColor: background }]}>
+      {/* 媒体加载占位：app 背景色 + 品牌 logo，避免等待期黑屏/色差 */}
+      <View style={[launchStyles.mediaPlaceholder, { backgroundColor: background }]}>
+        <Image source={LogoImage} style={launchStyles.placeholderLogo} accessibilityLabel="品牌图标" />
+      </View>
+      {hasMedia ? (
+        <Animated.View style={[StyleSheet.absoluteFill, { opacity: fade }]}>
+          {splash.videoUrl ? (
+            <VideoView
+              contentFit="cover"
+              nativeControls={false}
+              player={player}
+              style={StyleSheet.absoluteFill}
+            />
+          ) : (
+            <Image
+              accessibilityLabel="闪屏图片"
+              onError={() => setFailed(true)}
+              onLoad={() => setMediaReady(true)}
+              resizeMode="cover"
+              source={{ uri: splash.imageUrl ?? undefined }}
+              style={StyleSheet.absoluteFill}
+            />
+          )}
+        </Animated.View>
+      ) : (
+        // 无媒体或加载失败 → 品牌 fallback（内置插画 + 活动文案）
+        <View style={[StyleSheet.absoluteFill, launchStyles.fallback, { backgroundColor: background }]}>
+          <PromoIllustration />
+          <Text style={launchStyles.badge}>{splash.badge}</Text>
+          <Text style={styles.title}>{splash.title}</Text>
+          <Text style={styles.secondary}>{splash.description}</Text>
+        </View>
+      )}
     </View>
   );
 }
@@ -192,7 +220,18 @@ export function OnboardingScreen() {
 }
 
 const launchStyles = StyleSheet.create({
-  splashRoot: { flex: 1, backgroundColor: '#000' },
+  splashRoot: { flex: 1 },
+  splashMediaRoot: { flex: 1 },
+  mediaPlaceholder: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  placeholderLogo: { width: 48, height: 48, opacity: 0.6 },
   overlay: {
     position: 'absolute',
     top: 0,
@@ -203,7 +242,6 @@ const launchStyles = StyleSheet.create({
     padding: spacing.x3,
   },
   topBar: { alignItems: 'flex-end' },
-  bottomBar: { alignItems: 'center' },
   skipCapsule: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -214,19 +252,12 @@ const launchStyles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.4)',
   },
   skipCapsuleText: { color: '#FFFFFF', fontSize: 14, fontWeight: '600' },
-  caption: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    textShadowColor: 'rgba(0,0,0,0.6)',
-    textShadowRadius: 4,
-  },
   fallback: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     gap: spacing.x2,
     padding: spacing.x6,
-    backgroundColor: '#FFFFFF',
   },
   logoMark: { width: 48, height: 48 },
   badge: { color: colors.brand, fontSize: 13, fontWeight: '700' },

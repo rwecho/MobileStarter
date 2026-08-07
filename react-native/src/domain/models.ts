@@ -73,9 +73,11 @@ export type RuntimeConfig = Readonly<{
     badge: string;
     actionLabel: string;
     imageUrl: string | null;
+    videoUrl: string | null;
+    linkUrl: string | null;
     skippable: boolean;
     durationSeconds: number;
-  }>;
+  }> | null;
   auth: Readonly<{
     providers: ReadonlyArray<Readonly<{
       id: 'password' | 'phone' | 'apple' | 'google' | 'github' | 'wechat';

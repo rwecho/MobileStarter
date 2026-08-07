@@ -1,6 +1,5 @@
 export type AppRoute =
-  | 'launch.logo'
-  | 'launch.promo'
+  | 'launch.splash'
   | 'launch.onboarding'
   | 'home'
   | 'auth.signIn'

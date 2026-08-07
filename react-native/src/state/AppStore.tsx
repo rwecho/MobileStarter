@@ -40,6 +40,7 @@ type AppContextValue = Readonly<{
   authProviderConfig: AuthProviderConfig;
   authProviderPolicy: AuthProviderPolicy;
   online: boolean;
+  bootstrapped: boolean;
   busy: boolean;
   toast: ToastState | null;
   confirm: ConfirmState | null;
@@ -86,6 +87,7 @@ export function AppProvider({ children }: Readonly<{ children: ReactNode }>) {
   const [authProviderConfig, setAuthProviderConfig] = useState<AuthProviderConfig>({});
   const [authProviderPolicy, setAuthProviderPolicy] = useState(defaultProviderPolicy);
   const [online, setOnline] = useState(true);
+  const [bootstrapped, setBootstrapped] = useState(false);
   const [busy, setBusy] = useState(false);
   const [pendingRoute, setPendingRoute] = useState<AppRoute | null>(null);
 
@@ -115,7 +117,9 @@ export function AppProvider({ children }: Readonly<{ children: ReactNode }>) {
   }, [navigation.route]);
 
   useEffect(() => {
-    void refreshBootstrap();
+    // 仅初始那次 bootstrap 完成后置 bootstrapped；轮询/回前台 resume 不改动它，
+    // 品牌闪屏据此判断"拉配置完成"。
+    void refreshBootstrap().finally(() => setBootstrapped(true));
     const timer = setInterval(() => void refreshBootstrap(), config.cacheTtlSeconds * 1000);
     return () => clearInterval(timer);
   }, [config.cacheTtlSeconds, refreshBootstrap]);
@@ -198,6 +202,7 @@ export function AppProvider({ children }: Readonly<{ children: ReactNode }>) {
     authProviderConfig,
     authProviderPolicy,
     online,
+    bootstrapped,
     busy,
     refreshBootstrap,
     openEntryRoute,
@@ -206,6 +211,7 @@ export function AppProvider({ children }: Readonly<{ children: ReactNode }>) {
     authProviders,
     authProviderConfig,
     authProviderPolicy,
+    bootstrapped,
     busy,
     config,
     dataActions,

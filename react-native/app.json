@@ -28,7 +28,8 @@
       "@react-native-firebase/analytics",
       "@react-native-firebase/crashlytics",
       "expo-apple-authentication",
-      "./plugins/withModularHeaders"
+      "./plugins/withModularHeaders",
+      "expo-video"
     ],
     "ios": {
       "usesAppleSignIn": true,

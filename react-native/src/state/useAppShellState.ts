@@ -14,7 +14,7 @@ let routeKey = 0;
 
 export function useNavigationState() {
   const [stack, setStack] = useState<RouteEntry[]>([
-    { key: 'route-0', name: 'launch.logo' },
+    { key: 'route-0', name: 'launch.splash' },
   ]);
   const navigate = useCallback((name: AppRoute) => {
     routeKey += 1;

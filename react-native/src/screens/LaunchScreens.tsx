@@ -1,97 +1,179 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { Image, StyleSheet, Text, View } from 'react-native';
-import { AppButton, OfflineBanner } from '../design-system/components';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import * as ExpoSplashScreen from 'expo-splash-screen';
+import { useVideoPlayer, VideoView } from 'expo-video';
+import { AppButton } from '../design-system/components';
 import { PromoIllustration } from '../design-system/PromoIllustration';
 import { useApp } from '../state/AppStore';
 import { usePreferences } from '../preferences/PreferencesProvider';
-import { colors, spacing } from '../theme/tokens';
+import { RuntimeConfig } from '../domain/models';
+import { colors, radii, spacing } from '../theme/tokens';
 import { styles } from '../theme/styles';
-import { SplashHeader } from './SplashHeader';
 
 const LogoImage = require('../../assets/splash-icon.png');
 
-// ── Logo screen ──────────────────────────────────────────────────────
-// Shows the shared brand logo while the app bootstraps, then auto‑navigates
-// to the promo screen after a minimum display time. No tap required.
+// 品牌闪屏阶段常量
+const MIN_LOGO_MS = 1000; // logo+loading 最短展示时间，避免 bootstrap 极快时闪跳
+const MAX_SPLASH_WAIT_MS = 8000; // fetch 无显式超时，最长等待兜底防挂死
 
-export function LogoScreen() {
-  const { navigate, config } = useApp();
-  const timer = useRef<ReturnType<typeof setTimeout>>(null);
-
-  useEffect(() => {
-    timer.current = setTimeout(() => navigate('launch.promo'), 1500);
-    return () => { if (timer.current) clearTimeout(timer.current); };
-  }, [navigate]);
-
-  return (
-    <View accessibilityLabel="启动中" style={styles.centered}>
-      <Image
-        source={LogoImage}
-        style={launchStyles.logoMark}
-        accessibilityLabel="品牌图标"
-      />
-      <Text style={styles.title}>{config.brand.appName}</Text>
-      <Text style={styles.secondary}>{config.brand.tagline}</Text>
-    </View>
-  );
-}
-
-// ── Promo / campaign screen ──────────────────────────────────────────
-// Displays the campaign artwork with a 3‑2‑1 countdown that auto‑enters
-// the home screen when it reaches 0. A "跳过" button lets the user skip.
-
-export function PromoScreen() {
-  const { replace, config, online } = useApp();
+// ── Splash screen ────────────────────────────────────────────────────
+// 统一三端启动体验：原生 logo → 品牌闪屏 → home。闪屏仅在「在线且有 splash 配置」
+// 时展示（全屏媒体 + 右上角胶囊跳过 + 倒计时）；离线或未配置 → 直接进首页。
+// 合规：非按钮区域不可点击跳转，仅跳过按钮可点。
+export function SplashScreen() {
+  const { replace, config, bootstrapped, online } = useApp();
   const { palette } = usePreferences();
-  const [elapsedSeconds, setElapsedSeconds] = useState(0);
-  const countdown = 3 - elapsedSeconds;
-  const canSkip = config.splash.skippable !== false;
+  const [minElapsed, setMinElapsed] = useState(false);
+  const [countdown, setCountdown] = useState<number | null>(null);
+  const doneRef = useRef(false);
 
+  // 首帧渲染完成后隐藏原生启动屏：与 App.tsx 的 preventAutoHideAsync 配合，
+  // 无缝过渡到 JS 品牌闪屏，避免闪跳并遮住 dev-client 的 bundle 下载。
   useEffect(() => {
-    const timers = [1, 2, 3].map((sec) =>
-      setTimeout(() => setElapsedSeconds(sec), sec * 1000),
-    );
-    return () => timers.forEach(clearTimeout);
+    void ExpoSplashScreen.hideAsync();
   }, []);
 
-  useEffect(() => {
-    if (elapsedSeconds >= 3) replace('home');
-  }, [elapsedSeconds, replace]);
+  const goHome = useCallback(() => {
+    if (doneRef.current) return;
+    doneRef.current = true;
+    replace('home');
+  }, [replace]);
 
+  useEffect(() => {
+    const t = setTimeout(() => setMinElapsed(true), MIN_LOGO_MS);
+    return () => clearTimeout(t);
+  }, []);
+
+  // fetch 无显式超时，最长等待兜底，避免一直卡在 loading
+  useEffect(() => {
+    const t = setTimeout(goHome, MAX_SPLASH_WAIT_MS);
+    return () => clearTimeout(t);
+  }, [goHome]);
+
+  const ready = minElapsed && bootstrapped;
+  useEffect(() => {
+    if (!ready || countdown !== null) return;
+    if (config.splash && online) {
+      setCountdown(config.splash.durationSeconds);
+    } else {
+      goHome(); // 未配置闪屏或离线 → 直接进首页
+    }
+  }, [ready, config.splash, online, countdown, goHome]);
+
+  useEffect(() => {
+    if (countdown === null) return;
+    if (countdown <= 0) {
+      goHome();
+      return;
+    }
+    const t = setTimeout(() => setCountdown((c) => (c === null ? c : c - 1)), 1000);
+    return () => clearTimeout(t);
+  }, [countdown, goHome]);
+
+  if (countdown === null) {
+    // 阶段 loading：logo + appName + tagline + 转圈 + "加载中…"
+    // 背景用白色与原生启动屏一致，隐藏原生 splash 时无缝过渡不闪跳
+    return (
+      <View accessibilityLabel="启动中" style={[styles.centered, { backgroundColor: palette.surface }]}>
+        <Image
+          source={LogoImage}
+          style={launchStyles.logoMark}
+          accessibilityLabel="品牌图标"
+        />
+        <Text style={styles.title}>{config.brand.appName}</Text>
+        <Text style={styles.secondary}>{config.brand.tagline}</Text>
+        <ActivityIndicator color={colors.brand} style={launchStyles.loadingSpinner} />
+        <Text style={launchStyles.loadingText}>加载中…</Text>
+      </View>
+    );
+  }
+
+  // countdown 非空即已确认有 splash 配置；类型兜底
+  const splash = config.splash;
+  if (!splash) return null;
+  const canSkip = splash.skippable !== false;
   return (
-    <View style={launchStyles.promo}>
-      <SplashHeader
-        canSkip={canSkip}
-        countdown={Math.max(countdown, 0)}
-        onSkip={() => replace('home')}
-        surfaceColor={palette.surfaceMuted}
-      />
-      <OfflineBanner />
-      <PromotionMedia uri={config.splash.imageUrl} />
-      <View style={launchStyles.copy}>
-        <Text style={launchStyles.badge}>{config.splash.badge}</Text>
-        <Text style={styles.title}>{config.splash.title}</Text>
-        <Text style={styles.secondary}>{config.splash.description}</Text>
-        <Text style={styles.caption}>
-          {online ? `配置版本 v${config.version}` : '离线 · 使用最近成功配置'}
-        </Text>
+    <View style={launchStyles.splashRoot}>
+      <SplashMedia splash={splash} />
+      <View pointerEvents="box-none" style={launchStyles.overlay}>
+        <View style={launchStyles.topBar}>
+          <SkipCapsule canSkip={canSkip} countdown={Math.max(countdown, 0)} onSkip={goHome} />
+        </View>
+        <View style={launchStyles.bottomBar}>
+          <Text style={launchStyles.caption}>配置版本 v{config.version}</Text>
+        </View>
       </View>
     </View>
   );
 }
 
-function PromotionMedia({ uri }: Readonly<{ uri?: string | null }>) {
-  const [failed, setFailed] = useState(false);
-  useEffect(() => setFailed(false), [uri]);
-  if (!uri || failed) return <PromoIllustration />;
+// 右上角胶囊跳过按钮（开屏广告标准形态：半透明深底 + 白字 + 倒计时）
+function SkipCapsule({
+  canSkip,
+  countdown,
+  onSkip,
+}: Readonly<{ canSkip: boolean; countdown: number; onSkip: () => void }>) {
   return (
-    <Image
-      accessibilityLabel="宣传活动图片"
-      onError={() => setFailed(true)}
-      resizeMode="contain"
-      source={{ uri }}
-      style={launchStyles.promoImage}
-    />
+    <Pressable
+      accessibilityLabel={`跳过闪屏，剩余 ${countdown} 秒`}
+      accessibilityRole="button"
+      onPress={onSkip}
+      style={launchStyles.skipCapsule}
+    >
+      <Text style={launchStyles.skipCapsuleText}>
+        {canSkip ? `${countdown}s 跳过` : `${countdown}s`}
+      </Text>
+    </Pressable>
+  );
+}
+
+// 全屏媒体背景：视频（videoUrl）> 图片（imageUrl cover）> 品牌 fallback。
+// 视频静音自动循环播放（iOS 自动播放需静音）；加载失败自动回退下一级。
+function SplashMedia({ splash }: Readonly<{ splash: NonNullable<RuntimeConfig['splash']> }>) {
+  const [failed, setFailed] = useState(false);
+  useEffect(() => setFailed(false), [splash.imageUrl, splash.videoUrl]);
+
+  const player = useVideoPlayer(splash.videoUrl ?? null, (p) => {
+    p.loop = true;
+    p.muted = true;
+    if (splash.videoUrl) p.play();
+  });
+  useEffect(() => {
+    const sub = player.addListener('statusChange', ({ status }) => {
+      if (status === 'error') setFailed(true);
+    });
+    return () => sub.remove();
+  }, [player]);
+
+  if (splash.videoUrl && !failed) {
+    return (
+      <VideoView
+        contentFit="cover"
+        nativeControls={false}
+        player={player}
+        style={StyleSheet.absoluteFill}
+      />
+    );
+  }
+  if (splash.imageUrl && !failed) {
+    return (
+      <Image
+        accessibilityLabel="闪屏图片"
+        onError={() => setFailed(true)}
+        resizeMode="cover"
+        source={{ uri: splash.imageUrl }}
+        style={StyleSheet.absoluteFill}
+      />
+    );
+  }
+  // 无媒体或加载失败 → 品牌 fallback（内置插画 + 活动文案）
+  return (
+    <View style={launchStyles.fallback}>
+      <PromoIllustration />
+      <Text style={launchStyles.badge}>{splash.badge}</Text>
+      <Text style={styles.title}>{splash.title}</Text>
+      <Text style={styles.secondary}>{splash.description}</Text>
+    </View>
   );
 }
 
@@ -110,10 +192,45 @@ export function OnboardingScreen() {
 }
 
 const launchStyles = StyleSheet.create({
+  splashRoot: { flex: 1, backgroundColor: '#000' },
+  overlay: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    justifyContent: 'space-between',
+    padding: spacing.x3,
+  },
+  topBar: { alignItems: 'flex-end' },
+  bottomBar: { alignItems: 'center' },
+  skipCapsule: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 36,
+    minWidth: 72,
+    paddingHorizontal: spacing.x3,
+    borderRadius: radii.round,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+  },
+  skipCapsuleText: { color: '#FFFFFF', fontSize: 14, fontWeight: '600' },
+  caption: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    textShadowColor: 'rgba(0,0,0,0.6)',
+    textShadowRadius: 4,
+  },
+  fallback: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.x2,
+    padding: spacing.x6,
+    backgroundColor: '#FFFFFF',
+  },
   logoMark: { width: 48, height: 48 },
-  promo: { flex: 1, padding: spacing.x6, justifyContent: 'center', gap: spacing.x6 },
-  copy: { gap: spacing.x2 },
   badge: { color: colors.brand, fontSize: 13, fontWeight: '700' },
   fullWidth: { width: '100%' },
-  promoImage: { width: '100%', height: 260 },
+  loadingSpinner: { marginTop: spacing.x4 },
+  loadingText: { color: colors.brand, fontSize: 14, marginTop: spacing.x2 },
 });

@@ -3,7 +3,7 @@ import { FeedbackHost } from '../design-system/FeedbackHost';
 import { useApp } from '../state/AppStore';
 import { AuthScreen } from '../screens/AuthScreens';
 import { HomeScreen } from '../screens/HomeScreen';
-import { LogoScreen, OnboardingScreen, PromoScreen } from '../screens/LaunchScreens';
+import { OnboardingScreen, SplashScreen } from '../screens/LaunchScreens';
 import {
   EditProfileScreen,
   ProfileScreen,
@@ -60,8 +60,7 @@ export function AppRouter() {
   const { route } = useApp();
   let screen: React.ReactNode;
   switch (route) {
-    case 'launch.logo': screen = <LogoScreen />; break;
-    case 'launch.promo': screen = <PromoScreen />; break;
+    case 'launch.splash': screen = <SplashScreen />; break;
     case 'launch.onboarding': screen = <OnboardingScreen />; break;
     case 'home': screen = <HomeScreen />; break;
     case 'auth.signIn': screen = <AuthScreen mode="signIn" />; break;

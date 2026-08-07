@@ -47,6 +47,8 @@ export const embeddedConfig: RuntimeConfig = {
     badge: '精选',
     actionLabel: '开始探索',
     imageUrl: null,
+    videoUrl: null,
+    linkUrl: null,
     skippable: true,
     durationSeconds: 5,
   },

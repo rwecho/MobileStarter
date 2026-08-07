@@ -2,7 +2,10 @@
   "expo": {
     "name": "MobileStarter",
     "slug": "mobilestarter",
-    "scheme": ["mobilestarter", "mobileui"],
+    "scheme": [
+      "mobilestarter",
+      "mobileui"
+    ],
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
@@ -24,10 +27,13 @@
       "@react-native-firebase/app",
       "@react-native-firebase/analytics",
       "@react-native-firebase/crashlytics",
-      "expo-apple-authentication"
+      "expo-apple-authentication",
+      "./plugins/withModularHeaders"
     ],
     "ios": {
-      "usesAppleSignIn": true
+      "usesAppleSignIn": true,
+      "bundleIdentifier": "com.mobileui.mobilestarter",
+      "googleServicesFile": "./GoogleService-Info.plist"
     },
     "android": {
       "package": "com.mobileui.mobilestarter",

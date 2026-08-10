@@ -9,6 +9,7 @@ import {
   AuthProviderConfig,
   AuthProviderPolicy,
   AuthProviders,
+  OrderView,
   RuntimeConfig,
   UserSettings,
 } from '../domain/models';
@@ -30,6 +31,16 @@ import {
 type ToastTone = 'success' | 'info' | 'error';
 export type { ToastState } from './useAppShellState';
 
+// 购买流程的当前状态。success/failed 携带服务器确认后的订单（真实 order.status）。
+export type PurchaseState =
+  | { kind: 'idle' }
+  | { kind: 'loading' }
+  | { kind: 'success'; order: OrderView }
+  | { kind: 'failed'; order: OrderView }
+  | { kind: 'error'; message: string }
+  | { kind: 'offline' }
+  | { kind: 'unauthorized' };
+
 type AppContextValue = Readonly<{
   route: AppRoute;
   canGoBack: boolean;
@@ -42,6 +53,7 @@ type AppContextValue = Readonly<{
   online: boolean;
   bootstrapped: boolean;
   busy: boolean;
+  purchaseState: PurchaseState;
   toast: ToastState | null;
   confirm: ConfirmState | null;
   navigate: (route: AppRoute) => void;
@@ -89,6 +101,7 @@ export function AppProvider({ children }: Readonly<{ children: ReactNode }>) {
   const [online, setOnline] = useState(true);
   const [bootstrapped, setBootstrapped] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [purchaseState, setPurchaseState] = useState<PurchaseState>({ kind: 'idle' });
   const [pendingRoute, setPendingRoute] = useState<AppRoute | null>(null);
 
   const refreshBootstrap = useCallback(async () => {
@@ -173,10 +186,14 @@ export function AppProvider({ children }: Readonly<{ children: ReactNode }>) {
     run,
     setUser,
     onAuthenticated: () => {
+      setPurchaseState({ kind: 'idle' });
       navigation.replaceTop(pendingRoute ?? 'home');
       setPendingRoute(null);
     },
-    onSignedOut: () => navigation.replace('home'),
+    onSignedOut: () => {
+      setPurchaseState({ kind: 'idle' });
+      navigation.replace('home');
+    },
     showToast: feedback.showToast,
   });
   useEffect(() => {
@@ -187,7 +204,7 @@ export function AppProvider({ children }: Readonly<{ children: ReactNode }>) {
     });
     return () => registerSessionExpiredHandler(null);
   }, [navigation]);
-  const dataActions = useDataActions(run, setUser, user);
+  const dataActions = useDataActions(run, setUser, user, setPurchaseState);
   const value = useMemo<AppContextValue>(() => ({
     ...navigation,
     navigate,
@@ -204,6 +221,7 @@ export function AppProvider({ children }: Readonly<{ children: ReactNode }>) {
     online,
     bootstrapped,
     busy,
+    purchaseState,
     refreshBootstrap,
     openEntryRoute,
   }), [
@@ -213,6 +231,7 @@ export function AppProvider({ children }: Readonly<{ children: ReactNode }>) {
     authProviderPolicy,
     bootstrapped,
     busy,
+    purchaseState,
     config,
     dataActions,
     feedback,

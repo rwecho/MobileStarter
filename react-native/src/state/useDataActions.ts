@@ -1,5 +1,5 @@
 import { Dispatch, SetStateAction, useMemo } from 'react';
-import { apiClient } from '../data/apiClient';
+import { apiClient, ApiClientError } from '../data/apiClient';
 import { saveSessionToken } from '../data/storage';
 import {
   AppUser,
@@ -11,6 +11,8 @@ import {
   UsageSummary,
   UserSettings,
 } from '../domain/models';
+import { MockPaymentProvider } from '../payment/mockPaymentProvider';
+import type { PurchaseState } from './AppStore';
 
 type Run = <T>(operation: () => Promise<T>) => Promise<T>;
 
@@ -40,6 +42,7 @@ export function useDataActions(
   run: Run,
   setUser: Dispatch<SetStateAction<AppUser | null>>,
   user: AppUser | null,
+  setPurchaseState: Dispatch<SetStateAction<PurchaseState>>,
 ): DataActions {
   return useMemo(() => ({
     updateProfile: async (patch: {
@@ -74,12 +77,33 @@ export function useDataActions(
       } catch { return false; }
     },
     purchase: async (planId: string) => {
+      setPurchaseState({ kind: 'loading' });
       try {
-        // TEMP: Task 4 rewires the full createOrder -> store purchase -> verify flow.
-        await run(() => apiClient.createOrder(planId, `${Date.now()}-${Math.random().toString(36).slice(2)}`));
-        setUser((await run(apiClient.bootstrap)).user);
-        return true;
-      } catch { return false; }
+        const idempotencyKey = `rn-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        const order = await run(() => apiClient.createOrder(planId, idempotencyKey));
+        const provider = new MockPaymentProvider();
+        const result = await provider.purchase(order.storeProductId);
+        const verified = await run(() => apiClient.verifyPurchase(order.orderId, result.receipt));
+        if (verified.status === 'success') {
+          setUser((await run(apiClient.bootstrap)).user);
+        }
+        setPurchaseState(verified.status === 'success'
+          ? { kind: 'success', order: verified }
+          : { kind: 'failed', order: verified });
+        return verified.status === 'success';
+      } catch (error) {
+        if (error instanceof ApiClientError) {
+          setPurchaseState(error.status === 0
+            ? { kind: 'offline' }
+            : { kind: 'error', message: error.message });
+        } else {
+          setPurchaseState({
+            kind: 'error',
+            message: error instanceof Error ? error.message : '购买失败',
+          });
+        }
+        return false;
+      }
     },
     loadSessions: () => run(apiClient.sessions),
     revokeSession: async (id: string) => {
@@ -100,5 +124,5 @@ export function useDataActions(
     loadUsage: () => run(apiClient.usage),
     loadCoupons: () => run(apiClient.coupons),
     loadReferral: () => run(apiClient.referral),
-  }), [run, setUser, user]);
+  }), [run, setPurchaseState, setUser, user]);
 }

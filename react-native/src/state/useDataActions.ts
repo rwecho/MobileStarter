@@ -75,7 +75,8 @@ export function useDataActions(
     },
     purchase: async (planId: string) => {
       try {
-        await run(() => apiClient.purchase(planId));
+        // TEMP: Task 4 rewires the full createOrder -> store purchase -> verify flow.
+        await run(() => apiClient.createOrder(planId, `${Date.now()}-${Math.random().toString(36).slice(2)}`));
         setUser((await run(apiClient.bootstrap)).user);
         return true;
       } catch { return false; }

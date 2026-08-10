@@ -16,6 +16,7 @@ import {
   UserSettings,
   UsageSummary,
 } from '../domain/models';
+import { parseOrderStatus, type CreateOrderResult, type MembershipCurrent } from '../payment/paymentModels';
 import { getPlatformHeader } from './runtimePlatform';
 
 type Envelope<T> = Readonly<{ data: T }>;
@@ -122,21 +123,32 @@ export const apiClient = {
     request<{ read: boolean }>(`/api/v1/notifications/${id}`, { method: 'PATCH' }),
   deleteNotification: (id: string) =>
     request<{ deleted: boolean }>(`/api/v1/notifications/${id}`, { method: 'DELETE' }),
-  orders: () => request<readonly OrderView[]>('/api/v1/orders'),
+  orders: () => request<readonly OrderView[]>('/api/v1/orders')
+    .then((rows) => rows.map(toOrderView)),
   usage: () => request<UsageSummary>('/api/v1/me/usage'),
   coupons: () => request<readonly CouponView[]>('/api/v1/me/coupons'),
   referral: () => request<ReferralView>('/api/v1/me/referral'),
-  purchase: (planId: string) => request<OrderView>(
+  createOrder: (planId: string, idempotencyKey: string) => request<CreateOrderResult>(
     '/api/v1/orders',
     {
       ...jsonOptions('POST', { planId }),
       headers: {
         ...clientHeaders(),
         'Content-Type': 'application/json',
-        'Idempotency-Key': createIdempotencyKey(),
+        'Idempotency-Key': idempotencyKey,
       },
     },
   ),
+  verifyPurchase: (orderId: string | undefined, receipt: unknown) => request<OrderView>(
+    '/api/v1/purchases/verify',
+    jsonOptions('POST', { ...(orderId ? { orderId } : {}), receipt }),
+  ).then(toOrderView),
+  restore: (receipts: unknown[]) => request<{ entitlements: readonly string[] }>(
+    '/api/v1/purchases/restore',
+    jsonOptions('POST', { receipts }),
+  ),
+  membershipCurrent: () => request<MembershipCurrent>('/api/v1/membership/current'),
+  entitlements: () => request<{ keys: readonly string[] }>('/api/v1/membership/entitlements'),
   deleteAccount: (password: string) => request<{ deleted: boolean }>(
     '/api/v1/me/deletion',
     jsonOptions('DELETE', { password, confirmation: 'DELETE' }),
@@ -326,6 +338,12 @@ function serviceUnavailableError(status = 0) {
     status,
     true,
   );
+}
+
+// Normalize OrderView.status at the boundary: the wire returns raw strings,
+// but OrderView.status is the typed OrderStatus union.
+function toOrderView(raw: OrderView): OrderView {
+  return { ...raw, status: parseOrderStatus(raw.status) };
 }
 
 function jsonOptions(method: string, body: unknown): RequestInit {

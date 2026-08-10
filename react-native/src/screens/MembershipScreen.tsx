@@ -8,12 +8,13 @@ import { styles } from '../theme/styles';
 import { PrimaryTabs } from '../navigation/PrimaryTabs';
 
 export function MembershipScreen() {
-  const { config, user, navigate, busy, setPendingPlanId } = useApp();
+  const { config, user, navigate, busy, setPendingPlanId, setPurchaseState } = useApp();
   const [selected, setSelected] = useState(config.plans[0]?.id ?? '');
   const selectedPlan = config.plans.find((plan) => plan.id === selected);
   const buy = () => {
     if (!user) { navigate('auth.signIn'); return; }
     if (!selected) return;
+    setPurchaseState({ kind: 'idle' });
     setPendingPlanId(selected);
     navigate('membership.checkout');
   };

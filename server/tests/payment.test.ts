@@ -266,3 +266,35 @@ test('嵌套事务中内层写入随外层回滚而回滚（原子性）', async
   ).get('mock', 'sp-atomic');
   assert.equal(row, undefined, '嵌套事务的写入必须随外层回滚而消失');
 });
+
+const { applyWebhook } = await import('../src/server/webhook-service.ts');
+
+async function seedSucceededOrder(userId: string): Promise<string> {
+  const { orderId } = await createOrder({
+    userId, idempotencyKey: `w-${Math.random().toString(36).slice(2, 8)}`,
+    planId: 'pro-monthly', platform: 'ios', config: configWith(),
+  });
+  return (await verifyPurchase({
+    appId: 'app1', environment: 'development', userId, orderId,
+    receipt: { productId: 'com.x.pro' }, platform: 'ios', config: configWith(),
+  })).id;
+}
+
+test('同一 webhook 投递 10 次只处理 1 次', async () => {
+  const userId = await makeUser('app1');
+  const orderId = await seedSucceededOrder(userId);
+  const body = Buffer.from(JSON.stringify({ eventId: 'e10', kind: 'refund', orderId }));
+  for (let i = 0; i < 10; i++) {
+    await applyWebhook('mock', body, {});
+  }
+  const order = await findOrderById(orderId);
+  assert.equal(order!.status, 'refunded');
+  assert.equal((await listActiveEntitlements(userId, 'app1')).length, 0);
+});
+
+test('非 mock 渠道 webhook 在 P-1 返回 401（验签骨架）', async () => {
+  await assert.rejects(
+    () => applyWebhook('apple', Buffer.from('{}'), {}),
+    (err: any) => err.status === 401 && err.code === 'WEBHOOK_SIGNATURE_INVALID',
+  );
+});

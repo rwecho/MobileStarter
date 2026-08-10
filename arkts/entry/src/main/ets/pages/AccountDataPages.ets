@@ -67,7 +67,7 @@ export struct OrdersPage {
               Column({ space: AppSpacing.x2 }) {
                 Text(order.planId).fontSize(18).fontWeight(FontWeight.Bold)
                 Text(`${order.currency} ${(order.amountMinor / 100).toFixed(2)}`)
-                Text(order.status).fontColor(AppColors.textSecondary)
+                Text(`${order.status}`).fontColor(AppColors.textSecondary)
               }
               .alignItems(HorizontalAlign.Start)
               .padding(AppSpacing.x4)

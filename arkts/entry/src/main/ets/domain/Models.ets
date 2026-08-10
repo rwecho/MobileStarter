@@ -34,6 +34,7 @@ export interface BillingPlan {
   priceMinor: number
   currency: string
   provider: string
+  storeProductMapping?: StoreProductMapping
 }
 
 export interface LegalDocument {
@@ -124,7 +125,7 @@ export interface SessionView {
 export interface OrderView {
   id: string
   planId: string
-  status: string
+  status: OrderStatus
   amountMinor: number
   currency: string
   provider: string
@@ -268,4 +269,60 @@ export interface CreateTicketInput {
   severity: string
   subject: string
   message: string
+}
+
+export interface StoreProductMapping {
+  apple?: string
+  google?: string
+  hms?: string
+}
+
+export interface StoreProduct {
+  storeProductId: string
+  title?: string
+}
+
+export interface PurchaseResult {
+  storeProductId: string
+  receipt: Record<string, string | boolean | null>
+}
+
+export interface Entitlement {
+  key: string
+  expiresAt: string | null
+}
+
+export interface Subscription {
+  planId: string
+  status: string
+  renewAt: string | null
+}
+
+export interface MembershipCurrent {
+  tier: string | null
+  entitlements: Entitlement[]
+  subscription: Subscription | null
+}
+
+export interface CreateOrderResult {
+  orderId: string
+  storeProductId: string
+  status: string
+}
+
+export enum OrderStatus {
+  Pending = 'pending',
+  Processing = 'processing',
+  Success = 'success',
+  Failed = 'failed',
+  Refunded = 'refunded'
+}
+
+export function parseOrderStatus(value: string): OrderStatus {
+  if (value === 'pending') return OrderStatus.Pending
+  if (value === 'processing') return OrderStatus.Processing
+  if (value === 'success') return OrderStatus.Success
+  if (value === 'failed') return OrderStatus.Failed
+  if (value === 'refunded') return OrderStatus.Refunded
+  return OrderStatus.Pending
 }

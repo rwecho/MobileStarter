@@ -78,7 +78,7 @@ MobileStarter 是可派生产品的跨端母模板，目标是派生出在 鸿�
 ### 3.2 `orders` 表扩展（`database-schema-product.ts`）
 
 ```text
-status: 'pending'|'processing'|'succeeded'|'failed'|'closed'|'refunded'
+status: 'pending'|'processing'|'success'|'failed'|'refunded'   # 'success' 沿用既有值；'closed' 暂不引入（YAGNI）
 provider: 'mock'|'apple'|'google'|'hms'|'wechat'|'alipay'
 store_transaction_id: text nullable
 receipt_hash: text nullable              -- sha256(receipt)，便于幂等/审计
@@ -139,13 +139,12 @@ export type VerifyResult = Readonly<{
 ### 4.2 Order 状态机与服务（`order-service.ts` 重写）
 
 ```text
-pending ──verifyPurchase()─▶ processing ──ok──▶ succeeded ──refund webhook──▶ refunded
+pending ──verifyPurchase()─▶ processing ──ok──▶ success ──refund webhook──▶ refunded
                                    └──fail──▶ failed
-succeeded/refunded ──close──▶ closed
 ```
 
 - `createOrder({userId, appId, idempotencyKey, planId})`：幂等（既有）；`platform` 取自请求已有的 `x-platform` 头（`client-context`，客户端不另传）；从 `plan.storeProductMapping[platform]` 取 `storeProductId`，返回 `{ orderId, storeProductId, status: 'pending' }`。若该 platform 无商品映射 → `404 PRODUCT_NOT_MAPPED`。
-- `verifyPurchase({orderId?, receipt})`：置 `processing` → `adapter.verifyReceipt` → 同一事务内：成功则 `Order→succeeded`（orderId 缺省时先按 `receipt.productId` 反查 plan 创建 order）+ 发放/续期 `UserEntitlement` + upsert `Subscription`；失败则 `Order→failed`（不发权益）。重复 verify 同一 receipt（`receipt_hash` 命中已 succeeded）→ 幂等返回，不重复发权益。
+- `verifyPurchase({orderId?, receipt})`：置 `processing` → `adapter.verifyReceipt` → 同一事务内：成功则 `Order→success`（orderId 缺省时先按 `receipt.productId` 反查 plan 创建 order）+ 发放/续期 `UserEntitlement` + upsert `Subscription`；失败则 `Order→failed`（不发权益）。重复 verify 同一 receipt（`receipt_hash` 命中已 success）→ 幂等返回，不重复发权益。
 - `restorePurchases({userId, receipts[]})`：对每条 receipt 调 `verifyPurchase`（orderId 缺省，走反查），幂等补发 entitlement（已存在则跳过）。
 - `applyWebhook(provider, rawBody, headers)`：`parseWebhook` → 按 `(provider, event_id)` 入 `webhook_events` 去重 → 同一事务更新 order/subscription/entitlement。
 

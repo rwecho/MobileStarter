@@ -298,3 +298,14 @@ test('非 mock 渠道 webhook 在 P-1 返回 401（验签骨架）', async () =>
     (err: any) => err.status === 401 && err.code === 'WEBHOOK_SIGNATURE_INVALID',
   );
 });
+
+const { paymentContractSnapshot } = await import('../src/server/contract-snapshot.ts');
+
+test('契约快照导出 order/verify/restore/membership 的 JSON Schema', () => {
+  const snap = paymentContractSnapshot as Record<string, unknown>;
+  assert.equal(snap.type, 'object');
+  const props = snap.properties as Record<string, unknown>;
+  for (const key of ['orderRequest', 'verifyRequest', 'restoreRequest']) {
+    assert.ok(props[key], `missing ${key}`);
+  }
+});

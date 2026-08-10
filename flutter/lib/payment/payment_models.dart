@@ -1,4 +1,7 @@
-import '../app/runtime_models.dart';
+// Local typedef — avoids a circular import with runtime_models.dart (which
+// imports this file for StoreProductMapping). Kept in sync with the one in
+// runtime_models.dart.
+typedef JsonMap = Map<String, Object?>;
 
 final class StoreProductMapping {
   const StoreProductMapping({this.apple, this.google, this.hms});

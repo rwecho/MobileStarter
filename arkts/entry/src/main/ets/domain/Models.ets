@@ -326,3 +326,13 @@ export function parseOrderStatus(value: string): OrderStatus {
   if (value === 'refunded') return OrderStatus.Refunded
   return OrderStatus.Pending
 }
+
+export enum PurchaseStatus {
+  Idle = 'idle',
+  Loading = 'loading',
+  Success = 'success',
+  Failed = 'failed',
+  Error = 'error',
+  Offline = 'offline',
+  Unauthorized = 'unauthorized'
+}

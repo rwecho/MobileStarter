@@ -15,19 +15,24 @@ export class MockPaymentProvider implements PaymentProvider {
   }
 
   purchase(storeProductId: string): Promise<PurchaseResult> {
-    const receipt: Record<string, string | boolean> = { productId: storeProductId }
+    const receipt: Record<string, string | boolean> = {}
+    receipt['productId'] = storeProductId
     if (this.failPurchases) {
       receipt['fail'] = true
     } else {
       this.owned.push(storeProductId)
     }
-    return Promise.resolve({ storeProductId, receipt })
+    const result: PurchaseResult = { storeProductId: storeProductId, receipt: receipt }
+    return Promise.resolve(result)
   }
 
   restore(): Promise<PurchaseResult[]> {
     const results: PurchaseResult[] = []
     for (let i = 0; i < this.owned.length; i++) {
-      results.push({ storeProductId: this.owned[i], receipt: { productId: this.owned[i] } })
+      const receipt: Record<string, string | boolean> = {}
+      receipt['productId'] = this.owned[i]
+      const result: PurchaseResult = { storeProductId: this.owned[i], receipt: receipt }
+      results.push(result)
     }
     return Promise.resolve(results)
   }

@@ -2,8 +2,10 @@ import common from '@ohos.app.ability.common'
 import { ConfigurationConstant } from '@kit.AbilityKit'
 import { apiClient, ApiFailure } from '../data/ApiClient'
 import { localStore } from '../data/LocalStore'
-import { AppUser, AuthPayload, RuntimeConfig } from '../domain/Models'
+import { AppUser, AuthPayload, OrderStatus, OrderView, PurchaseStatus, RuntimeConfig }
+  from '../domain/Models'
 import { RemoteDataStore } from './RemoteDataStore'
+import { MockPaymentProvider } from '../payment/MockPaymentProvider'
 import { AppRoute } from '../navigation/AppRoute'
 import { telemetry, TelemetryConfig } from '../telemetry/Telemetry'
 import { AppTelemetrySink } from '../telemetry/AppTelemetrySink'
@@ -70,6 +72,11 @@ export class AppStore {
   recoveryEmail: string = ''
   resetToken: string = ''
   pendingRoute: AppRoute | null = null
+  // payment
+  purchaseStatus: PurchaseStatus = PurchaseStatus.Idle
+  purchaseOrder: OrderView | null = null
+  purchaseMessage: string = ''
+  pendingPlanId: string = ''
   remote: RemoteDataStore = new RemoteDataStore()
   private context: common.UIAbilityContext | null = null
   private initialized: boolean = false
@@ -488,6 +495,47 @@ export class AppStore {
     } finally {
       this.busy = false
     }
+  }
+
+  async purchase(planId: string): Promise<boolean> {
+    this.purchaseStatus = PurchaseStatus.Loading
+    this.purchaseOrder = null
+    this.purchaseMessage = ''
+    try {
+      const idempotencyKey: string =
+        `ark-${Date.now()}-${Math.random().toString(36).slice(2)}`
+      const order = await apiClient.createOrder(planId, idempotencyKey)
+      const provider: MockPaymentProvider = new MockPaymentProvider()
+      const result = await provider.purchase(order.storeProductId)
+      const verified = await apiClient.verifyPurchase(order.orderId, result.receipt)
+      this.purchaseOrder = verified
+      this.purchaseStatus =
+        verified.status === OrderStatus.Success ? PurchaseStatus.Success : PurchaseStatus.Failed
+      if (verified.status === OrderStatus.Success) {
+        // Best-effort membership refresh: re-bootstrap so the user tier reflects
+        // the purchase. `initialize` needs the UIAbilityContext captured at boot.
+        const context = this.context
+        try {
+          if (context !== null) { await this.initialize(context) }
+        } catch (e) { /* best-effort membership refresh */ }
+      }
+      return verified.status === OrderStatus.Success
+    } catch (error) {
+      if (error instanceof ApiFailure && error.status === 401) {
+        this.purchaseStatus = PurchaseStatus.Unauthorized
+      } else if (error instanceof ApiFailure && error.status === 0) {
+        this.purchaseStatus = PurchaseStatus.Offline
+      } else {
+        this.purchaseStatus = PurchaseStatus.Error
+        this.purchaseMessage = error instanceof ApiFailure ? error.message : '订阅失败，请重试'
+      }
+      return false
+    }
+  }
+
+  startCheckout(planId: string): void {
+    this.purchaseStatus = PurchaseStatus.Idle
+    this.pendingPlanId = planId
   }
 
   showToast(message: string, error: boolean = false): void {

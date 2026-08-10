@@ -27,12 +27,12 @@ export interface SocialSignInInput {
 }
 
 export interface VerifyPurchaseBody {
-  receipt: Record<string, string | boolean>
+  receipt: Record<string, string | boolean | null>
   orderId?: string
 }
 
 export interface RestorePurchasesBody {
-  receipts: Record<string, string | boolean>[]
+  receipts: Record<string, string | boolean | null>[]
 }
 
 export type ApiRequestBody =

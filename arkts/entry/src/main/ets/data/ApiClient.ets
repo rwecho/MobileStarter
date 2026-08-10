@@ -4,25 +4,31 @@ import {
   ApiFailure,
   ApiRequestBody,
   ApiTransport,
-  SocialSignInInput
+  RestorePurchasesBody,
+  SocialSignInInput,
+  VerifyPurchaseBody
 } from './ApiTransport'
 import {
   AppUser,
   AuthPayload,
   BootstrapPayload,
   CouponView,
+  CreateOrderResult,
   CreateTicketInput,
   DeleteAccountInput,
   FeedbackInput,
   HelpArticle,
+  MembershipCurrent,
+  NotificationView,
+  OrderStatus,
+  OrderView,
   PhoneCodeInput,
   PhoneVerifyInput,
+  parseOrderStatus,
   ReferralView,
   SessionView,
   SignInInput,
   SignUpInput,
-  OrderView,
-  NotificationView,
   SupportTicket,
   SupportTicketDetail,
   SupportMessage,
@@ -208,6 +214,50 @@ export class ApiClient {
     return this.request<OrderView[]>('/api/v1/orders', http.RequestMethod.GET)
   }
 
+  createOrder(planId: string, idempotencyKey: string): Promise<CreateOrderResult> {
+    return this.request<CreateOrderResult>(
+      '/api/v1/orders',
+      http.RequestMethod.POST,
+      { planId },
+      { 'Idempotency-Key': idempotencyKey }
+    )
+  }
+
+  verifyPurchase(orderId: string | null, receipt: Record<string, string | boolean>):
+    Promise<OrderView> {
+    const body: VerifyPurchaseBody = { receipt }
+    if (orderId != null) body.orderId = orderId
+    return this.request<OrderView>(
+      '/api/v1/purchases/verify', http.RequestMethod.POST, body
+    ).then((order: OrderView): OrderView => ({
+      id: order.id,
+      planId: order.planId,
+      status: parseOrderStatus(String(order.status)),
+      amountMinor: order.amountMinor,
+      currency: order.currency,
+      provider: order.provider,
+      createdAt: order.createdAt,
+      completedAt: order.completedAt
+    }))
+  }
+
+  restorePurchases(receipts: Record<string, string | boolean>[]): Promise<string[]> {
+    const body: RestorePurchasesBody = { receipts }
+    return this.request<Record<string, string[]>>(
+      '/api/v1/purchases/restore', http.RequestMethod.POST, body
+    ).then(result => result['entitlements'] ?? [])
+  }
+
+  membershipCurrent(): Promise<MembershipCurrent> {
+    return this.request<MembershipCurrent>('/api/v1/membership/current', http.RequestMethod.GET)
+  }
+
+  entitlements(): Promise<string[]> {
+    return this.request<Record<string, string[]>>(
+      '/api/v1/membership/entitlements', http.RequestMethod.GET
+    ).then(result => result['keys'] ?? [])
+  }
+
   notifications(): Promise<NotificationView[]> {
     return this.request<NotificationView[]>('/api/v1/notifications', http.RequestMethod.GET)
   }
@@ -300,9 +350,10 @@ export class ApiClient {
   private async request<T>(
     path: string,
     method: http.RequestMethod,
-    body?: ApiRequestBody
+    body?: ApiRequestBody,
+    extraHeaders?: Record<string, string>
   ): Promise<T> {
-    return this.transport.request<T>(path, method, body)
+    return this.transport.request<T>(path, method, body, extraHeaders)
   }
 }
 

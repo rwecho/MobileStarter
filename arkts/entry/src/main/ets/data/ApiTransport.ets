@@ -26,11 +26,21 @@ export interface SocialSignInInput {
   codeVerifier?: string
 }
 
+export interface VerifyPurchaseBody {
+  receipt: Record<string, string | boolean>
+  orderId?: string
+}
+
+export interface RestorePurchasesBody {
+  receipts: Record<string, string | boolean>[]
+}
+
 export type ApiRequestBody =
   Record<string, string | number | boolean> |
   SignInInput | SignUpInput | DeleteAccountInput |
   PhoneCodeInput | PhoneVerifyInput | FeedbackInput |
-  CreateTicketInput | SocialSignInInput
+  CreateTicketInput | SocialSignInInput |
+  VerifyPurchaseBody | RestorePurchasesBody
 
 interface TelemetryEventEnvelope {
   eventId: string
@@ -99,13 +109,21 @@ export class ApiTransport {
     path: string,
     method: http.RequestMethod,
     body?: ApiRequestBody,
+    extraHeaders?: Record<string, string>,
     retried: boolean = false
   ): Promise<T> {
     const client = http.createHttp()
     try {
+      const merged = this.headers()
+      if (extraHeaders !== undefined) {
+        const keys = Object.keys(extraHeaders)
+        for (let i = 0; i < keys.length; i++) {
+          merged[keys[i]] = extraHeaders[keys[i]]
+        }
+      }
       const response = await client.request(`${API_BASE}${path}`, {
         method,
-        header: this.headers(),
+        header: merged,
         extraData: body === undefined ? undefined : JSON.stringify(body),
         expectDataType: http.HttpDataType.STRING,
         connectTimeout: 5000,
@@ -113,7 +131,7 @@ export class ApiTransport {
       })
       const text = String(response.result)
       if (response.responseCode === 401 && !retried && await this.refreshSession()) {
-        return this.request<T>(path, method, body, true)
+        return this.request<T>(path, method, body, extraHeaders, true)
       }
       if (response.responseCode < 200 || response.responseCode >= 300) {
         if (response.responseCode === 401 && !retried) {

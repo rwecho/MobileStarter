@@ -82,14 +82,14 @@ export function useDataActions(
         const idempotencyKey = `rn-${Date.now()}-${Math.random().toString(36).slice(2)}`;
         const order = await run(() => apiClient.createOrder(planId, idempotencyKey));
         const provider = new MockPaymentProvider();
-        const result = await provider.purchase(order.storeProductId);
+        const result = await run(() => provider.purchase(order.storeProductId));
         const verified = await run(() => apiClient.verifyPurchase(order.orderId, result.receipt));
-        if (verified.status === 'success') {
-          setUser((await run(apiClient.bootstrap)).user);
-        }
         setPurchaseState(verified.status === 'success'
           ? { kind: 'success', order: verified }
           : { kind: 'failed', order: verified });
+        if (verified.status === 'success') {
+          try { setUser((await run(apiClient.bootstrap)).user); } catch { /* best-effort */ }
+        }
         return verified.status === 'success';
       } catch (error) {
         if (error instanceof ApiClientError) {

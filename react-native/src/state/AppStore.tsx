@@ -54,6 +54,8 @@ type AppContextValue = Readonly<{
   bootstrapped: boolean;
   busy: boolean;
   purchaseState: PurchaseState;
+  pendingPlanId: string | null;
+  setPendingPlanId: (planId: string | null) => void;
   toast: ToastState | null;
   confirm: ConfirmState | null;
   navigate: (route: AppRoute) => void;
@@ -102,6 +104,7 @@ export function AppProvider({ children }: Readonly<{ children: ReactNode }>) {
   const [bootstrapped, setBootstrapped] = useState(false);
   const [busy, setBusy] = useState(false);
   const [purchaseState, setPurchaseState] = useState<PurchaseState>({ kind: 'idle' });
+  const [pendingPlanId, setPendingPlanId] = useState<string | null>(null);
   const [pendingRoute, setPendingRoute] = useState<AppRoute | null>(null);
 
   const refreshBootstrap = useCallback(async () => {
@@ -222,6 +225,8 @@ export function AppProvider({ children }: Readonly<{ children: ReactNode }>) {
     bootstrapped,
     busy,
     purchaseState,
+    pendingPlanId,
+    setPendingPlanId,
     refreshBootstrap,
     openEntryRoute,
   }), [
@@ -231,6 +236,7 @@ export function AppProvider({ children }: Readonly<{ children: ReactNode }>) {
     authProviderPolicy,
     bootstrapped,
     busy,
+    pendingPlanId,
     purchaseState,
     config,
     dataActions,

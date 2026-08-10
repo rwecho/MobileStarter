@@ -9,6 +9,7 @@ import {
   ProfileScreen,
 } from '../screens/ProfileScreens';
 import { MembershipScreen } from '../screens/MembershipScreen';
+import { CheckoutScreen } from '../screens/CheckoutScreen';
 import { CouponsScreen, InviteScreen, StatisticsScreen } from '../screens/ProfileUtilityScreens';
 import {
   AccountSecurityScreen,
@@ -75,8 +76,8 @@ export function AppRouter() {
     case 'profile.invite': screen = <InviteScreen />; break;
     case 'profile.coupons': screen = <CouponsScreen />; break;
     case 'membership.home': screen = <MembershipScreen />; break;
-    case 'membership.plans':
-    case 'membership.checkout': screen = <MembershipScreen />; break;
+    case 'membership.plans': screen = <MembershipScreen />; break;
+    case 'membership.checkout': screen = <CheckoutScreen />; break;
     case 'membership.orders': screen = <OrdersScreen />; break;
     case 'notifications.center': screen = <NotificationsScreen />; break;
     case 'settings.home': screen = <SettingsScreen />; break;

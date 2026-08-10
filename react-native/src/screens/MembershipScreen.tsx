@@ -8,16 +8,14 @@ import { styles } from '../theme/styles';
 import { PrimaryTabs } from '../navigation/PrimaryTabs';
 
 export function MembershipScreen() {
-  const { config, user, navigate, purchase, busy, showToast } = useApp();
+  const { config, user, navigate, busy, setPendingPlanId } = useApp();
   const [selected, setSelected] = useState(config.plans[0]?.id ?? '');
   const selectedPlan = config.plans.find((plan) => plan.id === selected);
-  const buy = async () => {
-    if (!user) {
-      navigate('auth.signIn');
-      return;
-    }
+  const buy = () => {
+    if (!user) { navigate('auth.signIn'); return; }
     if (!selected) return;
-    if (await purchase(selected)) showToast('订阅已生效，权益已同步', 'success');
+    setPendingPlanId(selected);
+    navigate('membership.checkout');
   };
   return (
     <View style={styles.page}>
@@ -54,7 +52,7 @@ export function MembershipScreen() {
                     ? '演示下单（非真实支付）'
                     : '确认订阅'}
               icon="crown"
-              onPress={() => void buy()}
+              onPress={() => buy()}
             />
           </>
         ) : <Text style={styles.secondary}>当前 App 暂未配置可售方案。</Text>}
@@ -112,7 +110,7 @@ function PlanCard({ accent, plan, selected, select }: Readonly<{
   );
 }
 
-function formatPrice(plan: BillingPlan) {
+export function formatPrice(plan: BillingPlan) {
   const price = new Intl.NumberFormat('zh-CN', {
     style: 'currency', currency: plan.currency,
   }).format(plan.priceMinor / 100);

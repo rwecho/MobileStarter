@@ -523,11 +523,13 @@ export class AppStore {
     } catch (error) {
       if (error instanceof ApiFailure && error.status === 401) {
         this.purchaseStatus = PurchaseStatus.Unauthorized
-      } else if (error instanceof ApiFailure && error.status === 0) {
-        this.purchaseStatus = PurchaseStatus.Offline
-      } else {
+      } else if (error instanceof ApiFailure) {
+        // server returned an error envelope (non-2xx)
         this.purchaseStatus = PurchaseStatus.Error
-        this.purchaseMessage = error instanceof ApiFailure ? error.message : '订阅失败，请重试'
+        this.purchaseMessage = error.message
+      } else {
+        // non-ApiFailure = transport/network failure (timeout/DNS) → offline
+        this.purchaseStatus = PurchaseStatus.Offline
       }
       return false
     }

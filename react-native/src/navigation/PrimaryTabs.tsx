@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { AppIcon, IconName } from '../design-system/AppIcon';
 import { usePreferences } from '../preferences/PreferencesProvider';
 import { useApp } from '../state/AppStore';
@@ -7,6 +7,8 @@ import { spacing } from '../theme/tokens';
 
 type PrimaryTab = 'home' | 'membership' | 'profile';
 
+// 悬浮胶囊 tab bar：圆角卡片 + 阴影 + 与屏幕边缘留白，仍占文档流（三屏内容区无需改 padding）。
+// 选中项用 brandSoft 药丸背景高亮，观感更现代。
 export function PrimaryTabs({ active }: Readonly<{ active: PrimaryTab }>) {
   const { replace } = useApp();
   const { locale, palette } = usePreferences();
@@ -14,10 +16,12 @@ export function PrimaryTabs({ active }: Readonly<{ active: PrimaryTab }>) {
     ? { home: 'Home', membership: 'Membership', profile: 'Profile' }
     : { home: '首页', membership: '会员', profile: '我的' };
   return (
-    <View style={[tabStyles.bar, { backgroundColor: palette.surface, borderTopColor: palette.border }]}>
-      <Tab active={active === 'home'} icon="home" label={labels.home} onPress={() => replace('home')} />
-      <Tab active={active === 'membership'} icon="crown" label={labels.membership} onPress={() => replace('membership.home')} />
-      <Tab active={active === 'profile'} icon="user" label={labels.profile} onPress={() => replace('profile.home')} />
+    <View style={tabStyles.dock}>
+      <View style={[tabStyles.bar, { backgroundColor: palette.surface }]}>
+        <Tab active={active === 'home'} icon="home" label={labels.home} onPress={() => replace('home')} />
+        <Tab active={active === 'membership'} icon="crown" label={labels.membership} onPress={() => replace('membership.home')} />
+        <Tab active={active === 'profile'} icon="user" label={labels.profile} onPress={() => replace('profile.home')} />
+      </View>
     </View>
   );
 }
@@ -31,7 +35,12 @@ function Tab({ active, icon, label, onPress }: Readonly<{
   const { palette } = usePreferences();
   const color = active ? palette.brand : palette.textSecondary;
   return (
-    <Pressable accessibilityRole="tab" accessibilityState={{ selected: active }} onPress={onPress} style={tabStyles.item}>
+    <Pressable
+      accessibilityRole="tab"
+      accessibilityState={{ selected: active }}
+      onPress={onPress}
+      style={[tabStyles.item, active && { backgroundColor: palette.brandSoft }]}
+    >
       <AppIcon name={icon} color={color} size={22} />
       <Text style={[tabStyles.label, { color }]}>{label}</Text>
     </Pressable>
@@ -39,11 +48,34 @@ function Tab({ active, icon, label, onPress }: Readonly<{
 }
 
 const tabStyles = StyleSheet.create({
-  bar: {
-    height: 66,
-    flexDirection: 'row',
-    borderTopWidth: StyleSheet.hairlineWidth,
+  dock: {
+    // 与屏幕左右下留白，给阴影和悬浮感让出空间
+    paddingHorizontal: spacing.x4,
+    paddingBottom: spacing.x3,
   },
-  item: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.x1 },
+  bar: {
+    height: 60,
+    flexDirection: 'row',
+    borderRadius: 24,
+    gap: spacing.x1,
+    paddingHorizontal: spacing.x2,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOpacity: 0.12,
+        shadowRadius: 12,
+        shadowOffset: { width: 0, height: 6 },
+      },
+      android: { elevation: 8 },
+    }),
+  },
+  item: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.x1,
+    paddingVertical: spacing.x1,
+    borderRadius: 18,
+  },
   label: { fontSize: 12, fontWeight: '600' },
 });

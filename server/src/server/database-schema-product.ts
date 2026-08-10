@@ -34,10 +34,34 @@ export async function initializeProductSchema(database: PostgresDatabase) {
     );
     CREATE TABLE IF NOT EXISTS orders (
       id TEXT PRIMARY KEY, user_id TEXT NOT NULL, plan_id TEXT NOT NULL,
-      idempotency_key TEXT NOT NULL, status TEXT NOT NULL,
+      tier_id TEXT, idempotency_key TEXT NOT NULL, status TEXT NOT NULL,
       amount_minor INTEGER NOT NULL, currency TEXT NOT NULL, provider TEXT NOT NULL,
+      store_transaction_id TEXT, receipt_hash TEXT, expires_at TEXT,
       created_at TEXT NOT NULL, completed_at TEXT, UNIQUE(user_id, idempotency_key),
       FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+    CREATE TABLE IF NOT EXISTS user_entitlements (
+      id TEXT PRIMARY KEY, user_id TEXT NOT NULL, app_id TEXT NOT NULL,
+      entitlement_key TEXT NOT NULL, source_order_id TEXT NOT NULL,
+      active INTEGER NOT NULL DEFAULT 1, acquired_at TEXT NOT NULL, expires_at TEXT,
+      FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY(source_order_id) REFERENCES orders(id) ON DELETE CASCADE
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS ux_user_entitlement_active
+      ON user_entitlements(user_id, entitlement_key) WHERE active = 1;
+    CREATE TABLE IF NOT EXISTS subscriptions (
+      id TEXT PRIMARY KEY, user_id TEXT NOT NULL, app_id TEXT NOT NULL,
+      plan_id TEXT NOT NULL, platform TEXT NOT NULL, status TEXT NOT NULL,
+      current_order_id TEXT NOT NULL, renew_at TEXT,
+      created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+      UNIQUE(user_id, app_id, plan_id),
+      FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY(current_order_id) REFERENCES orders(id) ON DELETE CASCADE
+    );
+    CREATE TABLE IF NOT EXISTS webhook_events (
+      id TEXT PRIMARY KEY, provider TEXT NOT NULL, event_id TEXT NOT NULL,
+      payload_hash TEXT NOT NULL, processed INTEGER NOT NULL DEFAULT 0,
+      received_at TEXT NOT NULL, UNIQUE(provider, event_id)
     );
     CREATE TABLE IF NOT EXISTS referral_profiles (
       user_id TEXT PRIMARY KEY, code TEXT NOT NULL UNIQUE, created_at TEXT NOT NULL,

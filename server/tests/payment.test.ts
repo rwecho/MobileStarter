@@ -31,3 +31,21 @@ test('购买请求 schema 校验', () => {
   assert.ok(restorePurchasesSchema.safeParse({ receipts: [{ productId: 'p' }] }).success);
   assert.equal(restorePurchasesSchema.safeParse({ receipts: [] }).success, false);
 });
+
+test('新表与 orders 新列存在', async () => {
+  const tables = await database.prepare(`
+    SELECT table_name FROM information_schema.tables
+    WHERE table_schema = 'public'
+      AND table_name IN ('user_entitlements', 'subscriptions', 'webhook_events')
+  `).all() as { table_name: string }[];
+  const names = tables.map((t) => t.table_name).sort();
+  assert.deepEqual(names, ['subscriptions', 'user_entitlements', 'webhook_events']);
+
+  const cols = await database.prepare(`
+    SELECT column_name FROM information_schema.columns
+    WHERE table_name = 'orders' AND column_name IN
+      ('store_transaction_id', 'receipt_hash', 'expires_at', 'tier_id')
+  `).all() as { column_name: string }[];
+  assert.deepEqual(cols.map((c) => c.column_name).sort(),
+    ['expires_at', 'receipt_hash', 'store_transaction_id', 'tier_id']);
+});

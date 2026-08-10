@@ -38,6 +38,10 @@ async function applyIdempotentMigrations() {
     ALTER TABLE users ADD COLUMN IF NOT EXISTS consented_at TEXT;
     UPDATE users SET display_name = username
     WHERE display_name IS NULL OR trim(display_name) = '';
+    ALTER TABLE orders ADD COLUMN IF NOT EXISTS tier_id TEXT;
+    ALTER TABLE orders ADD COLUMN IF NOT EXISTS store_transaction_id TEXT;
+    ALTER TABLE orders ADD COLUMN IF NOT EXISTS receipt_hash TEXT;
+    ALTER TABLE orders ADD COLUMN IF NOT EXISTS expires_at TEXT;
   `);
 }
 

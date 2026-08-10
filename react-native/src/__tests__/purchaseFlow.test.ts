@@ -39,4 +39,32 @@ describe('purchase flow (real server)', () => {
     const mc = await apiClient.membershipCurrent();
     expect(mc.entitlements.length).toBe(0);
   });
+
+  it('verify rejects another user order (ORDER_NOT_FOUND)', async () => {
+    // owner creates an order with their own session
+    const ownerToken = await signUpAndGetToken(`p13-own-${Date.now()}@test.local`);
+    setSessionTokenReader(async () => ownerToken);
+    const owner = await apiClient.createOrder('pro-monthly', `own-${Date.now()}`);
+    // switch back to the attacker session (the outer `token`)
+    setSessionTokenReader(async () => token);
+    await expect(
+      apiClient.verifyPurchase(owner.orderId, { productId: owner.storeProductId }),
+    ).rejects.toThrow();
+  });
+
+  it('same idempotencyKey → same orderId', async () => {
+    const key = `idem-${Date.now()}`;
+    const a = await apiClient.createOrder('pro-monthly', key);
+    const b = await apiClient.createOrder('pro-monthly', key);
+    expect(a.orderId).toBe(b.orderId);
+  });
+
+  it('restore replays purchases', async () => {
+    const order = await apiClient.createOrder('pro-monthly', `restore-${Date.now()}`);
+    const provider = new MockPaymentProvider();
+    await provider.purchase(order.storeProductId);
+    const receipts = (await provider.restore()).map((r) => r.receipt);
+    const { entitlements: keys } = await apiClient.restore(receipts);
+    expect(keys.length).toBeGreaterThan(0);
+  });
 });

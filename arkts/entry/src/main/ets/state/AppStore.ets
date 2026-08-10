@@ -54,6 +54,8 @@ export class AppStore {
   routeStack: AppRoute[] = [AppRoute.Logo]
   signedIn: boolean = false
   online: boolean = true
+  // bootstrapped：初始 bootstrap 是否完成（成功或失败）；品牌闪屏据此判断"配置拉取完成"。
+  bootstrapped: boolean = false
   busy: boolean = false
   theme: string = 'system'
   language: string = 'zh-CN'
@@ -105,6 +107,7 @@ export class AppStore {
     this.configureTelemetry()
     this.applyPreferences()
     this.initialized = true
+    this.bootstrapped = true
     if (this.queuedEntryName !== null) {
       const name = this.queuedEntryName
       const cold = this.queuedEntryCold

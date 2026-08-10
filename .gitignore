@@ -38,6 +38,7 @@ arkts/**/build/
 arkts/.hvigor/
 arkts/**/.preview/
 arkts/.cxx/
+arkts/**/.arkts/
 
 # Next.js / local runtime data
 server/node_modules/

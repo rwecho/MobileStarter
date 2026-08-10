@@ -11,6 +11,8 @@ export interface SplashConfig {
   badge: string
   actionLabel: string
   imageUrl: string | null
+  videoUrl: string | null
+  linkUrl: string | null
   skippable: boolean
   durationSeconds: number
 }
@@ -73,7 +75,7 @@ export interface RuntimeConfig {
   version: number
   cacheTtlSeconds: number
   brand: BrandConfig
-  splash: SplashConfig
+  splash: SplashConfig | null
   legal: LegalDocument[]
   settingsPolicy: Record<string, SettingPolicy>
   features: Record<string, boolean>

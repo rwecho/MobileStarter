@@ -14,7 +14,7 @@ import {
   LegalDocumentPage, LegalPage, ProfileEditPage
 } from './SettingsActionPages'
 import { HomePage } from './HomePage'
-import { LogoPage, OnboardingPage, PromoPage } from './LaunchPages'
+import { OnboardingPage, SplashPage } from './LaunchPages'
 import { MembershipPage, ProfilePage } from './ProfilePages'
 import { SettingDetailPage, SettingsPage } from './SettingsPages'
 import { SettingsUtilityPage } from './SettingsUtilityPage'
@@ -74,9 +74,9 @@ struct LaunchAuthHost {
   @ObjectLink store: AppStore
   build() {
     if (this.store.route === AppRoute.Logo) {
-      LogoPage({ store: this.store })
+      SplashPage({ store: this.store })
     } else if (this.store.route === AppRoute.Promo) {
-      PromoPage({ store: this.store })
+      SplashPage({ store: this.store })
     } else if (this.store.route === AppRoute.Onboarding) {
       OnboardingPage({ store: this.store })
     } else if (this.store.route === AppRoute.Home) {

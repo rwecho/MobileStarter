@@ -1,4 +1,6 @@
 // Real-server test helper (mirrors flutter/test/payment/test_server.dart).
+// NOTE: tests mutate module-level apiClient readers (e.g. setSessionTokenReader)
+// to switch accounts — sequential-only; do not enable parallel vitest.
 const apiBase = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3210';
 const appId = process.env.EXPO_PUBLIC_APP_ID;
 const appEnv = process.env.EXPO_PUBLIC_APP_ENVIRONMENT;

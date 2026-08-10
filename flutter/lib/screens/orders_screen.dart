@@ -56,7 +56,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
               (order) => AppCard(
                 child: ListTile(
                   title: Text(order.planId),
-                  subtitle: Text(order.status),
+                  subtitle: Text(order.status.name),
                   trailing: Text(
                     '${order.currency} ${(order.amountMinor / 100).toStringAsFixed(2)}',
                   ),

@@ -1,3 +1,5 @@
+import '../payment/payment_models.dart';
+
 part 'runtime_activity_models.dart';
 
 typedef JsonMap = Map<String, Object?>;
@@ -196,6 +198,7 @@ final class BillingPlan {
     required this.priceMinor,
     required this.currency,
     required this.provider,
+    this.storeProductMapping,
   });
 
   factory BillingPlan.fromJson(JsonMap json) => BillingPlan(
@@ -206,6 +209,9 @@ final class BillingPlan {
     priceMinor: json['priceMinor']! as int,
     currency: json['currency']! as String,
     provider: json['provider']! as String,
+    storeProductMapping: json['storeProductMapping'] == null
+        ? null
+        : StoreProductMapping.fromJson(JsonMap.from(json['storeProductMapping']! as Map)),
   );
 
   final String id;
@@ -215,6 +221,7 @@ final class BillingPlan {
   final int priceMinor;
   final String currency;
   final String provider;
+  final StoreProductMapping? storeProductMapping;
 }
 
 final class SessionView {
@@ -255,6 +262,15 @@ final class NotificationView {
   final String? route;
 }
 
+enum OrderStatus { pending, processing, success, failed, refunded }
+
+OrderStatus _parseOrderStatus(String s) {
+  return OrderStatus.values.firstWhere(
+    (e) => e.name == s,
+    orElse: () => OrderStatus.pending,
+  );
+}
+
 final class OrderView {
   const OrderView({
     required this.id,
@@ -262,17 +278,26 @@ final class OrderView {
     required this.status,
     required this.amountMinor,
     required this.currency,
+    this.provider,
+    this.storeTransactionId,
+    this.expiresAt,
   });
   factory OrderView.fromJson(JsonMap json) => OrderView(
     id: json['id']! as String,
     planId: json['planId']! as String,
-    status: json['status']! as String,
+    status: _parseOrderStatus(json['status']! as String),
     amountMinor: json['amountMinor']! as int,
     currency: json['currency']! as String,
+    provider: json['provider'] as String?,
+    storeTransactionId: json['storeTransactionId'] as String?,
+    expiresAt: json['expiresAt'] as String?,
   );
   final String id;
   final String planId;
-  final String status;
+  final OrderStatus status;
   final int amountMinor;
   final String currency;
+  final String? provider;
+  final String? storeTransactionId;
+  final String? expiresAt;
 }

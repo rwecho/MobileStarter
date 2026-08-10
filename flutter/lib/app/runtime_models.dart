@@ -6,6 +6,7 @@ final class RuntimeConfig {
   const RuntimeConfig({
     required this.version,
     required this.appName,
+    required this.tagline,
     required this.splash,
     required this.features,
     required this.settingsPolicy,
@@ -16,10 +17,14 @@ final class RuntimeConfig {
 
   factory RuntimeConfig.fromJson(JsonMap json) {
     final brand = JsonMap.from(json['brand']! as Map);
+    final splashJson = json['splash'];
     return RuntimeConfig(
       version: json['version']! as int,
       appName: brand['appName']! as String,
-      splash: SplashCampaign.fromJson(JsonMap.from(json['splash']! as Map)),
+      tagline: brand['tagline']! as String,
+      splash: splashJson == null
+          ? null
+          : SplashCampaign.fromJson(JsonMap.from(splashJson as Map)),
       features: Map<String, bool>.from(json['features']! as Map),
       settingsPolicy: (json['settingsPolicy']! as Map).map(
         (key, value) => MapEntry(
@@ -41,7 +46,8 @@ final class RuntimeConfig {
 
   final int version;
   final String appName;
-  final SplashCampaign splash;
+  final String tagline;
+  final SplashCampaign? splash;
   final Map<String, bool> features;
   final Map<String, SettingPolicy> settingsPolicy;
   final List<MembershipTier> tiers;
@@ -57,7 +63,10 @@ final class SplashCampaign {
     required this.badge,
     required this.actionLabel,
     required this.imageUrl,
+    required this.videoUrl,
+    required this.linkUrl,
     required this.skippable,
+    required this.durationSeconds,
   });
 
   factory SplashCampaign.fromJson(JsonMap json) => SplashCampaign(
@@ -67,7 +76,10 @@ final class SplashCampaign {
     badge: json['badge']! as String,
     actionLabel: json['actionLabel']! as String,
     imageUrl: json['imageUrl'] as String?,
+    videoUrl: json['videoUrl'] as String?,
+    linkUrl: json['linkUrl'] as String?,
     skippable: json['skippable']! as bool,
+    durationSeconds: json['durationSeconds']! as int,
   );
 
   final String id;
@@ -76,7 +88,10 @@ final class SplashCampaign {
   final String badge;
   final String actionLabel;
   final String? imageUrl;
+  final String? videoUrl;
+  final String? linkUrl;
   final bool skippable;
+  final int durationSeconds;
 }
 
 final class SettingPolicy {

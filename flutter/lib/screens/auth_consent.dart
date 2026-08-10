@@ -12,6 +12,7 @@ class AuthConsent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 点普通文字（"我已阅读并同意"/"与"）切换勾选；点链接（用户协议/隐私政策）跳转。
     return Semantics(
       container: true,
       label: '登录与注册协议确认',
@@ -24,9 +25,21 @@ class AuthConsent extends StatelessWidget {
               value: value,
               onChanged: (next) => onChanged(next ?? false),
             ),
-            const Text('我已阅读并同意'),
+            InkWell(
+              onTap: () => onChanged(!value),
+              child: const Padding(
+                padding: EdgeInsets.symmetric(vertical: AppSpacing.x2),
+                child: Text('我已阅读并同意'),
+              ),
+            ),
             const _LegalLink(label: '用户协议', route: AppRoute.termsOfService),
-            const Text('与'),
+            InkWell(
+              onTap: () => onChanged(!value),
+              child: const Padding(
+                padding: EdgeInsets.symmetric(vertical: AppSpacing.x2),
+                child: Text('与'),
+              ),
+            ),
             const _LegalLink(label: '隐私政策', route: AppRoute.privacyPolicy),
           ],
         ),

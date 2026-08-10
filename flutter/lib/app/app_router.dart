@@ -25,8 +25,8 @@ import '../screens/text_size_screen.dart';
 abstract final class AppRouter {
   static Widget screenFor(AppRoute route) {
     return switch (route) {
-      AppRoute.logo => const LogoScreen(),
-      AppRoute.promo => const PromoScreen(),
+      AppRoute.logo => const SplashScreen(),
+      AppRoute.promo => const SplashScreen(),
       AppRoute.onboarding => const OnboardingScreen(),
       AppRoute.home => const HomeScreen(),
       AppRoute.signIn => const AuthScreen(mode: AuthMode.signIn),

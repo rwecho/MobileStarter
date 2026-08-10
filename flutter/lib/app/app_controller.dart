@@ -40,6 +40,12 @@ final class AppController extends ChangeNotifier {
   AsyncState<void> get actionState => _actionState;
   RuntimeConfig? get config => _config;
   AppUser? get user => _user;
+  // online：最近一次 bootstrap 是否成功拉到配置（失败即视为离线）。
+  // bootstrapped：初始 bootstrap 是否完成（成功或失败）；闪屏据此判断"配置拉取完成"。
+  bool _online = true;
+  bool _bootstrapped = false;
+  bool get online => _online;
+  bool get bootstrapped => _bootstrapped;
 
   void openEntryName(String? name, {required bool cold}) =>
       _openEntryName(name, cold: cold);
@@ -67,12 +73,18 @@ final class AppController extends ChangeNotifier {
       authProviderPolicy = result.authProviderPolicy;
       authProviderConfig = result.authProviderConfig;
       _syncLocale();
+      _online = true;
       _actionState = const Success<void>(null);
     } on ApiException catch (error) {
+      _online = false;
       _actionState = Failure(error.message);
     } catch (_) {
+      _online = false;
       _actionState = const Offline();
     }
+    // 仅标记初始 bootstrap 已完成（resume 轮询到此处是无害的再赋值），
+    // 一旦为 true 不再回到 false，闪屏据此放行。
+    _bootstrapped = true;
     notifyListeners();
   }
 

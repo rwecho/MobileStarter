@@ -1,4 +1,5 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
+import { randomUUID } from 'node:crypto';
 import { Pool, types, type PoolClient, type QueryResultRow } from 'pg';
 
 export type SQLInputValue = string | number | boolean | null | Buffer;
@@ -109,6 +110,19 @@ export class PostgresDatabase {
   }
 
   async transaction<T>(action: () => Promise<T>): Promise<T> {
+    const ambient = transactionClient.getStore();
+    if (ambient) {
+      const sp = `sp_${randomUUID().replace(/-/g, '')}`;
+      try {
+        await ambient.query(`SAVEPOINT ${sp}`);
+        const result = await transactionClient.run(ambient, action);
+        await ambient.query(`RELEASE SAVEPOINT ${sp}`);
+        return result;
+      } catch (error) {
+        await ambient.query(`ROLLBACK TO SAVEPOINT ${sp}`);
+        throw error;
+      }
+    }
     const client = await this.pool.connect();
     try {
       await client.query('BEGIN');

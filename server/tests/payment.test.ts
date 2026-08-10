@@ -247,3 +247,22 @@ test('restorePurchases 按 productId 反查并补发（orderId 缺省）', async
   const ents = (await listActiveEntitlements(userId, 'app1')).map((e) => e.entitlement_key).sort();
   assert.deepEqual(ents, ['cloud.100gb', 'export.hd', 'templates.pro']);
 });
+
+const { runTransaction } = await import('../src/server/database.ts');
+
+test('嵌套事务中内层写入随外层回滚而回滚（原子性）', async () => {
+  await assert.rejects(
+    () => runTransaction(async () => {
+      // insertWebhookEventIfNew itself calls runTransaction → this is a NESTED call.
+      // Its write must live in the SAME outer transaction, so an outer failure rolls it back.
+      const inserted = await insertWebhookEventIfNew({ provider: 'mock', eventId: 'sp-atomic', payloadHash: 'p' });
+      assert.equal(inserted, true);
+      throw new Error('outer fails after nested write');
+    }),
+    /outer fails after nested write/,
+  );
+  const row = await database.prepare(
+    'SELECT 1 AS ok FROM webhook_events WHERE provider = ? AND event_id = ?',
+  ).get('mock', 'sp-atomic');
+  assert.equal(row, undefined, '嵌套事务的写入必须随外层回滚而消失');
+});

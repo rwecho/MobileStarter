@@ -74,6 +74,7 @@ export async function verifyPurchase(input: VerifyInput): Promise<OrderView> {
   if (input.orderId) {
     const order = await findOrderById(input.orderId);
     if (!order || order.userId !== input.userId) throw new ApiError(404, 'ORDER_NOT_FOUND', '订单不存在');
+    if (order.status === 'success' || order.status === 'refunded') return order;
     const existing = await findOrderByReceiptHash(input.userId, receiptHash);
     if (existing && existing.status === 'success') return existing;
     plan = resolvePlan(input.config, order.planId);
@@ -82,15 +83,19 @@ export async function verifyPurchase(input: VerifyInput): Promise<OrderView> {
   } else {
     const r = (input.receipt ?? {}) as { productId?: string };
     if (!r.productId) throw new ApiError(400, 'PRODUCT_NOT_MAPPED', 'receipt 缺少 productId');
+    plan = findPlanByProductId(input.config, r.productId);
     const existing = await findOrderByReceiptHash(input.userId, receiptHash);
     if (existing && existing.status === 'success') return existing;
-    plan = findPlanByProductId(input.config, r.productId);
-    const order = await insertPendingOrder({
-      userId: input.userId, planId: plan.id, tierId: plan.tierId,
-      idempotencyKey: `restore-${receiptHash.slice(0, 24)}`, amountMinor: plan.priceMinor,
-      currency: plan.currency, provider: plan.provider,
-    });
-    orderId = order.id;
+    if (existing) {
+      orderId = existing.id;
+    } else {
+      const order = await insertPendingOrder({
+        userId: input.userId, planId: plan.id, tierId: plan.tierId,
+        idempotencyKey: `restore-${receiptHash.slice(0, 24)}`, amountMinor: plan.priceMinor,
+        currency: plan.currency, provider: plan.provider,
+      });
+      orderId = order.id;
+    }
     await markProcessing(orderId);
   }
 

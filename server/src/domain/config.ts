@@ -26,6 +26,8 @@ export type MembershipTier = Readonly<{
   entitlements: readonly string[];
 }>;
 
+export type StoreProductMapping = Readonly<{ apple?: string; google?: string; hms?: string }>;
+
 export type BillingPlan = Readonly<{
   id: string;
   tierId: string;
@@ -34,7 +36,8 @@ export type BillingPlan = Readonly<{
   priceMinor: number;
   currency: string;
   originalPriceMinor?: number;
-  provider: 'mock' | 'apple' | 'google' | 'wechat' | 'alipay';
+  provider: 'mock' | 'apple' | 'google' | 'hms' | 'wechat' | 'alipay';
+  storeProductMapping?: StoreProductMapping;
 }>;
 
 export type PasswordPolicy = Readonly<{
@@ -261,6 +264,7 @@ export const defaultConfig: RuntimeConfig = {
       priceMinor: 1800,
       currency: 'CNY',
       provider: 'mock',
+      storeProductMapping: { apple: 'com.zhongbei.pro.monthly', google: 'pro_monthly_001', hms: 'pro_monthly_001' },
     },
     {
       id: 'pro-yearly',

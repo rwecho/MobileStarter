@@ -161,6 +161,12 @@ const tierSchema = z.object({
   entitlements: z.array(z.string()).max(50),
 });
 
+const storeProductMappingSchema = z.object({
+  apple: z.string().min(1).max(200).optional(),
+  google: z.string().min(1).max(200).optional(),
+  hms: z.string().min(1).max(200).optional(),
+}).optional();
+
 const planSchema = z.object({
   id: z.string().regex(/^[a-z0-9-]+$/),
   tierId: z.string().min(1),
@@ -169,7 +175,17 @@ const planSchema = z.object({
   priceMinor: z.number().int().nonnegative(),
   currency: z.string().length(3),
   originalPriceMinor: z.number().int().positive().optional(),
-  provider: z.enum(['mock', 'apple', 'google', 'wechat', 'alipay']),
+  provider: z.enum(['mock', 'apple', 'google', 'hms', 'wechat', 'alipay']),
+  storeProductMapping: storeProductMappingSchema,
+});
+
+export const verifyPurchaseSchema = z.object({
+  orderId: z.string().min(1).max(80).optional(),
+  receipt: z.custom((v) => v !== undefined, { message: 'receipt is required' }),
+});
+
+export const restorePurchasesSchema = z.object({
+  receipts: z.array(z.unknown()).min(1).max(50),
 });
 
 export const runtimeConfigSchema = z.object({
@@ -268,6 +284,18 @@ export const runtimeConfigSchema = z.object({
         path: ['plans'],
         message: `方案 ${plan.id} 引用了不存在的等级`,
       });
+    }
+  }
+  for (const plan of config.plans) {
+    if (plan.provider === 'apple' || plan.provider === 'google' || plan.provider === 'hms') {
+      const mapped = plan.storeProductMapping?.[plan.provider];
+      if (!mapped) {
+        context.addIssue({
+          code: 'custom',
+          path: ['plans'],
+          message: `方案 ${plan.id} 的 provider=${plan.provider} 缺少 storeProductMapping.${plan.provider}`,
+        });
+      }
     }
   }
 });

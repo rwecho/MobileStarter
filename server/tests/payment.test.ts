@@ -92,3 +92,45 @@ test('platform → storeKey 解析', () => {
   assert.equal(storeKeyForPlatform('harmonyos'), 'hms');
   assert.equal(storeKeyForPlatform('web'), undefined);
 });
+
+const { issueEntitlements, revokeEntitlementsForOrder, listActiveEntitlements } =
+  await import('../src/server/entitlement-service.ts');
+
+async function makeUser(appId: string): Promise<string> {
+  const id = `u-${process.pid}-${Math.random().toString(36).slice(2, 8)}`;
+  const ts = new Date().toISOString();
+  await database.prepare(
+    `INSERT INTO users(id, app_id, email, password_hash, username, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+  ).run(id, appId, `t-${id}@test.local`, 'hash', id, ts, ts);
+  return id;
+}
+
+async function makeOrder(orderId: string, userId: string): Promise<string> {
+  const ts = new Date().toISOString();
+  await database.prepare(
+    `INSERT INTO orders(id, user_id, plan_id, tier_id, idempotency_key, status, amount_minor, currency, provider, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).run(orderId, userId, 'pro-monthly', 'pro', `k-${orderId}`, 'success', 1800, 'CNY', 'mock', ts);
+  return orderId;
+}
+
+test('issueEntitlements 按 tier 发放权益且幂等', async () => {
+  const userId = await makeUser('app1');
+  await makeOrder('o1', userId);
+  const tier = defaultConfig.tiers.find((t) => t.id === 'pro')!;
+  await issueEntitlements({ userId, appId: 'app1', orderId: 'o1', tier, expiresAt: null });
+  await issueEntitlements({ userId, appId: 'app1', orderId: 'o1', tier, expiresAt: null });
+  const keys = (await listActiveEntitlements(userId, 'app1')).map((e) => e.entitlement_key).sort();
+  assert.deepEqual(keys, ['cloud.100gb', 'export.hd', 'templates.pro']);
+});
+
+test('revokeEntitlementsForOrder 撤销该订单权益', async () => {
+  const userId = await makeUser('app1');
+  await makeOrder('o2', userId);
+  const tier = defaultConfig.tiers.find((t) => t.id === 'pro')!;
+  await issueEntitlements({ userId, appId: 'app1', orderId: 'o2', tier, expiresAt: null });
+  await revokeEntitlementsForOrder('o2');
+  const keys = await listActiveEntitlements(userId, 'app1');
+  assert.equal(keys.length, 0);
+});

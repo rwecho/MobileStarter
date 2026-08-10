@@ -1,62 +1,80 @@
-import type { RuntimeConfig } from '@/domain/config';
+import { randomUUID } from 'node:crypto';
+import type { ClientPlatform } from './client-context';
 import { ApiError } from './http';
 
-type BillingPlan = RuntimeConfig['plans'][number];
-type StartPaymentInput = Readonly<{
-  appId: string;
-  environment: string;
-  userId: string;
-  plan: BillingPlan;
-}>;
+export type StoreKey = 'apple' | 'google' | 'hms';
+export type PaymentProviderId = 'mock' | 'apple' | 'google' | 'hms' | 'wechat' | 'alipay';
 
-export type PaymentStart = Readonly<{
-  complete: boolean;
-}>;
-
-export interface PaymentProviderPort {
-  readonly id: BillingPlan['provider'];
-  start(input: StartPaymentInput): Promise<PaymentStart>;
+export function storeKeyForPlatform(platform: ClientPlatform): StoreKey | undefined {
+  if (platform === 'ios') return 'apple';
+  if (platform === 'android') return 'google';
+  if (platform === 'harmonyos') return 'hms';
+  return undefined;
 }
 
-const mockProvider: PaymentProviderPort = {
+export type VerifyResult = Readonly<{
+  ok: boolean;
+  storeTransactionId?: string;
+  productId?: string;
+  expiresAt?: string;
+  refund?: boolean;
+}>;
+
+export type WebhookEvent = Readonly<{
+  provider: PaymentProviderId;
+  eventId: string;
+  kind: 'renew' | 'refund';
+  orderId: string;
+}>;
+
+export interface PaymentAdapter {
+  readonly id: PaymentProviderId;
+  verifyReceipt(input: Readonly<{
+    appId: string; userId: string; orderId?: string; receipt: unknown;
+  }>): Promise<VerifyResult>;
+  parseWebhook(rawBody: Buffer, headers: Readonly<Record<string, string>>): Promise<WebhookEvent | null>;
+}
+
+const mockAdapter: PaymentAdapter = {
   id: 'mock',
-  async start() {
-    return { complete: true };
+  async verifyReceipt({ receipt }) {
+    const r = (receipt ?? {}) as { productId?: string; fail?: boolean };
+    if (r.fail) return { ok: false };
+    return { ok: true, storeTransactionId: `mock-${randomUUID()}`, productId: r.productId };
+  },
+  async parseWebhook(rawBody) {
+    const e = JSON.parse(rawBody.toString()) as Partial<WebhookEvent> & { eventId?: string };
+    if (!e.eventId || !e.kind || !e.orderId) return null;
+    return { provider: 'mock', eventId: e.eventId, kind: e.kind, orderId: e.orderId };
   },
 };
 
-const unavailableProviders = new Map<string, PaymentProviderPort>(
-  (['apple', 'google', 'wechat', 'alipay'] as const).map((id) => [id, {
+function unavailable(id: PaymentProviderId): PaymentAdapter {
+  return {
     id,
-    async start() {
-      throw new ApiError(
-        503,
-        'PAYMENT_PROVIDER_NOT_CONFIGURED',
-        `${id} 支付尚未配置`,
-        true,
-      );
+    async verifyReceipt() {
+      throw new ApiError(503, 'PAYMENT_PROVIDER_NOT_CONFIGURED', `${id} 支付尚未配置`, true);
     },
-  }]),
-);
+    async parseWebhook() {
+      throw new ApiError(401, 'WEBHOOK_SIGNATURE_INVALID', `${id} webhook 验签失败或未配置`, false);
+    },
+  };
+}
 
-export function paymentProvider(
-  id: BillingPlan['provider'],
-  environment: string,
-) {
-  if (id === 'mock') {
-    if (environment === 'production') {
-      throw new ApiError(
-        503,
-        'MOCK_PAYMENT_FORBIDDEN',
-        '生产环境禁止使用模拟支付',
-        true,
-      );
-    }
-    return mockProvider;
+const adapters = new Map<PaymentProviderId, PaymentAdapter>([
+  ['mock', mockAdapter],
+  ['apple', unavailable('apple')],
+  ['google', unavailable('google')],
+  ['hms', unavailable('hms')],
+  ['wechat', unavailable('wechat')],
+  ['alipay', unavailable('alipay')],
+]);
+
+export function paymentProvider(id: PaymentProviderId, environment: string): PaymentAdapter {
+  if (id === 'mock' && environment === 'production') {
+    throw new ApiError(503, 'MOCK_PAYMENT_FORBIDDEN', '生产环境禁止使用模拟支付', true);
   }
-  const provider = unavailableProviders.get(id);
-  if (!provider) {
-    throw new ApiError(400, 'PAYMENT_PROVIDER_UNSUPPORTED', '不支持的支付渠道');
-  }
-  return provider;
+  const adapter = adapters.get(id);
+  if (!adapter) throw new ApiError(400, 'PAYMENT_PROVIDER_UNSUPPORTED', '不支持的支付渠道');
+  return adapter;
 }

@@ -49,3 +49,46 @@ test('新表与 orders 新列存在', async () => {
   assert.deepEqual(cols.map((c) => c.column_name).sort(),
     ['expires_at', 'receipt_hash', 'store_transaction_id', 'tier_id']);
 });
+
+const { paymentProvider, storeKeyForPlatform } = await import('../src/server/payment-providers.ts');
+
+test('mock 适配器 verifyReceipt 成功路径', async () => {
+  const r = await paymentProvider('mock', 'development').verifyReceipt({
+    appId: 'a', userId: 'u', receipt: { productId: 'p' },
+  });
+  assert.equal(r.ok, true);
+  assert.equal(r.productId, 'p');
+  assert.ok(r.storeTransactionId);
+});
+
+test('mock 适配器 verifyReceipt 失败路径', async () => {
+  const r = await paymentProvider('mock', 'development').verifyReceipt({
+    appId: 'a', userId: 'u', receipt: { fail: true },
+  });
+  assert.equal(r.ok, false);
+});
+
+test('未配置渠道 verifyReceipt 抛 503，parseWebhook 抛 401', async () => {
+  await assert.rejects(
+    () => paymentProvider('apple', 'development').verifyReceipt({ appId: 'a', userId: 'u', receipt: {} }),
+    (err: any) => err.status === 503 && err.code === 'PAYMENT_PROVIDER_NOT_CONFIGURED',
+  );
+  await assert.rejects(
+    () => paymentProvider('google', 'development').parseWebhook(Buffer.from('{}'), {}),
+    (err: any) => err.status === 401 && err.code === 'WEBHOOK_SIGNATURE_INVALID',
+  );
+});
+
+test('生产环境禁用 mock', () => {
+  assert.throws(
+    () => paymentProvider('mock', 'production'),
+    (err: any) => err.status === 503 && err.code === 'MOCK_PAYMENT_FORBIDDEN',
+  );
+});
+
+test('platform → storeKey 解析', () => {
+  assert.equal(storeKeyForPlatform('ios'), 'apple');
+  assert.equal(storeKeyForPlatform('android'), 'google');
+  assert.equal(storeKeyForPlatform('harmonyos'), 'hms');
+  assert.equal(storeKeyForPlatform('web'), undefined);
+});

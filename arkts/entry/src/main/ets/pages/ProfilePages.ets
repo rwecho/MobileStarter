@@ -3,9 +3,24 @@ import { AppStore } from '../state/AppStore'
 import { AppIcon, AppIconName } from '../design_system/AppIcon'
 import { AppButton, AppListRow, PageHeader } from '../design_system/Components'
 import { AppColors, AppRadii, AppSpacing } from '../theme/AppTokens'
-import { MembershipTier } from '../domain/Models'
+import { BillingPlan, MembershipTier } from '../domain/Models'
 import { appString, AppString } from '../localization/AppStrings'
 import { BottomTabs } from './HomePage'
+
+// 方案价格展示：与 RN/Flutter 端保持一致（如 CNY 18.00/月）
+export function formatPlanPrice(plan: BillingPlan): string {
+  const period = planIntervalLabel(plan.interval)
+  const amount = (plan.priceMinor / 100).toFixed(2)
+  return `${plan.currency} ${amount}/${period}`
+}
+
+function planIntervalLabel(interval: string): string {
+  if (interval === 'month') return '月'
+  if (interval === 'year') return '年'
+  if (interval === 'lifetime') return '终身'
+  if (interval === 'one_time') return '次'
+  return interval
+}
 
 @Component
 export struct ProfilePage {
@@ -194,6 +209,40 @@ export struct MembershipPage {
             .backgroundColor(AppColors.membershipSurface)
             .borderRadius(AppRadii.card)
           })
+          if ((this.store.config?.plans ?? []).length > 0) {
+            Column({ space: AppSpacing.x3 }) {
+              Text('可订阅方案')
+                .fontSize(18).fontWeight(FontWeight.Bold).fontColor(AppColors.text)
+              ForEach(this.store.config?.plans ?? [], (plan: BillingPlan) => {
+                Column({ space: AppSpacing.x2 }) {
+                  Row() {
+                    Text(plan.name)
+                      .fontColor(AppColors.text)
+                      .fontWeight(FontWeight.Bold)
+                      .fontSize(16)
+                      .layoutWeight(1)
+                    Text(formatPlanPrice(plan))
+                      .fontColor(AppColors.textSecondary)
+                      .fontSize(14)
+                  }.width('100%')
+                  Text(`支付渠道：${plan.provider}`)
+                    .fontColor(AppColors.textSecondary)
+                    .fontSize(13)
+                  AppButton({
+                    label: '确认订阅',
+                    onTap: () => this.confirmPlan(plan.id)
+                  })
+                }
+                .alignItems(HorizontalAlign.Start)
+                .padding(AppSpacing.x4)
+                .backgroundColor(AppColors.surface)
+                .borderRadius(AppRadii.card)
+                .width('100%')
+              })
+            }
+            .alignItems(HorizontalAlign.Start)
+            .width('100%')
+          }
           Column() {
             AppListRow({
               store: this.store,
@@ -224,6 +273,11 @@ export struct MembershipPage {
     }
     .width('100%')
     .height('100%')
+  }
+
+  private confirmPlan(planId: string): void {
+    this.store.startCheckout(planId)
+    this.store.navigateByName('membership.checkout')
   }
 }
 

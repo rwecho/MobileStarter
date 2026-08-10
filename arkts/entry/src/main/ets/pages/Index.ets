@@ -15,6 +15,7 @@ import {
 } from './SettingsActionPages'
 import { HomePage } from './HomePage'
 import { OnboardingPage, SplashPage } from './LaunchPages'
+import { CheckoutPage } from './CheckoutPage'
 import { MembershipPage, ProfilePage } from './ProfilePages'
 import { SettingDetailPage, SettingsPage } from './SettingsPages'
 import { SettingsUtilityPage } from './SettingsUtilityPage'
@@ -112,6 +113,8 @@ struct ProfileHost {
       CouponsPage({ store: this.store, remote: this.store.remote })
     } else if (this.store.route === AppRoute.Orders) {
       OrdersPage({ store: this.store, remote: this.store.remote })
+    } else if (this.store.route === AppRoute.Checkout) {
+      CheckoutPage({ store: this.store })
     } else {
       MembershipPage({ store: this.store })
     }

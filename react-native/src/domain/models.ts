@@ -1,3 +1,5 @@
+import { OrderStatus, StoreProductMapping } from '../payment/paymentModels';
+
 export type UserSettings = Readonly<Record<string, string | boolean | number>>;
 
 export type AppUser = Readonly<{
@@ -47,6 +49,7 @@ export type BillingPlan = Readonly<{
   originalPriceMinor?: number;
   currency: string;
   provider: 'mock' | 'apple' | 'google' | 'wechat' | 'alipay';
+  storeProductMapping?: StoreProductMapping;
 }>;
 
 export type RuntimeConfig = Readonly<{
@@ -219,7 +222,7 @@ export type NotificationItem = Readonly<{
 export type OrderView = Readonly<{
   id: string;
   planId: string;
-  status: string;
+  status: OrderStatus;
   amountMinor: number;
   currency: string;
   provider: string;

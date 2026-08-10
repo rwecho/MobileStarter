@@ -7,6 +7,7 @@ import {
   PageHeader,
 } from '../design-system/components';
 import { NotificationItem, OrderView } from '../domain/models';
+import type { OrderStatus } from '../payment/paymentModels';
 import { AppRoute } from '../navigation/routes';
 import { useApp } from '../state/AppStore';
 import { styles } from '../theme/styles';
@@ -126,14 +127,9 @@ function isAppRoute(value: string | null): value is AppRoute {
   return Boolean(value && !value.includes('://'));
 }
 
-function statusLabel(status: string) {
-  return {
-    success: '已完成',
-    pending: '待支付',
-    failed: '失败',
-    refunded: '已退款',
-  }[status] ?? status;
-}
+const statusLabel = (status: OrderStatus): string => ({
+  pending: '待支付', processing: '处理中', success: '已生效', failed: '失败', refunded: '已退款',
+}[status] ?? status);
 
 function formatMoney(amount: number, currency: string) {
   return new Intl.NumberFormat('zh-CN', { style: 'currency', currency }).format(amount / 100);

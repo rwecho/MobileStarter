@@ -3,6 +3,7 @@ import test, { after } from 'node:test';
 const { database } = await import('../src/server/database.ts');
 const { defaultConfig } = await import('../src/domain/config.ts');
 const { runtimeConfigSchema, verifyPurchaseSchema, restorePurchasesSchema } = await import('../src/server/schemas.ts');
+type ApiError = { status: number; code: string };
 after(async () => database.close());
 
 test('BillingPlan 支持 storeProductMapping 与 hms provider', () => {
@@ -71,18 +72,18 @@ test('mock 适配器 verifyReceipt 失败路径', async () => {
 test('未配置渠道 verifyReceipt 抛 503，parseWebhook 抛 401', async () => {
   await assert.rejects(
     () => paymentProvider('apple', 'development').verifyReceipt({ appId: 'a', userId: 'u', receipt: {} }),
-    (err: any) => err.status === 503 && err.code === 'PAYMENT_PROVIDER_NOT_CONFIGURED',
+    (err: ApiError) => err.status === 503 && err.code === 'PAYMENT_PROVIDER_NOT_CONFIGURED',
   );
   await assert.rejects(
     () => paymentProvider('google', 'development').parseWebhook(Buffer.from('{}'), {}),
-    (err: any) => err.status === 401 && err.code === 'WEBHOOK_SIGNATURE_INVALID',
+    (err: ApiError) => err.status === 401 && err.code === 'WEBHOOK_SIGNATURE_INVALID',
   );
 });
 
 test('生产环境禁用 mock', () => {
   assert.throws(
     () => paymentProvider('mock', 'production'),
-    (err: any) => err.status === 503 && err.code === 'MOCK_PAYMENT_FORBIDDEN',
+    (err: ApiError) => err.status === 503 && err.code === 'MOCK_PAYMENT_FORBIDDEN',
   );
 });
 
@@ -217,7 +218,7 @@ test('createOrder 无对应平台映射 → PRODUCT_NOT_MAPPED', async () => {
   const userId = await makeUser('app1');
   await assert.rejects(
     () => createOrder({ userId, idempotencyKey: 'i2', planId: 'pro-monthly', platform: 'ios', config: configWith(false) }),
-    (err: any) => err.status === 404 && err.code === 'PRODUCT_NOT_MAPPED',
+    (err: ApiError) => err.status === 404 && err.code === 'PRODUCT_NOT_MAPPED',
   );
 });
 
@@ -295,7 +296,7 @@ test('同一 webhook 投递 10 次只处理 1 次', async () => {
 test('非 mock 渠道 webhook 在 P-1 返回 401（验签骨架）', async () => {
   await assert.rejects(
     () => applyWebhook('apple', Buffer.from('{}'), {}),
-    (err: any) => err.status === 401 && err.code === 'WEBHOOK_SIGNATURE_INVALID',
+    (err: ApiError) => err.status === 401 && err.code === 'WEBHOOK_SIGNATURE_INVALID',
   );
 });
 

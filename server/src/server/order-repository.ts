@@ -32,33 +32,36 @@ function mapStatus(s: string): OrderStatus {
   return (['pending', 'processing', 'success', 'failed', 'refunded'].includes(s) ? s : 'pending') as OrderStatus;
 }
 
-function toView(row: any): OrderView {
+type OrderRow = Omit<OrderView, 'status'> & { status: string };
+
+function toView(row: OrderRow | undefined): OrderView {
+  if (!row) throw new Error('order row not found');
   return { ...row, status: mapStatus(row.status) };
 }
 
 export async function listOrders(userId: string): Promise<readonly OrderView[]> {
   const rows = await database.prepare(
     `SELECT ${COLUMNS} FROM orders WHERE user_id = ? ORDER BY created_at DESC`,
-  ).all(userId) as any[];
+  ).all<OrderRow>(userId);
   return rows.map(toView);
 }
 
 export async function findOrder(userId: string, idempotencyKey: string): Promise<OrderView | undefined> {
   const row = await database.prepare(
     `SELECT ${COLUMNS} FROM orders WHERE user_id = ? AND idempotency_key = ?`,
-  ).get(userId, idempotencyKey) as any | undefined;
+  ).get<OrderRow>(userId, idempotencyKey);
   return row ? toView(row) : undefined;
 }
 
 export async function findOrderById(orderId: string): Promise<OrderView | undefined> {
-  const row = await database.prepare(`SELECT ${COLUMNS} FROM orders WHERE id = ?`).get(orderId) as any | undefined;
+  const row = await database.prepare(`SELECT ${COLUMNS} FROM orders WHERE id = ?`).get<OrderRow>(orderId);
   return row ? toView(row) : undefined;
 }
 
 export async function findOrderByReceiptHash(userId: string, receiptHash: string): Promise<OrderView | undefined> {
   const row = await database.prepare(
     `SELECT ${COLUMNS} FROM orders WHERE user_id = ? AND receipt_hash = ?`,
-  ).get(userId, receiptHash) as any | undefined;
+  ).get<OrderRow>(userId, receiptHash);
   return row ? toView(row) : undefined;
 }
 
@@ -80,7 +83,7 @@ export async function insertPendingOrder(input: NewPending): Promise<OrderView> 
      VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?)`,
   ).run(orderId, input.userId, input.planId, input.tierId, input.idempotencyKey,
     input.amountMinor, input.currency, input.provider, ts);
-  const row = await database.prepare(`SELECT ${COLUMNS} FROM orders WHERE id = ?`).get(orderId) as any;
+  const row = await database.prepare(`SELECT ${COLUMNS} FROM orders WHERE id = ?`).get<OrderRow>(orderId);
   return toView(row);
 }
 
@@ -95,7 +98,7 @@ export async function completeOrder(orderId: string, input: Readonly<{
   await database.prepare(
     `UPDATE orders SET status = 'success', store_transaction_id = ?, receipt_hash = ?, expires_at = ?, completed_at = ? WHERE id = ?`,
   ).run(input.storeTransactionId, input.receiptHash, input.expiresAt, ts, orderId);
-  const row = await database.prepare(`SELECT ${COLUMNS} FROM orders WHERE id = ?`).get(orderId) as any;
+  const row = await database.prepare(`SELECT ${COLUMNS} FROM orders WHERE id = ?`).get<OrderRow>(orderId);
   return toView(row);
 }
 
@@ -140,11 +143,17 @@ export async function upsertSubscription(input: SubInput): Promise<void> {
     input.status, input.currentOrderId, input.renewAt, ts, ts);
 }
 
+type SubscriptionRow = {
+  current_order_id: string;
+  status: string;
+  renew_at: string | null;
+};
+
 export async function getCurrentSubscription(
   userId: string, appId: string, planId: string,
-): Promise<{ current_order_id: string; status: string; renew_at: string | null } | undefined> {
+): Promise<SubscriptionRow | undefined> {
   return await database.prepare(
     `SELECT current_order_id, status, renew_at FROM subscriptions
      WHERE user_id = ? AND app_id = ? AND plan_id = ?`,
-  ).get(userId, appId, planId) as any | undefined;
+  ).get<SubscriptionRow>(userId, appId, planId);
 }

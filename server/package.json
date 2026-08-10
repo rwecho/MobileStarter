@@ -9,7 +9,7 @@
     "start": "next start --hostname 0.0.0.0 --port 3210",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
-    "test": "node --import ./tests/register.mjs --test --experimental-transform-types tests/core.test.ts tests/auth.test.ts"
+    "test": "node --import ./tests/register.mjs --test --experimental-transform-types tests/core.test.ts tests/auth.test.ts tests/payment.test.ts"
   },
   "dependencies": {
     "@radix-ui/react-avatar": "^1.2.6",

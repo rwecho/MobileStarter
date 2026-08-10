@@ -8,18 +8,43 @@ import { DEFAULT_APP_ID } from './service-identity';
 
 export const database = new PostgresDatabase();
 
+// Node's test runner executes each test file in its own process, so multiple
+// workers import this module concurrently and would race on the idempotent
+// `CREATE TABLE IF NOT EXISTS` statements (Postgres still allocates the
+// matching composite type before noticing the table exists, producing
+// `duplicate key value violates pg_type_typname_nsp_index`). Serializing the
+// whole bootstrap behind a transaction-scoped advisory lock guarantees only
+// one worker mutates the schema at a time; the others wait, then re-run the
+// now-no-op idempotent statements.
+const BOOTSTRAP_ADVISORY_LOCK = 0x5a48_4f4e; // 'ZHON' sentinel
+let bootstrapPromise: Promise<void> | undefined;
+
+async function runBootstrap() {
+  await database.transaction(async () => {
+    await database.exec(
+      `SELECT pg_advisory_xact_lock(${BOOTSTRAP_ADVISORY_LOCK.toString()})`,
+    );
+    await initializeCoreSchema(database);
+    await initializeProductSchema(database);
+    await applyIdempotentMigrations();
+    await seedDefaultConfig();
+    if (process.env.NODE_ENV !== 'production') {
+      await ensureDevelopmentTestAccount();
+    }
+    await ensureBootstrapAdmin();
+  });
+}
+
+function ensureBootstrap() {
+  if (!bootstrapPromise) bootstrapPromise = runBootstrap();
+  return bootstrapPromise;
+}
+
 if (
   process.env.AUTH_SKIP_DATABASE_INIT !== '1' &&
   process.env.MOBILEUI_SKIP_DATABASE_INIT !== '1'
 ) {
-  await initializeCoreSchema(database);
-  await initializeProductSchema(database);
-  await applyIdempotentMigrations();
-  await seedDefaultConfig();
-  if (process.env.NODE_ENV !== 'production') {
-    await ensureDevelopmentTestAccount();
-  }
-  await ensureBootstrapAdmin();
+  await ensureBootstrap();
 }
 
 export function nowIso() {

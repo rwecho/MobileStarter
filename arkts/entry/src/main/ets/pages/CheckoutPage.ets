@@ -52,7 +52,13 @@ export struct CheckoutPage {
             .width('100%')
           }
           if (this.store.purchaseStatus === PurchaseStatus.Loading) {
-            AppButton({ label: '正在确认…', onTap: () => {} })
+            Row({ space: AppSpacing.x2 }) {
+              LoadingProgress().width(20).height(20).color(AppColors.onBrand)
+              Text('正在确认…').fontColor(AppColors.onBrand).fontWeight(FontWeight.Bold)
+            }
+            .justifyContent(FlexAlign.Center)
+            .width('100%')
+            .height(52)
           } else if (this.store.purchaseStatus === PurchaseStatus.Success) {
             AppButton({
               label: '完成',

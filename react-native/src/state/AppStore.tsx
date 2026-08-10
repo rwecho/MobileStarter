@@ -54,6 +54,7 @@ type AppContextValue = Readonly<{
   bootstrapped: boolean;
   busy: boolean;
   purchaseState: PurchaseState;
+  setPurchaseState: (state: PurchaseState) => void;
   pendingPlanId: string | null;
   setPendingPlanId: (planId: string | null) => void;
   toast: ToastState | null;
@@ -225,6 +226,7 @@ export function AppProvider({ children }: Readonly<{ children: ReactNode }>) {
     bootstrapped,
     busy,
     purchaseState,
+    setPurchaseState,
     pendingPlanId,
     setPendingPlanId,
     refreshBootstrap,

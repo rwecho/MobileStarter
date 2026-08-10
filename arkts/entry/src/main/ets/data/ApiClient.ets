@@ -6,7 +6,6 @@ import {
   ApiTransport,
   SocialSignInInput
 } from './ApiTransport'
-export { ApiFailure } from './ApiTransport'
 import {
   AppUser,
   AuthPayload,
@@ -29,6 +28,8 @@ import {
   SupportMessage,
   UsageSummary
 } from '../domain/Models'
+
+export { ApiFailure } from './ApiTransport'
 
 export class ApiClient {
   private transport: ApiTransport = new ApiTransport()

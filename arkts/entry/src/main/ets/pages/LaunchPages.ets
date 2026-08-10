@@ -28,6 +28,10 @@ export struct SplashPage {
   private advancing: boolean = false
   private done: boolean = false
 
+  private get splashConfig(): SplashConfig | null {
+    return this.store.config?.splash ?? null
+  }
+
   aboutToAppear(): void {
     this.minTimer = setTimeout(() => {
       this.minElapsed = true
@@ -96,14 +100,13 @@ export struct SplashPage {
       .backgroundColor(AppColors.background)
     } else {
       // 闪屏阶段：countdown 非空即已确认有 splash 配置（maybeAdvance 保证非空）
-      const splash = this.store.config!.splash
-      if (splash) {
+      if (this.splashConfig != null) {
         Stack({ alignContent: Alignment.TopEnd }) {
-          SplashMedia({ splash: splash })
+          SplashMedia({ splash: this.splashConfig })
           Row() {
             SkipCapsule({
               countdown: Math.max(this.countdown, 0),
-              canSkip: splash.skippable !== false,
+              canSkip: this.splashConfig.skippable !== false,
               onSkip: () => { this.goHome() }
             })
           }

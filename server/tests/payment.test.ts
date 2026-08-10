@@ -249,6 +249,23 @@ test('restorePurchases 按 productId 反查并补发（orderId 缺省）', async
   assert.deepEqual(ents, ['cloud.100gb', 'export.hd', 'templates.pro']);
 });
 
+test('verifyPurchase 拒绝跨用户订单（ORDER_NOT_FOUND，不泄露存在性）', async () => {
+  const owner = await makeUser('app1');
+  const attacker = await makeUser('app1');
+  const { orderId } = await createOrder({
+    userId: owner, idempotencyKey: `own-${Math.random().toString(36).slice(2, 8)}`,
+    planId: 'pro-monthly', platform: 'ios', config: configWith(),
+  });
+  await assert.rejects(
+    () => verifyPurchase({
+      appId: 'app1', environment: 'development', userId: attacker, orderId,
+      receipt: { productId: 'com.x.pro' }, platform: 'ios', config: configWith(),
+    }),
+    (err: ApiError) => err.status === 404 && err.code === 'ORDER_NOT_FOUND',
+  );
+  assert.equal((await listActiveEntitlements(attacker, 'app1')).length, 0);
+});
+
 const { runTransaction } = await import('../src/server/database.ts');
 
 test('嵌套事务中内层写入随外层回滚而回滚（原子性）', async () => {

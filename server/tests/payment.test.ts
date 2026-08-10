@@ -134,3 +134,57 @@ test('revokeEntitlementsForOrder 撤销该订单权益', async () => {
   const keys = await listActiveEntitlements(userId, 'app1');
   assert.equal(keys.length, 0);
 });
+
+const {
+  insertPendingOrder, completeOrder, findOrderById, findOrderByReceiptHash,
+  insertWebhookEventIfNew, upsertSubscription, getCurrentSubscription,
+} = await import('../src/server/order-repository.ts');
+
+test('insertPendingOrder 创建 pending 订单', async () => {
+  const userId = await makeUser('app1');
+  const order = await insertPendingOrder({
+    userId, planId: 'pro-monthly', tierId: 'pro',
+    idempotencyKey: 'k1', amountMinor: 1800, currency: 'CNY', provider: 'mock',
+  });
+  assert.equal(order.status, 'pending');
+  assert.equal(order.userId, userId);
+});
+
+test('completeOrder 置 success 并写入票据字段', async () => {
+  const userId = await makeUser('app1');
+  const order = await insertPendingOrder({
+    userId, planId: 'pro-monthly', tierId: 'pro',
+    idempotencyKey: 'k2', amountMinor: 1800, currency: 'CNY', provider: 'mock',
+  });
+  const done = await completeOrder(order.id, {
+    storeTransactionId: 't1', receiptHash: 'h1', expiresAt: null,
+  });
+  assert.equal(done.status, 'success');
+  const found = await findOrderByReceiptHash(userId, 'h1');
+  assert.ok(found);
+  assert.equal(found!.id, order.id);
+});
+
+test('insertWebhookEventIfNew 第二次返回 false（去重）', async () => {
+  const first = await insertWebhookEventIfNew({ provider: 'mock', eventId: 'e1', payloadHash: 'p' });
+  const second = await insertWebhookEventIfNew({ provider: 'mock', eventId: 'e1', payloadHash: 'p' });
+  assert.equal(first, true);
+  assert.equal(second, false);
+});
+
+test('upsertSubscription 同 plan 幂等更新', async () => {
+  const userId = await makeUser('app1');
+  await makeOrder('sub1', userId);
+  await makeOrder('sub2', userId);
+  await upsertSubscription({
+    userId, appId: 'app1', planId: 'pro-monthly', platform: 'ios',
+    status: 'active', currentOrderId: 'sub1', renewAt: null,
+  });
+  await upsertSubscription({
+    userId, appId: 'app1', planId: 'pro-monthly', platform: 'ios',
+    status: 'active', currentOrderId: 'sub2', renewAt: null,
+  });
+  const sub = await getCurrentSubscription(userId, 'app1', 'pro-monthly');
+  assert.ok(sub);
+  assert.equal(sub!.current_order_id, 'sub2');
+});

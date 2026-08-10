@@ -290,14 +290,6 @@ final class AppController extends ChangeNotifier {
     return true;
   }
 
-  Future<bool> purchase(String planId) async {
-    final result = await _capture(() => _repository.purchase(planId));
-    if (result == null) return false;
-    orders = [result, ...orders.where((order) => order.id != result.id)];
-    await initialize();
-    return true;
-  }
-
   Future<bool> _authenticate(Future<AuthResult> Function() operation) async {
     final result = await _capture(operation);
     if (result == null) return false;

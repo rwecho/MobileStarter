@@ -7,6 +7,11 @@ import 'app_controller.dart';
 import 'app_repository.dart';
 import 'app_router.dart';
 import 'app_scope.dart';
+import '../payment/mock_payment_provider.dart';
+import '../payment/payment_controller.dart';
+import '../payment/payment_repository.dart';
+import '../payment/payment_scope.dart';
+import '../payment/token_store.dart';
 import '../support/support_controller.dart';
 import '../support/support_repository.dart';
 import '../support/support_scope.dart';
@@ -21,12 +26,18 @@ class MobileUiApp extends StatefulWidget {
 class _MobileUiAppState extends State<MobileUiApp> with WidgetsBindingObserver {
   late final AppController controller;
   final supportController = SupportController(SupportRepository());
+  late final PaymentController paymentController;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     controller = AppController(AppRepository());
+    paymentController = PaymentController(
+      repository: PaymentRepository(tokenStore: SecureTokenStore()),
+      provider: MockPaymentProvider(),
+      onMembershipChanged: () => controller.initialize(),
+    );
     unawaited(_initialize());
   }
 
@@ -67,6 +78,7 @@ class _MobileUiAppState extends State<MobileUiApp> with WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
     controller.dispose();
     supportController.dispose();
+    paymentController.dispose();
     super.dispose();
   }
 
@@ -76,27 +88,34 @@ class _MobileUiAppState extends State<MobileUiApp> with WidgetsBindingObserver {
       controller: controller,
       child: SupportScope(
         controller: supportController,
-        child: AnimatedBuilder(
-          animation: controller,
-          builder: (context, _) => MaterialApp(
-            debugShowCheckedModeBanner: false,
-            title: 'MobileStarter',
-            theme: AppTheme.light,
-            darkTheme: AppTheme.dark,
-            themeMode: _themeModeOf(controller),
-            locale: _localeOf(controller),
-            supportedLocales: const [Locale('zh', 'CN'), Locale('en', 'US')],
-            localizationsDelegates: GlobalMaterialLocalizations.delegates,
-            builder: (context, child) {
-              final mediaQuery = MediaQuery.of(context);
-              return MediaQuery(
-                data: mediaQuery.copyWith(
-                  textScaler: TextScaler.linear(_textScaleOf(controller)),
-                ),
-                child: child ?? const SizedBox.shrink(),
-              );
-            },
-            home: AppRouter.screenFor(controller.route),
+        child: PaymentScope(
+          controller: paymentController,
+          child: AnimatedBuilder(
+            animation: Listenable.merge([
+              controller,
+              supportController,
+              paymentController,
+            ]),
+            builder: (context, _) => MaterialApp(
+              debugShowCheckedModeBanner: false,
+              title: 'MobileStarter',
+              theme: AppTheme.light,
+              darkTheme: AppTheme.dark,
+              themeMode: _themeModeOf(controller),
+              locale: _localeOf(controller),
+              supportedLocales: const [Locale('zh', 'CN'), Locale('en', 'US')],
+              localizationsDelegates: GlobalMaterialLocalizations.delegates,
+              builder: (context, child) {
+                final mediaQuery = MediaQuery.of(context);
+                return MediaQuery(
+                  data: mediaQuery.copyWith(
+                    textScaler: TextScaler.linear(_textScaleOf(controller)),
+                  ),
+                  child: child ?? const SizedBox.shrink(),
+                );
+              },
+              home: AppRouter.screenFor(controller.route),
+            ),
           ),
         ),
       ),

@@ -10,8 +10,8 @@ final class PaymentController extends ChangeNotifier {
     required PaymentRepository repository,
     required PaymentProvider provider,
     this.onMembershipChanged,
-  })  : _repository = repository,
-        _provider = provider;
+  }) : _repository = repository,
+       _provider = provider;
 
   final PaymentRepository _repository;
   final PaymentProvider _provider;
@@ -32,13 +32,25 @@ final class PaymentController extends ChangeNotifier {
     notifyListeners();
     try {
       final idempotencyKey = 'flutter-${DateTime.now().microsecondsSinceEpoch}';
-      final order = await _repository.createOrder(planId, idempotencyKey: idempotencyKey);
+      final order = await _repository.createOrder(
+        planId,
+        idempotencyKey: idempotencyKey,
+      );
       final result = await _provider.purchase(order.storeProductId);
-      final verified = await _repository.verifyPurchase(orderId: order.orderId, receipt: result.receipt);
-      await _repository.membershipCurrent();
-      await onMembershipChanged?.call();
+      final verified = await _repository.verifyPurchase(
+        orderId: order.orderId,
+        receipt: result.receipt,
+      );
       purchaseState = Success(verified);
       notifyListeners();
+      if (verified.status == OrderStatus.success) {
+        try {
+          await _repository.membershipCurrent();
+          await onMembershipChanged?.call();
+        } catch (_) {
+          // membership refresh failure must not mask a successful purchase
+        }
+      }
       return true;
     } on PaymentApiException catch (error) {
       purchaseState = error.status == 401
@@ -64,7 +76,9 @@ final class PaymentController extends ChangeNotifier {
       final results = await _provider.restore();
       final receipts = results.map((r) => r.receipt).toList();
       final entitlements = await _repository.restore(receipts);
-      restoreState = entitlements.isEmpty ? const Empty() : Success(entitlements);
+      restoreState = entitlements.isEmpty
+          ? const Empty()
+          : Success(entitlements);
       notifyListeners();
       return true;
     } on PaymentApiException catch (error) {

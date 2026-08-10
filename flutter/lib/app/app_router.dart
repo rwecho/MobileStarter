@@ -2,6 +2,7 @@ import 'package:flutter/widgets.dart';
 import '../navigation/app_route.dart';
 import '../screens/auth_screens.dart';
 import '../screens/account_security_screen.dart';
+import '../screens/checkout_screen.dart';
 import '../screens/coupons_screen.dart';
 import '../screens/delete_account_screen.dart';
 import '../screens/home_screen.dart';
@@ -84,7 +85,7 @@ abstract final class AppRouter {
       AppRoute.invite => const InviteScreen(),
       AppRoute.coupons => const CouponsScreen(),
       AppRoute.membershipPlans => const MembershipScreen(),
-      AppRoute.checkout => const MembershipScreen(),
+      AppRoute.checkout => const CheckoutScreen(),
       AppRoute.orders => const OrdersScreen(),
       AppRoute.notificationCenter => const NotificationsScreen(),
     };

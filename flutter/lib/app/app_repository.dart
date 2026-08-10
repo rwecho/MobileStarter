@@ -258,16 +258,6 @@ final class AppRepository {
   Future<ReferralView> referral() async =>
       ReferralView.fromJson(await _request('/api/v1/me/referral'));
 
-  Future<OrderView> purchase(String planId) async {
-    final data = await _request(
-      '/api/v1/orders',
-      method: 'POST',
-      body: {'planId': planId},
-      idempotencyKey: 'flutter-${DateTime.now().microsecondsSinceEpoch}',
-    );
-    return OrderView.fromJson(data);
-  }
-
   Future<void> changePassword(String current, String next) => _request(
     '/api/v1/me/change-password',
     method: 'POST',

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../app/app_controller.dart';
 import '../app/app_scope.dart';
 import '../app/runtime_models.dart';
 import '../design_system/app_icon.dart';
@@ -7,6 +6,7 @@ import '../design_system/components.dart';
 import '../design_system/feedback.dart';
 import '../design_system/primary_navigation.dart';
 import '../navigation/app_route.dart';
+import '../payment/payment_scope.dart';
 import '../theme/app_tokens.dart';
 
 class ProfileScreen extends StatelessWidget {
@@ -258,7 +258,7 @@ class _MembershipScreenState extends State<MembershipScreen> {
                   ? '演示下单（非真实支付）'
                   : '确认订阅',
               icon: AppIconName.crown,
-              onPressed: () => _purchase(controller),
+              onPressed: _confirm,
             ),
           ] else
             const Text('当前 App 暂未配置可售方案。'),
@@ -275,20 +275,21 @@ class _MembershipScreenState extends State<MembershipScreen> {
     );
   }
 
-  Future<void> _purchase(AppController controller) async {
+  void _confirm() {
+    final controller = AppScope.of(context);
     if (!controller.signedIn) {
       controller.navigate(AppRoute.signIn);
       return;
     }
     final planId = _effectivePlan(controller.config?.plans ?? const []);
     if (planId.isEmpty) return;
-    final success = await controller.purchase(planId);
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(success ? '订阅已生效' : controller.consumeError() ?? '订阅失败'),
-      ),
-    );
+    _pushCheckout(planId);
+  }
+
+  void _pushCheckout(String planId) {
+    final payment = PaymentScope.of(context);
+    payment.pendingPlanId = planId;
+    AppScope.of(context).navigate(AppRoute.checkout);
   }
 
   String _price(int minor, String currency, String interval) {

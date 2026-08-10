@@ -25,6 +25,12 @@ final class PaymentController extends ChangeNotifier {
   String? pendingPlanId;
   bool _busy = false;
 
+  /// Resets purchase state before starting a checkout for a (possibly different)
+  /// plan, so the CheckoutScreen auto-triggers instead of showing a stale result.
+  void resetPurchaseState() {
+    purchaseState = const Idle<OrderView>();
+  }
+
   Future<bool> checkout(String planId) async {
     if (_busy) return false;
     _busy = true;

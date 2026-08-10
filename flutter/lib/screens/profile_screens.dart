@@ -288,6 +288,7 @@ class _MembershipScreenState extends State<MembershipScreen> {
 
   void _pushCheckout(String planId) {
     final payment = PaymentScope.of(context);
+    payment.resetPurchaseState();
     payment.pendingPlanId = planId;
     AppScope.of(context).navigate(AppRoute.checkout);
   }

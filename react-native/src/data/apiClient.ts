@@ -1,4 +1,3 @@
-import { Platform } from 'react-native';
 import {
   AppUser,
   AuthSession,
@@ -17,13 +16,7 @@ import {
   UserSettings,
   UsageSummary,
 } from '../domain/models';
-import {
-  readAnonymousId,
-  readRefreshToken,
-  readSessionToken,
-  saveRefreshToken,
-  saveSessionToken,
-} from './storage';
+import { getPlatformHeader } from './runtimePlatform';
 
 type Envelope<T> = Readonly<{ data: T }>;
 type ErrorPayload = Readonly<{
@@ -36,8 +29,10 @@ type ErrorPayload = Readonly<{
 }>;
 type ErrorEnvelope = Readonly<{ error: ErrorPayload }>;
 
-const apiBase = process.env.EXPO_PUBLIC_API_URL
-  ?? (Platform.OS === 'android' ? 'http://10.0.2.2:3210' : 'http://localhost:3210');
+function getApiBase() {
+  return process.env.EXPO_PUBLIC_API_URL
+    ?? (getPlatformHeader() === 'android' ? 'http://10.0.2.2:3210' : 'http://localhost:3210');
+}
 
 export class ApiClientError extends Error {
   constructor(
@@ -57,7 +52,7 @@ export const apiClient = {
   signIn: (identifier: string, password: string) => requestAuth('/api/v1/auth/sign-in', {
     identifier,
     password,
-    deviceName: `${Platform.OS} · MobileUI`,
+    deviceName: `${getPlatformHeader()} · MobileUI`,
   }),
   signUp: (email: string, password: string, username: string, consentVersion: string) =>
     requestAuth('/api/v1/auth/sign-up', {
@@ -65,7 +60,7 @@ export const apiClient = {
       password,
       username,
       consentVersion,
-      deviceName: `${Platform.OS} · MobileUI`,
+      deviceName: `${getPlatformHeader()} · MobileUI`,
     }),
   verifyEmail: (email: string, code: string) => request<{ verified: boolean }>(
     '/api/v1/auth/verify-email', jsonOptions('POST', { email, code }),
@@ -83,7 +78,7 @@ export const apiClient = {
     nonce?: string;
   }) => requestAuth('/api/v1/auth/social', {
     ...input,
-    deviceName: `${Platform.OS} · MobileUI`,
+    deviceName: `${getPlatformHeader()} · MobileUI`,
   }),
   signOut: () => request<{ signedOut: boolean }>('/api/v1/auth/sign-out', { method: 'POST' }),
   signOutAll: () => request<{ signedOut: boolean }>('/api/v1/auth/sign-out-all', { method: 'POST' }),
@@ -94,7 +89,7 @@ export const apiClient = {
   verifyPhoneCode: (phone: string, code: string) => requestAuth('/api/v1/auth/phone/verify', {
     phone,
     code,
-    deviceName: `${Platform.OS} · MobileUI`,
+    deviceName: `${getPlatformHeader()} · MobileUI`,
   }),
   requestPasswordReset: (email: string) => request<{
     accepted: boolean;
@@ -186,6 +181,28 @@ export const apiClient = {
   }) => request<ProductFeedback>('/api/v1/support/feedback', jsonOptions('POST', input)),
 };
 
+// Token/anonymous sources are injectable so the HTTP layer is node-testable
+// (RN storage imports react-native/expo modules that don't load in node).
+// Defaults lazily load the RN implementation only when actually used.
+type Reader = () => Promise<string | null>;
+let sessionTokenReader: Reader = () => import('./storage').then((m) => m.readSessionToken());
+let refreshTokenReader: Reader = () => import('./storage').then((m) => m.readRefreshToken());
+let anonymousIdReader: Reader = () => import('./storage').then((m) => m.readAnonymousId());
+let sessionTokenWriter: (token: string | null) => Promise<void> =
+  (token) => import('./storage').then((m) => m.saveSessionToken(token));
+let refreshTokenWriter: (token: string | null) => Promise<void> =
+  (token) => import('./storage').then((m) => m.saveRefreshToken(token));
+
+export function setSessionTokenReader(reader: Reader) { sessionTokenReader = reader; }
+export function setRefreshTokenReader(reader: Reader) { refreshTokenReader = reader; }
+export function setAnonymousIdReader(reader: Reader) { anonymousIdReader = reader; }
+export function setSessionTokenWriter(writer: (token: string | null) => Promise<void>) { sessionTokenWriter = writer; }
+export function setRefreshTokenWriter(writer: (token: string | null) => Promise<void>) { refreshTokenWriter = writer; }
+
+// Platform header injection is re-exported so callers configure the whole HTTP
+// layer through apiClient alone (tests set it to 'ios'; App sets Platform.OS).
+export { setPlatformHeader } from './runtimePlatform';
+
 async function requestAuth(
   path: string,
   body: Readonly<Record<string, string | undefined>>,
@@ -212,16 +229,16 @@ async function sendRequest<T>(
   retried: boolean,
 ): Promise<T> {
   const [token, installationId] = await Promise.all([
-    readSessionToken(),
-    readAnonymousId(),
+    sessionTokenReader(),
+    anonymousIdReader(),
   ]);
   let response: Response;
   try {
-    response = await fetch(`${apiBase}${path}`, {
+    response = await fetch(`${getApiBase()}${path}`, {
       ...options,
       headers: {
         ...clientHeaders(),
-        'X-Installation-Id': installationId,
+        ...(installationId ? { 'X-Installation-Id': installationId } : {}),
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...options.headers,
       },
@@ -272,10 +289,10 @@ async function refreshSession(): Promise<boolean> {
 }
 
 async function performRefresh(): Promise<boolean> {
-  const refreshToken = await readRefreshToken();
+  const refreshToken = await refreshTokenReader();
   if (!refreshToken) return false;
   try {
-    const response = await fetch(`${apiBase}/api/v1/auth/refresh`, {
+    const response = await fetch(`${getApiBase()}/api/v1/auth/refresh`, {
       method: 'POST',
       headers: { ...clientHeaders(), 'Content-Type': 'application/json' },
       body: JSON.stringify({ refreshToken }),
@@ -284,8 +301,8 @@ async function performRefresh(): Promise<boolean> {
     const body = await response.json() as Envelope<AuthSession>;
     const data = body?.data;
     if (!data?.token || !data?.refreshToken) return false;
-    await saveSessionToken(data.token);
-    await saveRefreshToken(data.refreshToken);
+    await sessionTokenWriter(data.token);
+    await refreshTokenWriter(data.refreshToken);
     return true;
   } catch {
     return false;
@@ -336,7 +353,7 @@ function clientHeaders() {
   return {
     'X-App-Id': APP_ID,
     'X-App-Environment': APP_ENVIRONMENT,
-    'X-Platform': Platform.OS,
+    'X-Platform': getPlatformHeader(),
     'X-App-Version': '1.0.0',
     'Accept-Language': 'zh-CN',
   };

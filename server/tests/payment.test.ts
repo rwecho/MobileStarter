@@ -188,3 +188,62 @@ test('upsertSubscription 同 plan 幂等更新', async () => {
   assert.ok(sub);
   assert.equal(sub!.current_order_id, 'sub2');
 });
+
+const { createOrder, verifyPurchase, restorePurchases } = await import('../src/server/order-service.ts');
+
+function configWith(mappedPlan = true) {
+  return {
+    ...defaultConfig,
+    plans: [{
+      id: 'pro-monthly', tierId: 'pro', name: 'Pro', interval: 'month' as const,
+      priceMinor: 1800, currency: 'CNY', provider: 'mock' as const,
+      storeProductMapping: mappedPlan
+        ? { apple: 'com.x.pro', google: 'pro_g', hms: 'pro_h' }
+        : { google: 'pro_g' },
+    }],
+  };
+}
+
+test('createOrder 返回 pending + storeProductId，且幂等', async () => {
+  const userId = await makeUser('app1');
+  const a = await createOrder({ userId, idempotencyKey: 'i1', planId: 'pro-monthly', platform: 'ios', config: configWith() });
+  const b = await createOrder({ userId, idempotencyKey: 'i1', planId: 'pro-monthly', platform: 'ios', config: configWith() });
+  assert.equal(a.status, 'pending');
+  assert.equal(a.storeProductId, 'com.x.pro');
+  assert.equal(a.orderId, b.orderId);
+});
+
+test('createOrder 无对应平台映射 → PRODUCT_NOT_MAPPED', async () => {
+  const userId = await makeUser('app1');
+  await assert.rejects(
+    () => createOrder({ userId, idempotencyKey: 'i2', planId: 'pro-monthly', platform: 'ios', config: configWith(false) }),
+    (err: any) => err.status === 404 && err.code === 'PRODUCT_NOT_MAPPED',
+  );
+});
+
+test('verifyPurchase 成功 → order success + 发权益 + 幂等', async () => {
+  const userId = await makeUser('app1');
+  const { orderId } = await createOrder({ userId, idempotencyKey: 'i3', planId: 'pro-monthly', platform: 'ios', config: configWith() });
+  const receipt = { productId: 'com.x.pro' };
+  const r1 = await verifyPurchase({ appId: 'app1', environment: 'development', userId, orderId, receipt, platform: 'ios', config: configWith() });
+  const r2 = await verifyPurchase({ appId: 'app1', environment: 'development', userId, orderId, receipt, platform: 'ios', config: configWith() });
+  assert.equal(r1.status, 'success');
+  assert.equal(r2.status, 'success');
+  const ents = (await listActiveEntitlements(userId, 'app1')).map((e) => e.entitlement_key).sort();
+  assert.deepEqual(ents, ['cloud.100gb', 'export.hd', 'templates.pro']);
+});
+
+test('verifyPurchase 失败 → order failed，不发权益', async () => {
+  const userId = await makeUser('app1');
+  const { orderId } = await createOrder({ userId, idempotencyKey: 'i4', planId: 'pro-monthly', platform: 'ios', config: configWith() });
+  const r = await verifyPurchase({ appId: 'app1', environment: 'development', userId, orderId, receipt: { fail: true }, platform: 'ios', config: configWith() });
+  assert.equal(r.status, 'failed');
+  assert.equal((await listActiveEntitlements(userId, 'app1')).length, 0);
+});
+
+test('restorePurchases 按 productId 反查并补发（orderId 缺省）', async () => {
+  const userId = await makeUser('app1');
+  await restorePurchases({ appId: 'app1', environment: 'development', userId, receipts: [{ productId: 'com.x.pro' }], platform: 'ios', config: configWith() });
+  const ents = (await listActiveEntitlements(userId, 'app1')).map((e) => e.entitlement_key).sort();
+  assert.deepEqual(ents, ['cloud.100gb', 'export.hd', 'templates.pro']);
+});

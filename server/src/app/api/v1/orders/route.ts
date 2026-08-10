@@ -26,11 +26,10 @@ export async function POST(request: NextRequest) {
     const client = getClientContext(request);
     const config = await getRuntimeConfig(user.app_id, client.environment);
     const order = await createOrder({
-      appId: user.app_id,
-      environment: client.environment,
       userId: user.id,
       idempotencyKey,
       planId: input.planId,
+      platform: client.platform,
       config,
     });
     return ok(order, 201);

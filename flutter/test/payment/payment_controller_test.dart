@@ -40,4 +40,17 @@ void main() {
     final mc = await repo.membershipCurrent();
     expect(mc.entitlements, isEmpty);
   });
+
+  test('verifyPurchase rejects another user order (ORDER_NOT_FOUND)', () async {
+    // owner creates an order with their own session
+    final ownerToken = await signUpAndGetToken('p12-own-${DateTime.now().microsecondsSinceEpoch}@test.local');
+    final ownerRepo = PaymentRepository(tokenStore: InMemoryTokenStore(ownerToken));
+    final order = await ownerRepo.createOrder('pro-monthly', idempotencyKey: 'own-${DateTime.now().microsecondsSinceEpoch}');
+
+    // `repo` here is the setUp attacker's session — verifying owner's order must fail
+    expect(
+      () => repo.verifyPurchase(orderId: order.orderId, receipt: {'productId': order.storeProductId}),
+      throwsA(isA<PaymentApiException>()),
+    );
+  });
 }

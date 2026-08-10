@@ -2,6 +2,9 @@ import 'payment_models.dart';
 import 'payment_provider.dart';
 
 class MockPaymentProvider implements PaymentProvider {
+  /// When true, the next/ongoing purchases produce a fail receipt the server
+  /// rejects (verifies as a failed order). This is the sandbox failure mode.
+  bool failPurchases = false;
   final Set<String> _owned = {};
 
   @override
@@ -15,9 +18,9 @@ class MockPaymentProvider implements PaymentProvider {
   }
 
   @override
-  Future<PurchaseResult> purchase(String storeProductId, {bool fail = false}) async {
-    final receipt = <String, Object?>{'productId': storeProductId, if (fail) 'fail': true};
-    if (!fail) _owned.add(storeProductId);
+  Future<PurchaseResult> purchase(String storeProductId) async {
+    final receipt = <String, Object?>{'productId': storeProductId, if (failPurchases) 'fail': true};
+    if (!failPurchases) _owned.add(storeProductId);
     return PurchaseResult(storeProductId: storeProductId, receipt: receipt);
   }
 

@@ -9,9 +9,9 @@ void main() {
     expect((result.receipt as Map)['productId'], 'com.x.pro');
   });
 
-  test('purchase with fail:true yields a fail receipt', () async {
-    final provider = MockPaymentProvider();
-    final result = await provider.purchase('com.x.pro', fail: true);
+  test('failPurchases=true yields a fail receipt', () async {
+    final provider = MockPaymentProvider()..failPurchases = true;
+    final result = await provider.purchase('com.x.pro');
     expect((result.receipt as Map)['fail'], true);
   });
 

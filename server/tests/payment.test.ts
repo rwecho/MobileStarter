@@ -1,10 +1,66 @@
 import assert from 'node:assert/strict';
 import test, { after } from 'node:test';
+type ApiError = { status: number; code: string };
+
+// ALL imports at the top, before any test() — avoids node:test firing after() early.
 const { database } = await import('../src/server/database.ts');
 const { defaultConfig } = await import('../src/domain/config.ts');
 const { runtimeConfigSchema, verifyPurchaseSchema, restorePurchasesSchema } = await import('../src/server/schemas.ts');
-type ApiError = { status: number; code: string };
+const { paymentProvider, storeKeyForPlatform } = await import('../src/server/payment-providers.ts');
+const { issueEntitlements, revokeEntitlementsForOrder, listActiveEntitlements } = await import('../src/server/entitlement-service.ts');
+const {
+  insertPendingOrder, completeOrder, findOrderById, findOrderByReceiptHash,
+  insertWebhookEventIfNew, upsertSubscription, getCurrentSubscription,
+} = await import('../src/server/order-repository.ts');
+const { createOrder, verifyPurchase, restorePurchases } = await import('../src/server/order-service.ts');
+const { runTransaction } = await import('../src/server/database.ts');
+const { applyWebhook } = await import('../src/server/webhook-service.ts');
+const { paymentContractSnapshot } = await import('../src/server/contract-snapshot.ts');
+
 after(async () => database.close());
+
+async function makeUser(appId: string): Promise<string> {
+  const id = `u-${process.pid}-${Math.random().toString(36).slice(2, 8)}`;
+  const ts = new Date().toISOString();
+  await database.prepare(
+    `INSERT INTO users(id, app_id, email, password_hash, username, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+  ).run(id, appId, `t-${id}@test.local`, 'hash', id, ts, ts);
+  return id;
+}
+
+async function makeOrder(orderId: string, userId: string): Promise<string> {
+  const ts = new Date().toISOString();
+  await database.prepare(
+    `INSERT INTO orders(id, user_id, plan_id, tier_id, idempotency_key, status, amount_minor, currency, provider, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).run(orderId, userId, 'pro-monthly', 'pro', `k-${orderId}`, 'success', 1800, 'CNY', 'mock', ts);
+  return orderId;
+}
+
+function configWith(mappedPlan = true) {
+  return {
+    ...defaultConfig,
+    plans: [{
+      id: 'pro-monthly', tierId: 'pro', name: 'Pro', interval: 'month' as const,
+      priceMinor: 1800, currency: 'CNY', provider: 'mock' as const,
+      storeProductMapping: mappedPlan
+        ? { apple: 'com.x.pro', google: 'pro_g', hms: 'pro_h' }
+        : { google: 'pro_g' },
+    }],
+  };
+}
+
+async function seedSucceededOrder(userId: string): Promise<string> {
+  const { orderId } = await createOrder({
+    userId, idempotencyKey: `w-${Math.random().toString(36).slice(2, 8)}`,
+    planId: 'pro-monthly', platform: 'ios', config: configWith(),
+  });
+  return (await verifyPurchase({
+    appId: 'app1', environment: 'development', userId, orderId,
+    receipt: { productId: 'com.x.pro' }, platform: 'ios', config: configWith(),
+  })).id;
+}
 
 test('BillingPlan 支持 storeProductMapping 与 hms provider', () => {
   const plan = {
@@ -20,7 +76,7 @@ test('provider 为 apple/google/hms 但缺对应映射时 schema 拒绝', () => 
   const plan = {
     id: 'bad', tierId: 'pro', name: 'Bad', interval: 'month',
     priceMinor: 100, currency: 'CNY', provider: 'apple' as const,
-    storeProductMapping: { google: 'x' }, // 缺 apple
+    storeProductMapping: { google: 'x' },
   };
   assert.throws(() => runtimeConfigSchema.parse({ ...defaultConfig, plans: [plan] }));
 });
@@ -51,8 +107,6 @@ test('新表与 orders 新列存在', async () => {
     ['expires_at', 'receipt_hash', 'store_transaction_id', 'tier_id']);
 });
 
-const { paymentProvider, storeKeyForPlatform } = await import('../src/server/payment-providers.ts');
-
 test('mock 适配器 verifyReceipt 成功路径', async () => {
   const r = await paymentProvider('mock', 'development').verifyReceipt({
     appId: 'a', userId: 'u', receipt: { productId: 'p' },
@@ -70,10 +124,11 @@ test('mock 适配器 verifyReceipt 失败路径', async () => {
 });
 
 test('未配置渠道 verifyReceipt 抛 503，parseWebhook 抛 401', async () => {
-  await assert.rejects(
-    () => paymentProvider('apple', 'development').verifyReceipt({ appId: 'a', userId: 'u', receipt: {} }),
-    (err: ApiError) => err.status === 503 && err.code === 'PAYMENT_PROVIDER_NOT_CONFIGURED',
-  );
+  // Apple adapter now exists (StoreKit2 JWS verification); without a JWS string
+  // receipt it short-circuits to { ok: false } rather than throwing. Real Apple
+  // crypto coverage lives in payment-apple.test.ts.
+  const apple = await paymentProvider('apple', 'development').verifyReceipt({ appId: 'a', userId: 'u', receipt: {} });
+  assert.equal(apple.ok, false);
   await assert.rejects(
     () => paymentProvider('google', 'development').parseWebhook(Buffer.from('{}'), {}),
     (err: ApiError) => err.status === 401 && err.code === 'WEBHOOK_SIGNATURE_INVALID',
@@ -94,28 +149,6 @@ test('platform → storeKey 解析', () => {
   assert.equal(storeKeyForPlatform('web'), undefined);
 });
 
-const { issueEntitlements, revokeEntitlementsForOrder, listActiveEntitlements } =
-  await import('../src/server/entitlement-service.ts');
-
-async function makeUser(appId: string): Promise<string> {
-  const id = `u-${process.pid}-${Math.random().toString(36).slice(2, 8)}`;
-  const ts = new Date().toISOString();
-  await database.prepare(
-    `INSERT INTO users(id, app_id, email, password_hash, username, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
-  ).run(id, appId, `t-${id}@test.local`, 'hash', id, ts, ts);
-  return id;
-}
-
-async function makeOrder(orderId: string, userId: string): Promise<string> {
-  const ts = new Date().toISOString();
-  await database.prepare(
-    `INSERT INTO orders(id, user_id, plan_id, tier_id, idempotency_key, status, amount_minor, currency, provider, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-  ).run(orderId, userId, 'pro-monthly', 'pro', `k-${orderId}`, 'success', 1800, 'CNY', 'mock', ts);
-  return orderId;
-}
-
 test('issueEntitlements 按 tier 发放权益且幂等', async () => {
   const userId = await makeUser('app1');
   await makeOrder('o1', userId);
@@ -135,11 +168,6 @@ test('revokeEntitlementsForOrder 撤销该订单权益', async () => {
   const keys = await listActiveEntitlements(userId, 'app1');
   assert.equal(keys.length, 0);
 });
-
-const {
-  insertPendingOrder, completeOrder, findOrderById, findOrderByReceiptHash,
-  insertWebhookEventIfNew, upsertSubscription, getCurrentSubscription,
-} = await import('../src/server/order-repository.ts');
 
 test('insertPendingOrder 创建 pending 订单', async () => {
   const userId = await makeUser('app1');
@@ -189,21 +217,6 @@ test('upsertSubscription 同 plan 幂等更新', async () => {
   assert.ok(sub);
   assert.equal(sub!.current_order_id, 'sub2');
 });
-
-const { createOrder, verifyPurchase, restorePurchases } = await import('../src/server/order-service.ts');
-
-function configWith(mappedPlan = true) {
-  return {
-    ...defaultConfig,
-    plans: [{
-      id: 'pro-monthly', tierId: 'pro', name: 'Pro', interval: 'month' as const,
-      priceMinor: 1800, currency: 'CNY', provider: 'mock' as const,
-      storeProductMapping: mappedPlan
-        ? { apple: 'com.x.pro', google: 'pro_g', hms: 'pro_h' }
-        : { google: 'pro_g' },
-    }],
-  };
-}
 
 test('createOrder 返回 pending + storeProductId，且幂等', async () => {
   const userId = await makeUser('app1');
@@ -266,13 +279,9 @@ test('verifyPurchase 拒绝跨用户订单（ORDER_NOT_FOUND，不泄露存在�
   assert.equal((await listActiveEntitlements(attacker, 'app1')).length, 0);
 });
 
-const { runTransaction } = await import('../src/server/database.ts');
-
 test('嵌套事务中内层写入随外层回滚而回滚（原子性）', async () => {
   await assert.rejects(
     () => runTransaction(async () => {
-      // insertWebhookEventIfNew itself calls runTransaction → this is a NESTED call.
-      // Its write must live in the SAME outer transaction, so an outer failure rolls it back.
       const inserted = await insertWebhookEventIfNew({ provider: 'mock', eventId: 'sp-atomic', payloadHash: 'p' });
       assert.equal(inserted, true);
       throw new Error('outer fails after nested write');
@@ -284,19 +293,6 @@ test('嵌套事务中内层写入随外层回滚而回滚（原子性）', async
   ).get('mock', 'sp-atomic');
   assert.equal(row, undefined, '嵌套事务的写入必须随外层回滚而消失');
 });
-
-const { applyWebhook } = await import('../src/server/webhook-service.ts');
-
-async function seedSucceededOrder(userId: string): Promise<string> {
-  const { orderId } = await createOrder({
-    userId, idempotencyKey: `w-${Math.random().toString(36).slice(2, 8)}`,
-    planId: 'pro-monthly', platform: 'ios', config: configWith(),
-  });
-  return (await verifyPurchase({
-    appId: 'app1', environment: 'development', userId, orderId,
-    receipt: { productId: 'com.x.pro' }, platform: 'ios', config: configWith(),
-  })).id;
-}
 
 test('同一 webhook 投递 10 次只处理 1 次', async () => {
   const userId = await makeUser('app1');
@@ -316,8 +312,6 @@ test('非 mock 渠道 webhook 在 P-1 返回 401（验签骨架）', async () =>
     (err: ApiError) => err.status === 401 && err.code === 'WEBHOOK_SIGNATURE_INVALID',
   );
 });
-
-const { paymentContractSnapshot } = await import('../src/server/contract-snapshot.ts');
 
 test('契约快照导出 order/verify/restore/membership 的 JSON Schema', () => {
   const snap = paymentContractSnapshot as Record<string, unknown>;

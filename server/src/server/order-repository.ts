@@ -65,6 +65,13 @@ export async function findOrderByReceiptHash(userId: string, receiptHash: string
   return row ? toView(row) : undefined;
 }
 
+export async function findOrderByStoreTransactionId(storeTransactionId: string): Promise<OrderView | undefined> {
+  const row = await database.prepare(
+    `SELECT ${COLUMNS} FROM orders WHERE store_transaction_id = ?`,
+  ).get<OrderRow>(storeTransactionId);
+  return row ? toView(row) : undefined;
+}
+
 type NewPending = Readonly<{
   userId: string;
   planId: string;

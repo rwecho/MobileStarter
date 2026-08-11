@@ -12,6 +12,7 @@
     "test": "node --import ./tests/register.mjs --test --experimental-transform-types tests/core.test.ts tests/auth.test.ts tests/payment.test.ts"
   },
   "dependencies": {
+    "@apple/app-store-server-library": "^3.1.0",
     "@radix-ui/react-avatar": "^1.2.6",
     "@radix-ui/react-dialog": "^1.1.23",
     "@radix-ui/react-dropdown-menu": "^2.1.24",

@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { ClientPlatform } from './client-context';
 import { ApiError } from './http';
+import { appleAdapter } from './apple-adapter';
 
 export type StoreKey = 'apple' | 'google' | 'hms';
 export type PaymentProviderId = 'mock' | 'apple' | 'google' | 'hms' | 'wechat' | 'alipay';
@@ -63,7 +64,7 @@ function unavailable(id: PaymentProviderId): PaymentAdapter {
 
 const adapters = new Map<PaymentProviderId, PaymentAdapter>([
   ['mock', mockAdapter],
-  ['apple', unavailable('apple')],
+  ['apple', appleAdapter],
   ['google', unavailable('google')],
   ['hms', unavailable('hms')],
   ['wechat', unavailable('wechat')],

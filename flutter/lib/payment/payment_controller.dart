@@ -64,8 +64,15 @@ final class PaymentController extends ChangeNotifier {
           : Failure(error.message);
       notifyListeners();
       return false;
-    } catch (_) {
-      purchaseState = const Offline();
+    } catch (e) {
+      // Show the REAL error, not a blanket "network unavailable".
+      // Only map to Offline for actual connection failures.
+      final msg = e.toString();
+      final isNetwork = msg.contains('SocketException') ||
+          msg.contains('Failed host lookup') ||
+          msg.contains('Connection refused') ||
+          msg.contains('HandshakeException');
+      purchaseState = isNetwork ? const Offline() : Failure(msg);
       notifyListeners();
       return false;
     } finally {

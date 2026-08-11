@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../app/app_controller.dart';
 import '../app/app_scope.dart';
+import '../navigation/app_route.dart';
 import '../app/runtime_models.dart';
 import '../design_system/components.dart';
 import '../payment/payment_controller.dart';
@@ -43,7 +44,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     final planId = payment.pendingPlanId ?? '';
     final plan = _findPlan(app, planId);
     return Scaffold(
-      appBar: AppBar(title: const Text('确认订阅')),
+      appBar: AppBar(
+        title: const Text('确认订阅'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => AppScope.of(context).navigate(AppRoute.membership),
+        ),
+      ),
       body: AnimatedBuilder(
         animation: payment,
         builder: (context, _) {

@@ -64,3 +64,5 @@ release/*.zip
 .vscode/
 .DS_Store
 Thumbs.db
+*.google-service-account.json
+.hvigor/

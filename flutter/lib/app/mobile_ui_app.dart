@@ -13,7 +13,6 @@ import '../payment/mock_payment_provider.dart';
 import '../payment/payment_controller.dart';
 import '../payment/payment_repository.dart';
 import '../payment/payment_scope.dart';
-import '../payment/payment_provider.dart';
 import '../payment/token_store.dart';
 import '../support/support_controller.dart';
 import '../support/support_repository.dart';
@@ -38,7 +37,9 @@ class _MobileUiAppState extends State<MobileUiApp> with WidgetsBindingObserver {
     controller = AppController(AppRepository());
     paymentController = PaymentController(
       repository: PaymentRepository(tokenStore: SecureTokenStore()),
-      provider: Platform.isIOS ? IapPaymentProvider() : MockPaymentProvider() as PaymentProvider,
+      provider: (Platform.isIOS || Platform.isAndroid)
+          ? IapPaymentProvider()
+          : MockPaymentProvider(),
       onMembershipChanged: () => controller.initialize(),
     );
     unawaited(_initialize());

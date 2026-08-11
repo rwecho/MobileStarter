@@ -7,8 +7,14 @@ import 'payment_models.dart';
 import 'payment_provider.dart';
 
 /// Real StoreKit / Play Billing provider via the `in_app_purchase` plugin.
-/// On iOS 15+ the plugin uses StoreKit 2; `serverVerificationData` is the
-/// signed transaction JWS that the server (ApplePaymentAdapter) verifies.
+///
+/// **Server-authoritative flow (Apple/Google recommended)**:
+/// - iOS: sends `purchaseID` (transactionIdentifier) → server calls Apple's
+///   App Store Server API `getTransactionInfo` → authoritative verify.
+/// - Android: sends `{productId, purchaseToken}` → server calls Google Play
+///   Developer API → authoritative verify.
+///
+/// On desktop/web this provider should not be used; use MockPaymentProvider.
 class IapPaymentProvider implements PaymentProvider {
   IapPaymentProvider() : _iap = InAppPurchase.instance;
 
@@ -16,7 +22,6 @@ class IapPaymentProvider implements PaymentProvider {
   StreamSubscription<List<PurchaseDetails>>? _sub;
   final Map<String, Completer<PurchaseResult>> _pending = {};
 
-  /// Start listening to the purchase stream. Call once at app init.
   void start() {
     _sub ??= _iap.purchaseStream.listen(_onPurchase);
   }
@@ -31,10 +36,7 @@ class IapPaymentProvider implements PaymentProvider {
       final completer = _pending.remove(p.productID);
       if (p.status == PurchaseStatus.purchased || p.status == PurchaseStatus.restored) {
         _iap.completePurchase(p);
-        completer?.complete(PurchaseResult(
-          storeProductId: p.productID,
-          receipt: p.verificationData.serverVerificationData,
-        ));
+        completer?.complete(_toResult(p));
       } else if (p.status == PurchaseStatus.error || p.status == PurchaseStatus.canceled) {
         completer?.completeError(Exception(p.error?.message ?? 'purchase failed'));
       }
@@ -72,8 +74,6 @@ class IapPaymentProvider implements PaymentProvider {
   @override
   Future<List<PurchaseResult>> restore() async {
     start();
-    // restorePurchases triggers the purchaseStream with restored items.
-    // We collect them via a temporary completer.
     final results = <PurchaseResult>[];
     final completer = Completer<List<PurchaseResult>>();
     late StreamSubscription sub;
@@ -81,10 +81,7 @@ class IapPaymentProvider implements PaymentProvider {
       for (final p in purchases) {
         if (p.status == PurchaseStatus.restored) {
           _iap.completePurchase(p);
-          results.add(PurchaseResult(
-            storeProductId: p.productID,
-            receipt: p.verificationData.serverVerificationData,
-          ));
+          results.add(_toResult(p));
         }
       }
     }, onDone: () {
@@ -92,10 +89,27 @@ class IapPaymentProvider implements PaymentProvider {
       if (!completer.isCompleted) completer.complete(results);
     });
     await _iap.restorePurchases();
-    // Give the stream a moment to deliver, then resolve.
     return completer.future.timeout(const Duration(seconds: 5), onTimeout: () {
       sub.cancel();
       return results;
     });
+  }
+
+  /// Build the platform-specific receipt the server expects.
+  PurchaseResult _toResult(PurchaseDetails p) {
+    Object receipt;
+    if (Platform.isIOS) {
+      // iOS: transactionIdentifier → server calls Apple Server API getTransactionInfo.
+      receipt = p.purchaseID ?? '';
+    } else if (Platform.isAndroid) {
+      // Android: {productId, purchaseToken} → server calls Play Developer API.
+      receipt = <String, dynamic>{
+        'productId': p.productID,
+        'purchaseToken': p.verificationData.serverVerificationData,
+      };
+    } else {
+      receipt = p.purchaseID ?? '';
+    }
+    return PurchaseResult(storeProductId: p.productID, receipt: receipt);
   }
 }

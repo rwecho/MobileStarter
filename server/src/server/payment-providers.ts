@@ -3,6 +3,7 @@ import type { ClientPlatform } from './client-context';
 import { ApiError } from './http';
 import { appleAdapter } from './apple-adapter';
 import { googleAdapter } from './google-adapter';
+import { hmsAdapter } from './hms-adapter';
 
 export type StoreKey = 'apple' | 'google' | 'hms';
 export type PaymentProviderId = 'mock' | 'apple' | 'google' | 'hms' | 'wechat' | 'alipay';
@@ -67,7 +68,7 @@ const adapters = new Map<PaymentProviderId, PaymentAdapter>([
   ['mock', mockAdapter],
   ['apple', appleAdapter],
   ['google', googleAdapter],
-  ['hms', unavailable('hms')],
+  ['hms', hmsAdapter],
   ['wechat', unavailable('wechat')],
   ['alipay', unavailable('alipay')],
 ]);

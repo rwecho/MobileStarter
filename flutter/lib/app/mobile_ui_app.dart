@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -7,10 +8,12 @@ import 'app_controller.dart';
 import 'app_repository.dart';
 import 'app_router.dart';
 import 'app_scope.dart';
+import '../payment/iap_payment_provider.dart';
 import '../payment/mock_payment_provider.dart';
 import '../payment/payment_controller.dart';
 import '../payment/payment_repository.dart';
 import '../payment/payment_scope.dart';
+import '../payment/payment_provider.dart';
 import '../payment/token_store.dart';
 import '../support/support_controller.dart';
 import '../support/support_repository.dart';
@@ -35,7 +38,7 @@ class _MobileUiAppState extends State<MobileUiApp> with WidgetsBindingObserver {
     controller = AppController(AppRepository());
     paymentController = PaymentController(
       repository: PaymentRepository(tokenStore: SecureTokenStore()),
-      provider: MockPaymentProvider(),
+      provider: Platform.isIOS ? IapPaymentProvider() : MockPaymentProvider() as PaymentProvider,
       onMembershipChanged: () => controller.initialize(),
     );
     unawaited(_initialize());

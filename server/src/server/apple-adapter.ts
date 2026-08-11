@@ -1,12 +1,14 @@
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   SignedDataVerifier,
+  AppStoreServerAPIClient,
   Environment,
 } from '@apple/app-store-server-library';
 import type {
   JWSTransactionDecodedPayload,
   ResponseBodyV2DecodedPayload,
+  TransactionInfoResponse,
 } from '@apple/app-store-server-library';
 import { ApiError } from './http';
 import { findOrderByStoreTransactionId } from './order-repository';
@@ -39,6 +41,7 @@ function resolveEnvironment(value: string | undefined): Environment {
 export class AppleAdapter implements PaymentAdapter {
   readonly id: PaymentProviderId = 'apple';
   private verifier: SignedDataVerifier | null = null;
+  private apiClient: AppStoreServerAPIClient | null = null;
 
   private init(): SignedDataVerifier {
     if (this.verifier) return this.verifier;
@@ -58,13 +61,51 @@ export class AppleAdapter implements PaymentAdapter {
     return this.verifier;
   }
 
+  /**
+   * Build an App Store Server API client for authoritative server-side verification.
+   * Uses the issuer key (downloaded from App Store Connect) to call Apple's API directly.
+   * This is the Apple-recommended pattern: the client sends a transactionId, the server
+   * fetches the JWS from Apple and verifies it — never trusting client-sent data.
+   */
+  private initApiClient(): AppStoreServerAPIClient {
+    if (this.apiClient) return this.apiClient;
+    const issuerId = process.env.APPLE_ISSUER_ID;
+    const keyId = process.env.APPLE_KEY_ID;
+    const bundleId = process.env.APPLE_BUNDLE_ID;
+    const keyFile = process.env.APPLE_PRIVATE_KEY_FILE;
+    if (!issuerId || !keyId || !bundleId || !keyFile) {
+      throw new ApiError(503, 'PAYMENT_PROVIDER_NOT_CONFIGURED', 'Apple Server API 尚未配置', true);
+    }
+    const keyPath = join(process.cwd(), keyFile);
+    if (!existsSync(keyPath)) {
+      throw new ApiError(503, 'PAYMENT_PROVIDER_NOT_CONFIGURED', `Apple 私钥文件不存在: ${keyFile}`, true);
+    }
+    const signingKey = readFileSync(keyPath, 'utf8').trim();
+    const environment = resolveEnvironment(process.env.APPLE_ENVIRONMENT ?? 'Sandbox');
+    this.apiClient = new AppStoreServerAPIClient(signingKey, keyId, issuerId, bundleId, environment);
+    return this.apiClient;
+  }
+
   async verifyReceipt(input: Readonly<{
     appId: string; userId: string; orderId?: string; receipt: unknown;
   }>): Promise<VerifyResult> {
     if (typeof input.receipt !== 'string') return { ok: false };
     try {
+      let jws: string;
+      if (input.receipt.startsWith('eyJ')) {
+        // Client sent a JWS directly (StoreKit 2 signed transaction, or test fixture).
+        // Verify it with Apple's root CA — no network call needed.
+        jws = input.receipt;
+      } else {
+        // Client sent a transactionId — Apple's recommended authoritative flow.
+        // Fetch the JWS from Apple's App Store Server API, then verify.
+        const response: TransactionInfoResponse =
+          await this.initApiClient().getTransactionInfo(input.receipt);
+        jws = response.signedTransactionInfo ?? '';
+        if (!jws) return { ok: false };
+      }
       const tx: JWSTransactionDecodedPayload =
-        await this.init().verifyAndDecodeTransaction(input.receipt);
+        await this.init().verifyAndDecodeTransaction(jws);
       const expiresMs = tx.expiresDate;
       return {
         ok: true,

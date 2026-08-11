@@ -1,0 +1,58 @@
+{
+  "identifier" : "D4D5DC2E",
+  "type" : "autoconsumable",
+  "version" : 3,
+  "products" : [
+    {
+      "displayPrice" : "18.00",
+      "familyShareable" : false,
+      "internalID" : "test-pro-monthly",
+      "localizations" : [
+        {
+          "description" : "Pro monthly subscription",
+          "displayName" : "Pro Monthly",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "com.zhongbei.pro.monthly",
+      "referenceName" : "Pro Monthly",
+      "type" : "AutoRenewableSubscription"
+    }
+  ],
+  "settings" : {
+    "_failTransactionsEnabled" : false,
+    "_locale" : "en_US",
+    "_storefront" : "USA",
+    "_storeKitErrors" : [
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Load Products"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Purchase"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Verification"
+      }
+    ]
+  },
+  "subscriptionGroups" : [
+    {
+      "id" : "D4D5DC2E",
+      "localizations" : [
+        {
+          "description" : "Pro Plan",
+          "name" : "Pro Plan",
+          "locale" : "en_US"
+        }
+      ],
+      "name" : "Pro Plan",
+      "productId" : "com.zhongbei.pro.monthly"
+    }
+  ]
+}

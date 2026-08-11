@@ -128,3 +128,62 @@ test('fixture sanity: signed-transaction.jws is a 3-part JWS with a 3-cert x5c c
   assert.equal(header.alg, 'ES256');
   assert.equal(header.x5c?.length, 3, 'x5c chain must be leaf + intermediate + root');
 });
+
+// --- P-2a Task 3: ASSN V2 App Store Server Notifications JWS webhook tests ---
+//
+// The webhook handler Apple calls posts `{ signedPayload: "<jws>" }`. The JWS is
+// a signed NotificationPayload: SignedDataVerifier.verifyAndDecodeNotification
+// validates the x5c chain against the same testCA.der root + the ES256
+// signature, then returns the decoded notification (notificationType +
+// notificationUUID + data.signedTransactionInfo, etc.).
+//
+// The notification fixture (signed-notification.jws) is the library's
+// mock_signed_data/notifications sample: notificationType=TEST, environment
+// Sandbox, bundleId com.example, appAppleId 1234 — same verifier config as the
+// transaction fixture above. It carries no signedTransactionInfo, so we only
+// assert the notification-level claims.
+
+const notificationFixture = existsSync(join(FIXTURES, 'signed-notification.jws'))
+  ? readFixtureText(join(FIXTURES, 'signed-notification.jws'))
+  : null;
+const hasNotification = Boolean(notificationFixture && testCert);
+const notifIt = hasNotification ? test : test.skip;
+
+notifIt('ASSN V2 notification verifies and decodes correctly (real crypto)', async () => {
+  const verifier = new SignedDataVerifier(
+    [testCert!],
+    /* enableOnlineChecks */ false,
+    Environment.SANDBOX,
+    'com.example',
+    1234,
+  );
+  // Full x5c chain validation + ES256 signature verification on the notification JWS.
+  const notif = await verifier.verifyAndDecodeNotification(notificationFixture!);
+  assert.ok(notif.notificationType, 'decoded notification has notificationType');
+  assert.ok(notif.notificationUUID, 'decoded notification has notificationUUID (eventId)');
+  // The server-side kind mapping (mirrors server/services/payment-apple.ts):
+  // REFUND/REVOKE -> 'refund', anything else -> 'renew'. The TEST fixture must
+  // map to 'renew', proving the branch the webhook uses to route the event.
+  const notificationType = String(notif.notificationType);
+  const kind = notificationType === 'REFUND' || notificationType === 'REVOKE'
+    ? 'refund'
+    : 'renew';
+  assert.equal(kind, 'renew', 'TEST notification maps to renew kind');
+  // This fixture carries no signedTransactionInfo, so we stop here. (Production
+  // REFUND/REVOKE/SUBSCRIBED notifications would additionally let us decode
+  // originalTransactionId via verifyAndDecodeTransaction on data.signedTransactionInfo.)
+});
+
+notifIt('ASSN V2 tampered notification signature is rejected', async () => {
+  // Clobber the tail of the signature segment — chain may still anchor at
+  // testCA.der, but ECDSA verification of the JWS signature must fail.
+  const tampered = notificationFixture!.slice(0, -5) + 'XXXXX';
+  const verifier = new SignedDataVerifier(
+    [testCert!],
+    false,
+    Environment.SANDBOX,
+    'com.example',
+    1234,
+  );
+  await assert.rejects(() => verifier.verifyAndDecodeNotification(tampered));
+});

@@ -1,6 +1,5 @@
 import 'dart:async';
-import 'dart:io';
-
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:go_router/go_router.dart';
@@ -39,7 +38,12 @@ class _MobileUiAppState extends State<MobileUiApp> with WidgetsBindingObserver {
     controller = AppController(AppRepository());
     paymentController = PaymentController(
       repository: PaymentRepository(tokenStore: SecureTokenStore()),
-      provider: (Platform.isIOS || Platform.isAndroid)
+      // dart:io Platform is unsupported on web (throws on _operatingSystem);
+      // use kIsWeb + defaultTargetPlatform. IAP (in_app_purchase) has no web
+      // support, so web always uses the mock provider.
+      provider: (!kIsWeb &&
+              (defaultTargetPlatform == TargetPlatform.iOS ||
+                  defaultTargetPlatform == TargetPlatform.android))
           ? IapPaymentProvider()
           : MockPaymentProvider(),
       onMembershipChanged: () => controller.initialize(),

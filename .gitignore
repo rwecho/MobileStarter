@@ -66,3 +66,6 @@ release/*.zip
 Thumbs.db
 *.google-service-account.json
 .hvigor/
+
+# superpowers git worktrees
+.worktrees/

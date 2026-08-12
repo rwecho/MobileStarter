@@ -24,6 +24,7 @@ import {
   OrderView,
   PhoneCodeInput,
   PhoneVerifyInput,
+  PurchaseReceipt,
   parseOrderStatus,
   ReferralView,
   SessionView,
@@ -223,7 +224,7 @@ export class ApiClient {
     )
   }
 
-  verifyPurchase(orderId: string | null, receipt: Record<string, string | boolean | null>):
+  verifyPurchase(orderId: string | null, receipt: PurchaseReceipt):
     Promise<OrderView> {
     const body: VerifyPurchaseBody = { receipt }
     if (orderId != null) body.orderId = orderId
@@ -241,7 +242,7 @@ export class ApiClient {
     }))
   }
 
-  restorePurchases(receipts: Record<string, string | boolean | null>[]): Promise<string[]> {
+  restorePurchases(receipts: PurchaseReceipt[]): Promise<string[]> {
     const body: RestorePurchasesBody = { receipts }
     return this.request<Record<string, string[]>>(
       '/api/v1/purchases/restore', http.RequestMethod.POST, body

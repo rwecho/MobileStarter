@@ -6,45 +6,78 @@
  *
  * On HarmonyOS every device has HMS Core, so this is the production provider.
  * Use MockPaymentProvider for dev/testing.
+ *
+ * API notes (IAPKit @hms.core.iap, API 18):
+ *  - queryProducts(context, productIds: string[]): Promise<Array<Product>>
+ *  - purchase(context, { productId, productType, ... }): Promise<PurchaseResult>
+ *  - queryOwnedPurchases(context, { productType }): Promise<QueryPurchasesResult>
+ *  - PurchaseResult.inAppPurchaseData is a JSON string carrying purchaseToken.
  */
+import common from '@ohos.app.ability.common'
 import { iap } from '@kit.IAPKit'
 import { PurchaseResult, StoreProduct, StoreProductMapping } from '../domain/Models'
 import { PaymentProvider } from './PaymentProvider'
 
 export class HMSIapProvider implements PaymentProvider {
+  private context: common.UIAbilityContext
+  // Subscriptions are auto-renewable on this app; overridable if a plan maps a
+  // consumable / non-consumable product.
+  private productType: iap.ProductType = iap.ProductType.AUTORENEWABLE
+
+  constructor(context: common.UIAbilityContext) {
+    this.context = context
+  }
+
   loadProducts(mapping: StoreProductMapping | null): Promise<StoreProduct[]> {
     if (mapping == null || mapping.hms == null || mapping.hms.length === 0) {
       return Promise.resolve([])
     }
-    return iap.queryProducts({ productIds: [mapping.hms] })
-      .then((result: iap.ProductInfoResponse) => {
-        const products: StoreProduct[] = []
-        for (const info of result.productInfo) {
-          products.push({ storeProductId: info.productId })
+    return iap.queryProducts(this.context, [mapping.hms])
+      .then((products: iap.Product[]) => {
+        const result: StoreProduct[] = []
+        for (const p of products) {
+          result.push({ storeProductId: p.id })
         }
-        return products
+        return result
       })
   }
 
   purchase(storeProductId: string): Promise<PurchaseResult> {
-    return iap.requestPurchase({ productId: storeProductId })
-      .then((result: iap.PurchaseResult) => {
-        const receipt: Record<string, string | boolean | null> = { purchaseToken: result.purchaseToken }
-        return { storeProductId, receipt }
+    return iap.purchase(this.context, {
+      productId: storeProductId,
+      productType: this.productType
+    })
+      .then((result: iap.PurchaseResult): PurchaseResult => {
+        // HMS receipt for the server adapter is the purchaseToken string
+        // (hms-adapter.ts asserts typeof receipt === 'string').
+        const purchaseToken = this.extractPurchaseToken(result.inAppPurchaseData)
+        return { storeProductId, receipt: purchaseToken }
       })
   }
 
   restore(): Promise<PurchaseResult[]> {
-    return iap.getAvailablePurchases()
-      .then((owned: iap.OwnedPurchasesResult) => {
+    return iap.queryOwnedPurchases(this.context, {
+      productType: this.productType
+    })
+      .then((owned: iap.QueryPurchasesResult) => {
         const results: PurchaseResult[] = []
-        if (owned.record) {
-          for (const item of owned.record) {
-            const receipt: Record<string, string | boolean | null> = { purchaseToken: item.purchaseToken }
-            results.push({ storeProductId: item.productId, receipt })
-          }
+        const productList = owned.productList ?? []
+        const dataList = owned.inAppPurchaseDataList ?? []
+        for (let i = 0; i < productList.length; i++) {
+          const token = this.extractPurchaseToken(dataList[i] ?? '')
+          results.push({ storeProductId: productList[i], receipt: token })
         }
         return results
       })
+  }
+
+  private extractPurchaseToken(inAppPurchaseData: string): string {
+    try {
+      const data = JSON.parse(inAppPurchaseData) as Record<string, string>
+      return data['purchaseToken'] ?? ''
+    } catch {
+      // Fall back to the raw payload — some SDK versions return the token directly.
+      return inAppPurchaseData
+    }
   }
 }

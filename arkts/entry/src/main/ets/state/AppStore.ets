@@ -6,6 +6,8 @@ import { AppUser, AuthPayload, OrderStatus, OrderView, PurchaseStatus, RuntimeCo
   from '../domain/Models'
 import { RemoteDataStore } from './RemoteDataStore'
 import { MockPaymentProvider } from '../payment/MockPaymentProvider'
+import { HMSIapProvider } from '../payment/HMSIapProvider'
+import { PaymentProvider } from '../payment/PaymentProvider'
 import { AppRoute, routeName, routeByName } from '../navigation/AppRoute'
 import { telemetry, TelemetryConfig } from '../telemetry/Telemetry'
 import { AppTelemetrySink } from '../telemetry/AppTelemetrySink'
@@ -79,6 +81,9 @@ export class AppStore {
   purchaseOrder: OrderView | null = null
   purchaseMessage: string = ''
   pendingPlanId: string = ''
+  // True on a device with HMS Core + AppGallery Connect product config; drives
+  // the production HMS IAP provider instead of the dev mock.
+  useHmsIap: boolean = false
   remote: RemoteDataStore = new RemoteDataStore()
   private context: common.UIAbilityContext | null = null
   private initialized: boolean = false
@@ -526,7 +531,11 @@ export class AppStore {
       const idempotencyKey: string =
         `ark-${Date.now()}-${Math.random().toString(36).slice(2)}`
       const order = await apiClient.createOrder(planId, idempotencyKey)
-      const provider: MockPaymentProvider = new MockPaymentProvider()
+      // Production uses HMS IAP (server-authoritative). Dev/previewer falls back
+      // to mock — flip `useHmsIap` to true on a device with HMS Core + AGC config.
+      const provider: PaymentProvider = this.useHmsIap && this.context !== null
+        ? new HMSIapProvider(this.context)
+        : new MockPaymentProvider()
       const result = await provider.purchase(order.storeProductId)
       const verified = await apiClient.verifyPurchase(order.orderId, result.receipt)
       this.purchaseOrder = verified

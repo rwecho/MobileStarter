@@ -9,6 +9,7 @@ import {
   FeedbackInput,
   PhoneCodeInput,
   PhoneVerifyInput,
+  PurchaseReceipt,
   SignInInput,
   SignUpInput
 } from '../domain/Models'
@@ -27,12 +28,12 @@ export interface SocialSignInInput {
 }
 
 export interface VerifyPurchaseBody {
-  receipt: Record<string, string | boolean | null>
+  receipt: PurchaseReceipt
   orderId?: string
 }
 
 export interface RestorePurchasesBody {
-  receipts: Record<string, string | boolean | null>[]
+  receipts: PurchaseReceipt[]
 }
 
 export type ApiRequestBody =

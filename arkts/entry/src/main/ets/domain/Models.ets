@@ -282,9 +282,13 @@ export interface StoreProduct {
   title?: string
 }
 
+// Store receipt payload. Apple/HMS send a bare string (transactionId /
+// purchaseToken); Google/mock send a keyed record ({ productId, purchaseToken }).
+export type PurchaseReceipt = Record<string, string | boolean | null> | string
+
 export interface PurchaseResult {
   storeProductId: string
-  receipt: Record<string, string | boolean | null>
+  receipt: PurchaseReceipt
 }
 
 export interface Entitlement {

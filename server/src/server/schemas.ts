@@ -82,7 +82,8 @@ export const passwordSchema = z.object({
 
 export const settingsSchema = z.object({
   theme: z.enum(['system', 'light', 'dark']).optional(),
-  language: z.enum(['zh-CN', 'en-US']).optional(),
+  // 语言是开放集（BCP47 语言标签，如 zh-CN/en-US/ms-MY/ar-SA），不锁死中英。
+  language: z.string().min(2).max(20).optional(),
   textScale: z.number().min(0.85).max(1.3).optional(),
   notificationsEnabled: z.boolean().optional(),
   marketingEnabled: z.boolean().optional(),

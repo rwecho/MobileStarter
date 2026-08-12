@@ -6,7 +6,7 @@ import { AppUser, AuthPayload, OrderStatus, OrderView, PurchaseStatus, RuntimeCo
   from '../domain/Models'
 import { RemoteDataStore } from './RemoteDataStore'
 import { MockPaymentProvider } from '../payment/MockPaymentProvider'
-import { AppRoute } from '../navigation/AppRoute'
+import { AppRoute, routeName, routeByName } from '../navigation/AppRoute'
 import { telemetry, TelemetryConfig } from '../telemetry/Telemetry'
 import { AppTelemetrySink } from '../telemetry/AppTelemetrySink'
 import { guardRoute } from '../navigation/RouteGuard'
@@ -54,7 +54,8 @@ export class AppStore {
     'support.newTicket': AppRoute.NewSupportTicket
   }
 
-  routeStack: AppRoute[] = [AppRoute.Logo]
+  navStack: NavPathStack = new NavPathStack()
+  currentRoute: AppRoute = AppRoute.Logo
   signedIn: boolean = false
   online: boolean = true
   // bootstrapped：初始 bootstrap 是否完成（成功或失败）；品牌闪屏据此判断"配置拉取完成"。
@@ -83,6 +84,12 @@ export class AppStore {
   private initialized: boolean = false
   private queuedEntryName: string | null = null
   private queuedEntryCold: boolean = false
+
+  constructor() {
+    // Seed the nav stack with the splash route so Navigation renders SplashPage
+    // immediately (before bootstrap). pushPath on a detached NavPathStack is safe.
+    this.navStack.pushPath({ name: routeName(AppRoute.Logo) })
+  }
 
   async initialize(context: common.UIAbilityContext): Promise<void> {
     this.context = context
@@ -163,18 +170,19 @@ export class AppStore {
   }
 
   get route(): AppRoute {
-    return this.routeStack[this.routeStack.length - 1]
+    return this.currentRoute
   }
 
   get canGoBack(): boolean {
-    return this.routeStack.length > 1
+    return this.navStack.size() > 1
   }
 
   navigate(route: AppRoute): void {
     const decision = guardRoute(route, this.signedIn, this.config)
     if (decision.pending !== null) this.pendingRoute = decision.pending
     if (decision.unavailable) this.showToast('当前 App 未启用此功能')
-    this.routeStack = [...this.routeStack, decision.route]
+    this.navStack.pushPath({ name: routeName(decision.route) })
+    this.currentRoute = decision.route
     telemetry.screen(decision.route.toString())
   }
 
@@ -200,11 +208,16 @@ export class AppStore {
     if (decision.pending !== null) this.pendingRoute = decision.pending
     if (decision.unavailable) this.showToast('当前 App 未启用此功能')
     if (cold) {
-      this.routeStack = decision.route === AppRoute.Home ?
-        [AppRoute.Home] : [AppRoute.Home, decision.route]
-    } else if (this.route !== decision.route) {
-      this.routeStack = [...this.routeStack, decision.route]
+      // Cold start: reset the stack to [Home] (+ target if not Home).
+      this.navStack.clear()
+      this.navStack.pushPath({ name: routeName(AppRoute.Home) })
+      if (decision.route !== AppRoute.Home) {
+        this.navStack.pushPath({ name: routeName(decision.route) })
+      }
+    } else if (this.currentRoute !== decision.route) {
+      this.navStack.pushPath({ name: routeName(decision.route) })
     }
+    this.currentRoute = decision.route
     telemetry.screen(decision.route.toString())
   }
 
@@ -215,17 +228,20 @@ export class AppStore {
   replaceAll(route: AppRoute): void {
     const decision = guardRoute(route, this.signedIn, this.config)
     if (decision.pending !== null) this.pendingRoute = decision.pending
-    this.routeStack = [decision.route]
+    if (decision.unavailable) this.showToast('当前 App 未启用此功能')
+    this.navStack.clear()
+    this.navStack.pushPath({ name: routeName(decision.route) })
+    this.currentRoute = decision.route
     telemetry.screen(decision.route.toString())
   }
 
   replaceTop(route: AppRoute): void {
     const decision = guardRoute(route, this.signedIn, this.config)
     if (decision.pending !== null) this.pendingRoute = decision.pending
-    this.routeStack = [
-      ...this.routeStack.slice(0, this.routeStack.length - 1),
-      decision.route
-    ]
+    if (decision.unavailable) this.showToast('当前 App 未启用此功能')
+    this.navStack.pop()
+    this.navStack.pushPath({ name: routeName(decision.route) })
+    this.currentRoute = decision.route
     telemetry.screen(decision.route.toString())
   }
 
@@ -239,8 +255,11 @@ export class AppStore {
     if (!this.canGoBack) {
       return
     }
-    this.routeStack = this.routeStack.slice(0, this.routeStack.length - 1)
-    telemetry.screen(this.route.toString())
+    this.navStack.pop()
+    const names = this.navStack.getAllPathName()
+    const top = names.length > 0 ? routeByName(names[names.length - 1]) : undefined
+    this.currentRoute = top ?? AppRoute.Home
+    telemetry.screen(this.currentRoute.toString())
   }
 
   async signIn(email: string, password: string): Promise<boolean> {

@@ -74,3 +74,27 @@ export function routeTitle(route: AppRoute): string {
     default: return '功能页面'
   }
 }
+
+// Route enum value (numeric) → string name used as the NavPathStack path name.
+// Order MUST match the AppRoute enum above.
+export const ROUTE_NAMES: string[] = [
+  'Logo', 'Promo', 'Onboarding', 'Home', 'SignIn', 'SignUp', 'PhoneSignIn',
+  'ForgotPassword', 'VerifyEmail', 'ResetPassword', 'Profile', 'ProfileEdit',
+  'Statistics', 'Invite', 'Coupons', 'Membership', 'MembershipPlans', 'Checkout',
+  'Orders', 'Settings', 'AccountSecurity', 'Devices', 'NotificationSettings',
+  'Privacy', 'General', 'Appearance', 'Language', 'TextSize', 'Storage',
+  'Permissions', 'HelpFeedback', 'Legal', 'TermsOfService', 'PrivacyPolicy',
+  'About', 'DeleteAccount', 'NotificationCenter', 'StateGallery', 'SupportTicket',
+  'NewSupportTicket', 'ProductFeedback'
+]
+
+export function routeName(route: AppRoute): string {
+  return ROUTE_NAMES[route]
+}
+
+// Canonical-name lookup (does NOT cover deep-link aliases — those stay in
+// AppStore.ROUTE_BY_NAME). Used to resolve the NavPathStack top back to a route.
+export function routeByName(name: string): AppRoute | undefined {
+  const idx = ROUTE_NAMES.indexOf(name)
+  return idx >= 0 ? idx as AppRoute : undefined
+}

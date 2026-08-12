@@ -1,5 +1,5 @@
-﻿import common from '@ohos.app.ability.common'
-import { AppRoute } from '../navigation/AppRoute'
+import common from '@ohos.app.ability.common'
+import { AppRoute, routeByName } from '../navigation/AppRoute'
 import { EntryIntent, entryIntentInbox } from '../navigation/EntryIntent'
 import { AppStore } from '../state/AppStore'
 import { AppColors, AppRadii, AppSpacing } from '../theme/AppTokens'
@@ -45,125 +45,102 @@ struct Index {
     this.store.resume()
   }
 
+  private routeFromName(name: string): AppRoute {
+    return routeByName(name) ?? AppRoute.Home
+  }
+
+  // NavPathStack destination map: each route name → its page, wrapped in a
+  // NavDestination so HarmonyOS keeps the source page alive on push (issue #2).
+  @Builder
+  pageMap(name: string) {
+    NavDestination() {
+      if (name === 'Logo' || name === 'Promo') {
+        SplashPage({ store: this.store })
+      } else if (name === 'Onboarding') {
+        OnboardingPage({ store: this.store })
+      } else if (name === 'Home') {
+        HomePage({ store: this.store })
+      } else if (name === 'SignIn') {
+        AuthPage({ store: this.store, mode: AuthMode.SignIn })
+      } else if (name === 'SignUp') {
+        AuthPage({ store: this.store, mode: AuthMode.SignUp })
+      } else if (name === 'PhoneSignIn') {
+        AuthPage({ store: this.store, mode: AuthMode.Phone })
+      } else if (name === 'ForgotPassword') {
+        AuthPage({ store: this.store, mode: AuthMode.Forgot })
+      } else if (name === 'VerifyEmail') {
+        AuthPage({ store: this.store, mode: AuthMode.Verify })
+      } else if (name === 'ResetPassword') {
+        AuthPage({ store: this.store, mode: AuthMode.Reset })
+      } else if (name === 'Profile') {
+        ProfilePage({ store: this.store })
+      } else if (name === 'ProfileEdit') {
+        ProfileEditPage({ store: this.store })
+      } else if (name === 'Statistics') {
+        StatisticsPage({ store: this.store, remote: this.store.remote })
+      } else if (name === 'Invite') {
+        InvitePage({ store: this.store, remote: this.store.remote })
+      } else if (name === 'Coupons') {
+        CouponsPage({ store: this.store, remote: this.store.remote })
+      } else if (name === 'Membership' || name === 'MembershipPlans') {
+        MembershipPage({ store: this.store })
+      } else if (name === 'Checkout') {
+        CheckoutPage({ store: this.store })
+      } else if (name === 'Orders') {
+        OrdersPage({ store: this.store, remote: this.store.remote })
+      } else if (name === 'Settings') {
+        SettingsPage({ store: this.store })
+      } else if (name === 'AccountSecurity') {
+        AccountSecurityPage({ store: this.store })
+      } else if (name === 'Devices') {
+        SessionsPage({ store: this.store, remote: this.store.remote })
+      } else if (name === 'NotificationCenter') {
+        NotificationPage({ store: this.store, remote: this.store.remote })
+      } else if (name === 'Appearance' || name === 'Language' || name === 'TextSize') {
+        ChoicePreferencePage({ store: this.store, route: this.routeFromName(name) })
+      } else if (name === 'Legal') {
+        LegalPage({ store: this.store })
+      } else if (name === 'TermsOfService') {
+        LegalDocumentPage({ store: this.store, type: 'terms' })
+      } else if (name === 'PrivacyPolicy') {
+        LegalDocumentPage({ store: this.store, type: 'privacy' })
+      } else if (name === 'About') {
+        AboutPage({ store: this.store })
+      } else if (name === 'Storage' || name === 'Permissions') {
+        SettingsUtilityPage({ store: this.store, route: this.routeFromName(name) })
+      } else if (name === 'HelpFeedback') {
+        SupportHomePage({ store: this.store, remote: this.store.remote })
+      } else if (name === 'SupportTicket') {
+        SupportTicketPage({ store: this.store, remote: this.store.remote })
+      } else if (name === 'NewSupportTicket') {
+        NewSupportTicketPage({ store: this.store })
+      } else if (name === 'ProductFeedback') {
+        ProductFeedbackPage({ store: this.store })
+      } else if (name === 'StateGallery') {
+        StateGalleryPage({ store: this.store })
+      } else {
+        SettingDetailPage({ store: this.store, route: this.routeFromName(name) })
+      }
+    }
+    .hideTitleBar(true)
+    .onBackPressed(() => {
+      this.store.back()
+      return true
+    })
+  }
+
   build() {
     Stack({ alignContent: Alignment.Bottom }) {
-      RouteHost({ store: this.store })
+      Navigation(this.store.navStack) {
+      }
+      .navDestination(this.pageMap)
+      .hideTitleBar(true)
+      .mode(NavigationMode.Stack)
       if (this.store.toastMessage.length > 0) {
         ToastHost({ store: this.store })
       }
     }
     .width('100%').height('100%').backgroundColor(AppColors.background)
-  }
-}
-
-@Component
-struct RouteHost {
-  @ObjectLink store: AppStore
-  build() {
-    if (this.store.route <= AppRoute.ResetPassword) {
-      LaunchAuthHost({ store: this.store })
-    } else if (this.store.route <= AppRoute.Orders) {
-      ProfileHost({ store: this.store })
-    } else {
-      SettingsHost({ store: this.store })
-    }
-  }
-}
-
-@Component
-struct LaunchAuthHost {
-  @ObjectLink store: AppStore
-  build() {
-    if (this.store.route === AppRoute.Logo) {
-      SplashPage({ store: this.store })
-    } else if (this.store.route === AppRoute.Promo) {
-      SplashPage({ store: this.store })
-    } else if (this.store.route === AppRoute.Onboarding) {
-      OnboardingPage({ store: this.store })
-    } else if (this.store.route === AppRoute.Home) {
-      HomePage({ store: this.store })
-    } else {
-      AuthPage({ store: this.store, mode: this.authMode() })
-    }
-  }
-
-  private authMode(): AuthMode {
-    if (this.store.route === AppRoute.SignUp) return AuthMode.SignUp
-    if (this.store.route === AppRoute.PhoneSignIn) return AuthMode.Phone
-    if (this.store.route === AppRoute.ForgotPassword) return AuthMode.Forgot
-    if (this.store.route === AppRoute.VerifyEmail) return AuthMode.Verify
-    if (this.store.route === AppRoute.ResetPassword) return AuthMode.Reset
-    return AuthMode.SignIn
-  }
-}
-
-@Component
-struct ProfileHost {
-  @ObjectLink store: AppStore
-  build() {
-    if (this.store.route === AppRoute.Profile) {
-      ProfilePage({ store: this.store })
-    } else if (this.store.route === AppRoute.ProfileEdit) {
-      ProfileEditPage({ store: this.store })
-    } else if (this.store.route === AppRoute.Statistics) {
-      StatisticsPage({ store: this.store, remote: this.store.remote })
-    } else if (this.store.route === AppRoute.Invite) {
-      InvitePage({ store: this.store, remote: this.store.remote })
-    } else if (this.store.route === AppRoute.Coupons) {
-      CouponsPage({ store: this.store, remote: this.store.remote })
-    } else if (this.store.route === AppRoute.Orders) {
-      OrdersPage({ store: this.store, remote: this.store.remote })
-    } else if (this.store.route === AppRoute.Checkout) {
-      CheckoutPage({ store: this.store })
-    } else {
-      MembershipPage({ store: this.store })
-    }
-  }
-}
-
-@Component
-struct SettingsHost {
-  @ObjectLink store: AppStore
-  build() {
-    if (this.store.route === AppRoute.Settings) {
-      SettingsPage({ store: this.store })
-    } else if (this.store.route === AppRoute.Devices) {
-      SessionsPage({ store: this.store, remote: this.store.remote })
-    } else if (this.store.route === AppRoute.NotificationCenter) {
-      NotificationPage({ store: this.store, remote: this.store.remote })
-    } else if (this.store.route === AppRoute.AccountSecurity) {
-      AccountSecurityPage({ store: this.store })
-    } else if (this.isChoiceRoute()) {
-      ChoicePreferencePage({ store: this.store, route: this.store.route })
-    } else if (this.store.route === AppRoute.Legal) {
-      LegalPage({ store: this.store })
-    } else if (this.store.route === AppRoute.TermsOfService) {
-      LegalDocumentPage({ store: this.store, type: 'terms' })
-    } else if (this.store.route === AppRoute.PrivacyPolicy) {
-      LegalDocumentPage({ store: this.store, type: 'privacy' })
-    } else if (this.store.route === AppRoute.About) {
-      AboutPage({ store: this.store })
-    } else if (this.store.route === AppRoute.Storage ||
-      this.store.route === AppRoute.Permissions) {
-      SettingsUtilityPage({ store: this.store, route: this.store.route })
-    } else if (this.store.route === AppRoute.HelpFeedback) {
-      SupportHomePage({ store: this.store, remote: this.store.remote })
-    } else if (this.store.route === AppRoute.SupportTicket) {
-      SupportTicketPage({ store: this.store, remote: this.store.remote })
-    } else if (this.store.route === AppRoute.NewSupportTicket) {
-      NewSupportTicketPage({ store: this.store })
-    } else if (this.store.route === AppRoute.ProductFeedback) {
-      ProductFeedbackPage({ store: this.store })
-    } else if (this.store.route === AppRoute.StateGallery) {
-      StateGalleryPage({ store: this.store })
-    } else {
-      SettingDetailPage({ store: this.store, route: this.store.route })
-    }
-  }
-
-  private isChoiceRoute(): boolean {
-    return this.store.route === AppRoute.Appearance ||
-      this.store.route === AppRoute.Language || this.store.route === AppRoute.TextSize
   }
 }
 
@@ -184,4 +161,3 @@ struct ToastHost {
     .shadow({ radius: 16, color: '#26000000', offsetY: 4 })
   }
 }
-

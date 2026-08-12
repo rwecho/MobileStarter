@@ -231,24 +231,33 @@ GoRouter buildAppRouter(
         builder: (context, state, navigationShell) =>
             ShellScaffold(navigationShell: navigationShell),
         branches: [
-          StatefulShellBranch(routes: [
-            GoRoute(
-              path: pathFor(AppRoute.home),
-              builder: (context, state) => const HomeScreen(),
-            ),
-          ]),
-          StatefulShellBranch(routes: [
-            GoRoute(
-              path: pathFor(AppRoute.membership),
-              builder: (context, state) => const MembershipScreen(),
-            ),
-          ]),
-          StatefulShellBranch(routes: [
-            GoRoute(
-              path: pathFor(AppRoute.profile),
-              builder: (context, state) => const ProfileScreen(),
-            ),
-          ]),
+          StatefulShellBranch(
+            observers: [routeObserver],
+            routes: [
+              GoRoute(
+                path: pathFor(AppRoute.home),
+                builder: (context, state) => const HomeScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            observers: [routeObserver],
+            routes: [
+              GoRoute(
+                path: pathFor(AppRoute.membership),
+                builder: (context, state) => const MembershipScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            observers: [routeObserver],
+            routes: [
+              GoRoute(
+                path: pathFor(AppRoute.profile),
+                builder: (context, state) => const ProfileScreen(),
+              ),
+            ],
+          ),
         ],
       ),
     ],

@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
@@ -11,6 +12,7 @@ import 'package:mobilestarter_flutter/app/app_controller.dart';
 import 'package:mobilestarter_flutter/app/app_repository.dart';
 import 'package:mobilestarter_flutter/app/app_scope.dart';
 import 'package:mobilestarter_flutter/navigation/app_route.dart';
+import 'package:mobilestarter_flutter/navigation/app_route_paths.dart';
 import 'package:mobilestarter_flutter/screens/launch_screens.dart';
 import 'package:mobilestarter_flutter/telemetry/telemetry.dart';
 
@@ -35,9 +37,23 @@ void main() {
     // the widget-tree pump below runs in the test's fake-async clock.
     await tester.runAsync(() => controller.initialize());
 
+    final router = GoRouter(
+      initialLocation: pathFor(AppRoute.logo),
+      routes: [
+        GoRoute(
+          path: pathFor(AppRoute.logo),
+          builder: (context, state) => const SplashScreen(),
+        ),
+        GoRoute(
+          path: pathFor(AppRoute.home),
+          builder: (context, state) => const Scaffold(body: Text('home-page')),
+        ),
+      ],
+    );
     await tester.pumpWidget(
-      MaterialApp(
-        home: AppScope(controller: controller, child: const SplashScreen()),
+      AppScope(
+        controller: controller,
+        child: MaterialApp.router(routerConfig: router),
       ),
     );
     // Loading phase shows brand + spinner.
@@ -55,10 +71,10 @@ void main() {
     // Anchored to the top of the screen (SafeArea + Align topRight).
     expect(tester.getTopLeft(capsule).dy, lessThan(150));
 
-    // Skipping advances to home.
+    // Skipping advances to home (go_router navigates to the home route).
     await tester.tap(capsule);
-    await tester.pump();
-    expect(controller.route, AppRoute.home);
+    await tester.pumpAndSettle();
+    expect(find.text('home-page'), findsOneWidget);
   });
 }
 

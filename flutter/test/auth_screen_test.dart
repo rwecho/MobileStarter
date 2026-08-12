@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:mobilestarter_flutter/app/app_controller.dart';
 import 'package:mobilestarter_flutter/app/app_repository.dart';
 import 'package:mobilestarter_flutter/app/app_scope.dart';
 import 'package:mobilestarter_flutter/navigation/app_route.dart';
+import 'package:mobilestarter_flutter/navigation/app_route_paths.dart';
 import 'package:mobilestarter_flutter/screens/auth_screens.dart';
 import 'package:mobilestarter_flutter/telemetry/telemetry.dart';
 
@@ -29,8 +31,10 @@ void main() {
     );
 
     await tester.tap(find.text('用户协议'));
-    expect(controller.route, AppRoute.termsOfService);
-    await tester.pump(const Duration(seconds: 3));
+    await tester.pumpAndSettle();
+    // Tapping the consent link pushes the terms page via go_router; the auth
+    // screen beneath is offstage, so only the terms page's title is found.
+    expect(find.text('用户协议'), findsOneWidget);
   });
 
   testWidgets('sign-in also requires legal consent', (tester) async {
@@ -57,12 +61,32 @@ Future<void> _pumpAuth(
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
-  await tester.pumpWidget(
-    MaterialApp(
-      home: AppScope(
-        controller: controller,
-        child: AuthScreen(mode: mode),
+  final router = GoRouter(
+    initialLocation: '/',
+    routes: [
+      GoRoute(path: '/', builder: (context, state) => AuthScreen(mode: mode)),
+      GoRoute(
+        path: pathFor(AppRoute.termsOfService),
+        builder: (context, state) => const Scaffold(body: Text('用户协议')),
       ),
+      GoRoute(
+        path: pathFor(AppRoute.privacyPolicy),
+        builder: (context, state) => const Scaffold(body: Text('隐私政策')),
+      ),
+      GoRoute(
+        path: pathFor(AppRoute.signUp),
+        builder: (context, state) => const AuthScreen(mode: AuthMode.signUp),
+      ),
+      GoRoute(
+        path: pathFor(AppRoute.forgotPassword),
+        builder: (context, state) => const AuthScreen(mode: AuthMode.forgot),
+      ),
+    ],
+  );
+  await tester.pumpWidget(
+    AppScope(
+      controller: controller,
+      child: MaterialApp.router(routerConfig: router),
     ),
   );
   await tester.pump();

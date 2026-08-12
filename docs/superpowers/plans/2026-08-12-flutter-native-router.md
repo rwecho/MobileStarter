@@ -730,6 +730,10 @@ cd flutter && git add lib/app/mobile_ui_app.dart lib/navigation/app_router_confi
 
 For each `AppScope.of(context).navigate(route)` → `context.push(pathFor(route))`; for `controller.navigate(route)` (when `controller` is from `AppScope.of(context)`) → `context.push(pathFor(route))`.
 
+**Stale-read rule (from Task 5/6 code review):** go_router does NOT re-run the active route page's `build()` when the top-level `AnimatedBuilder` notifies (route Elements are preserved). So any screen that reads `controller.user` / `signedIn` / `config` directly in `build()` and expects it to refresh on notify must switch to self-listening — wrap the state-dependent subtree in `ListenableBuilder(listenable: controller, builder: ...)` (or read inside a `didChangeDependencies`/`ListenableBuilder`). Concretely affected: `profile_screens.dart` (`if (!controller.signedIn) return _SignedOutProfile()`), `home_screen.dart` (user data), settings/checkout screens reading `config` or `user`. The old `MaterialApp.home` contract ("notify → rebuild whole page") is gone.
+
+**`openEntryWarm` shell-branch edge (from the same review):** pushing a shell-branch route (`home`/`membership`/`profile`) would nest a second `ShellScaffold`. Guard it: in `notifications_screen.dart`, if the target is one of the 3 branch roots, use `context.go(pathFor(target))` instead of `push`.
+
 Replacements (per file):
 
 ```dart

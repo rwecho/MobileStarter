@@ -32,6 +32,7 @@ final class AppController extends ChangeNotifier {
   String recoveryEmail = '';
   String resetToken = '';
   AppRoute? _pendingRoute;
+  AppRoute? _authRedirectTarget;
 
   AppRoute get route => _stack.last;
   bool get canGoBack => _stack.length > 1;
@@ -57,6 +58,18 @@ final class AppController extends ChangeNotifier {
   void replaceTop(AppRoute route) => _replaceTop(route);
 
   void completeAuthentication() => _completeAuthentication();
+
+  /// Called by the router redirect when a signed-out user hits a protected
+  /// route; remembers the target so auth screens can resume it after login.
+  void setAuthRedirectTarget(AppRoute route) => _authRedirectTarget = route;
+
+  /// Returns and clears the pre-login target (or null if none) so auth screens
+  /// can `context.go(pathFor(target ?? AppRoute.home))` after a successful sign-in.
+  AppRoute? consumeAuthRedirectTarget() {
+    final target = _authRedirectTarget;
+    _authRedirectTarget = null;
+    return target;
+  }
 
   void back() => _back();
 

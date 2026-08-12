@@ -231,8 +231,12 @@ GoRouter buildAppRouter(
         builder: (context, state, navigationShell) =>
             ShellScaffold(navigationShell: navigationShell),
         branches: [
+          // NOTE: do NOT add a shared NavigatorObserver to branches — a single
+          // observer instance can only attach to ONE navigator (NavigatorState
+          // asserts observer.navigator == null), so sharing it across the root
+          // + 3 branch navigators crashes. Tab-switch telemetry is emitted from
+          // ShellScaffold._goBranch instead.
           StatefulShellBranch(
-            observers: [routeObserver],
             routes: [
               GoRoute(
                 path: pathFor(AppRoute.home),
@@ -241,7 +245,6 @@ GoRouter buildAppRouter(
             ],
           ),
           StatefulShellBranch(
-            observers: [routeObserver],
             routes: [
               GoRoute(
                 path: pathFor(AppRoute.membership),
@@ -250,7 +253,6 @@ GoRouter buildAppRouter(
             ],
           ),
           StatefulShellBranch(
-            observers: [routeObserver],
             routes: [
               GoRoute(
                 path: pathFor(AppRoute.profile),

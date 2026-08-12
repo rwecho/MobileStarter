@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../l10n/localized_text.dart';
 import '../design_system/app_icon.dart';
+import '../telemetry/telemetry.dart';
 
 /// The persistent shell: bottom NavigationBar + the current branch's page.
 /// Each branch in the StatefulShellRoute keeps its own stateful navigator, so
@@ -17,7 +18,13 @@ class ShellScaffold extends StatelessWidget {
       index,
       initialLocation: index == navigationShell.currentIndex,
     );
+    // Tab-switch screen telemetry. A shared NavigatorObserver can't be attached
+    // to both the root and branch navigators (NavigatorState asserts a single
+    // navigator per observer), so we emit here on the branch change.
+    if (_branchPaths.length > index) telemetry.screen(_branchPaths[index]);
   }
+
+  static const _branchPaths = ['/home', '/membership', '/profile'];
 
   @override
   Widget build(BuildContext context) {

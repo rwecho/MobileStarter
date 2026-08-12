@@ -2,13 +2,9 @@ import 'package:flutter/foundation.dart';
 
 import '../auth/social_auth.dart';
 import '../navigation/app_route.dart';
-import '../navigation/route_guard.dart';
 import '../state/async_state.dart';
-import '../telemetry/telemetry.dart';
 import 'app_repository.dart';
 import 'runtime_models.dart';
-
-part 'app_controller_navigation.dart';
 
 final class AppController extends ChangeNotifier {
   AppController(this._repository) {
@@ -16,7 +12,6 @@ final class AppController extends ChangeNotifier {
   }
 
   final AppRepository _repository;
-  final List<AppRoute> _stack = <AppRoute>[AppRoute.logo];
   AsyncState<void> _actionState = const Idle<void>();
   RuntimeConfig? _config;
   AppUser? _user;
@@ -31,11 +26,8 @@ final class AppController extends ChangeNotifier {
   ReferralView? referral;
   String recoveryEmail = '';
   String resetToken = '';
-  AppRoute? _pendingRoute;
   AppRoute? _authRedirectTarget;
 
-  AppRoute get route => _stack.last;
-  bool get canGoBack => _stack.length > 1;
   bool get signedIn => _user != null;
   bool get busy => _actionState is Loading<void>;
   AsyncState<void> get actionState => _actionState;
@@ -48,17 +40,6 @@ final class AppController extends ChangeNotifier {
   bool get online => _online;
   bool get bootstrapped => _bootstrapped;
 
-  void openEntryName(String? name, {required bool cold}) =>
-      _openEntryName(name, cold: cold);
-
-  void navigate(AppRoute route) => _navigate(route);
-
-  void replaceAll(AppRoute route) => _replaceAll(route);
-
-  void replaceTop(AppRoute route) => _replaceTop(route);
-
-  void completeAuthentication() => _completeAuthentication();
-
   /// Called by the router redirect when a signed-out user hits a protected
   /// route; remembers the target so auth screens can resume it after login.
   void setAuthRedirectTarget(AppRoute route) => _authRedirectTarget = route;
@@ -70,10 +51,6 @@ final class AppController extends ChangeNotifier {
     _authRedirectTarget = null;
     return target;
   }
-
-  void back() => _back();
-
-  void _changed() => notifyListeners();
 
   Future<void> initialize() async {
     _actionState = const Loading<void>();
@@ -219,7 +196,10 @@ final class AppController extends ChangeNotifier {
 
   void _handleSessionExpired() {
     _user = null;
-    replaceAll(AppRoute.signIn);
+    // Navigation is now driven by go_router: notifying listeners re-evaluates
+    // the router redirect, which sends a signed-out user on a protected route
+    // back to sign-in (remembering the target via setAuthRedirectTarget).
+    notifyListeners();
   }
 
   Future<bool> loadSessions() async {

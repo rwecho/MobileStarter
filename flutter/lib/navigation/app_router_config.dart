@@ -273,3 +273,7 @@ AppRoute? _routeFor(Uri uri) {
   }
   return null;
 }
+
+/// Warm entry: push a named route onto the current stack (e.g. notification tap).
+void openEntryWarm(GoRouter router, AppRoute target) =>
+    router.push(pathFor(target));

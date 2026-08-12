@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../app/app_scope.dart';
 import '../app/runtime_models.dart';
 import '../design_system/components.dart';
 import '../design_system/feedback.dart';
 import '../navigation/app_route.dart';
+import '../navigation/app_router_config.dart';
 import '../state/async_state.dart';
 import '../theme/app_tokens.dart';
 
@@ -127,7 +129,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     if (!item.read) await controller.markNotificationRead(item.id);
     if (!mounted) return;
     final route = appRouteFromName(item.route);
-    if (route != null) controller.navigate(route);
+    if (route != null) openEntryWarm(GoRouter.of(context), route);
   }
 
   Future<void> _markRead() async {

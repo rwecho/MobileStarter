@@ -22,12 +22,8 @@ import { DataActions, useDataActions } from './useDataActions';
 import {
   Credentials, SocialCredentials, useAccountActions,
 } from './useAccountActions';
-import {
-  ConfirmState,
-  ToastState,
-  useFeedbackState,
-  useNavigationState,
-} from './useAppShellState';
+import { ConfirmState, ToastState, useFeedbackState } from './useAppShellState';
+import { navigationRef, navigateRoute } from '../navigation/navigationRef';
 type ToastTone = 'success' | 'info' | 'error';
 export type { ToastState } from './useAppShellState';
 
@@ -94,7 +90,6 @@ type AppContextValue = Readonly<{
 const AppContext = createContext<AppContextValue | null>(null);
 
 export function AppProvider({ children }: Readonly<{ children: ReactNode }>) {
-  const navigation = useNavigationState();
   const feedback = useFeedbackState();
   const [user, setUser] = useState<AppUser | null>(null);
   const [config, setConfig] = useState<RuntimeConfig>(embeddedConfig);
@@ -130,10 +125,6 @@ export function AppProvider({ children }: Readonly<{ children: ReactNode }>) {
   }, []);
 
   useEffect(() => {
-    telemetry.screen(navigation.route);
-  }, [navigation.route]);
-
-  useEffect(() => {
     // 仅初始那次 bootstrap 完成后置 bootstrapped；轮询/回前台 resume 不改动它，
     // 品牌闪屏据此判断"拉配置完成"。
     void refreshBootstrap().finally(() => setBootstrapped(true));
@@ -160,13 +151,16 @@ export function AppProvider({ children }: Readonly<{ children: ReactNode }>) {
     const decision = guardRoute(route, { signedIn: user !== null, features: config.features });
     if (decision.pending) setPendingRoute(decision.pending);
     if (decision.unavailable) feedback.showToast('当前 App 未启用此功能', 'info');
-    navigation.navigate(decision.route);
-  }, [config.features, feedback, navigation, user]);
+    navigateRoute(decision.route);
+  }, [config.features, feedback, user]);
   const replace = useCallback((route: AppRoute) => {
     const decision = guardRoute(route, { signedIn: user !== null, features: config.features });
     if (decision.pending) setPendingRoute(decision.pending);
-    navigation.replace(decision.route);
-  }, [config.features, navigation, user]);
+    if (navigationRef.isReady()) navigationRef.reset({ routes: [{ name: decision.route }] });
+  }, [config.features, user]);
+  const back = useCallback(() => {
+    if (navigationRef.isReady() && navigationRef.canGoBack()) navigationRef.goBack();
+  }, []);
   const openEntryRoute = useCallback((
     route: AppRoute,
     cold: boolean,
@@ -174,29 +168,39 @@ export function AppProvider({ children }: Readonly<{ children: ReactNode }>) {
   ) => {
     const decision = guardRoute(route, { signedIn: user !== null, features: config.features });
     if (decision.pending) setPendingRoute(decision.pending);
+    if (!navigationRef.isReady()) return;
     if (decision.unavailable) {
       feedback.showToast('目标内容不可用，已返回首页', 'info');
-      navigation.openEntry('home', cold);
+      navigationRef.reset({ routes: [{ name: 'home' }] });
       return;
     }
-    navigation.openEntry(decision.route, cold);
+    if (cold) {
+      navigationRef.reset({
+        routes: decision.route === 'home'
+          ? [{ name: 'home' }]
+          : [{ name: 'home' }, { name: decision.route }],
+      });
+    } else {
+      navigateRoute(decision.route);
+    }
     telemetry.track('entry_open', {
       route,
       source,
       launchState: cold ? 'cold' : 'warm',
     });
-  }, [config.features, feedback, navigation, user]);
+  }, [config.features, feedback, user]);
   const actions = useAccountActions({
     run,
     setUser,
     onAuthenticated: () => {
       setPurchaseState({ kind: 'idle' });
-      navigation.replaceTop(pendingRoute ?? 'home');
+      const target = pendingRoute ?? 'home';
       setPendingRoute(null);
+      if (navigationRef.isReady()) navigationRef.reset({ routes: [{ name: target }] });
     },
     onSignedOut: () => {
       setPurchaseState({ kind: 'idle' });
-      navigation.replace('home');
+      replace('home');
     },
     showToast: feedback.showToast,
   });
@@ -204,15 +208,19 @@ export function AppProvider({ children }: Readonly<{ children: ReactNode }>) {
     registerSessionExpiredHandler(() => {
       setUser(null);
       void clearAuthStorage();
-      navigation.replace('auth.signIn');
+      if (navigationRef.isReady()) {
+        navigationRef.reset({ routes: [{ name: 'auth.signIn' }] });
+      }
     });
     return () => registerSessionExpiredHandler(null);
-  }, [navigation]);
+  }, []);
   const dataActions = useDataActions(run, setUser, user, setPurchaseState);
   const value = useMemo<AppContextValue>(() => ({
-    ...navigation,
+    route: (navigationRef.getCurrentRoute()?.name ?? 'launch.splash') as AppRoute,
+    canGoBack: navigationRef.isReady() && navigationRef.canGoBack(),
     navigate,
     replace,
+    back,
     ...feedback,
     ...actions,
     ...dataActions,
@@ -244,7 +252,7 @@ export function AppProvider({ children }: Readonly<{ children: ReactNode }>) {
     dataActions,
     feedback,
     navigate,
-    navigation,
+    back,
     online,
     openEntryRoute,
     refreshBootstrap,

@@ -12,7 +12,7 @@ class ShellScaffold extends StatelessWidget {
 
   final StatefulNavigationShell navigationShell;
 
-  void _goBranch(BuildContext context, int index) {
+  void _goBranch(int index) {
     navigationShell.goBranch(
       index,
       initialLocation: index == navigationShell.currentIndex,
@@ -25,18 +25,27 @@ class ShellScaffold extends StatelessWidget {
       body: navigationShell,
       bottomNavigationBar: NavigationBar(
         selectedIndex: navigationShell.currentIndex,
-        onDestinationSelected: (index) => _goBranch(context, index),
+        onDestinationSelected: _goBranch,
         destinations: [
           NavigationDestination(
-            icon: const AppIcon(AppIconName.home),
+            icon: AppIcon(
+              AppIconName.home,
+              color: IconTheme.of(context).color,
+            ),
             label: localizedText(context, '首页', 'Home'),
           ),
           NavigationDestination(
-            icon: const AppIcon(AppIconName.crown),
+            icon: AppIcon(
+              AppIconName.crown,
+              color: IconTheme.of(context).color,
+            ),
             label: localizedText(context, '会员', 'Membership'),
           ),
           NavigationDestination(
-            icon: const AppIcon(AppIconName.user),
+            icon: AppIcon(
+              AppIconName.user,
+              color: IconTheme.of(context).color,
+            ),
             label: localizedText(context, '我的', 'Profile'),
           ),
         ],

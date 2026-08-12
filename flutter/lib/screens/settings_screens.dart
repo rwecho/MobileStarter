@@ -30,49 +30,52 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     final controller = AppScope.of(context);
-    return AppPage(
-      title: '设置',
-      child: ListView(
-        padding: const EdgeInsets.all(AppSpacing.x4),
-        children: [
-          AppCard(
-            child: AppListTile(
-              label: controller.user?.username ?? '未登录用户',
-              value: controller.user?.email ?? '登录后同步跨设备设置',
+    return ListenableBuilder(
+      listenable: controller,
+      builder: (context, _) => AppPage(
+        title: '设置',
+        child: ListView(
+          padding: const EdgeInsets.all(AppSpacing.x4),
+          children: [
+            AppCard(
+              child: AppListTile(
+                label: controller.user?.username ?? '未登录用户',
+                value: controller.user?.email ?? '登录后同步跨设备设置',
+              ),
             ),
-          ),
-          const SizedBox(height: AppSpacing.x5),
-          const _SettingsGroup(
-            title: '账户与服务',
-            items: [
-              ('账户与安全', AppRoute.accountSecurity, null),
-              ('登录设备管理', AppRoute.devices, null),
-              ('会员与订阅', AppRoute.membership, null),
-            ],
-          ),
-          _SettingsGroup(
-            title: '应用偏好',
-            items: [
-              ('通知设置', AppRoute.notificationSettings, null),
-              ('通用设置', AppRoute.general, null),
-              ('外观主题', AppRoute.appearance, '跟随系统'),
-              ('语言', AppRoute.language, '简体中文'),
-              ('字体大小', AppRoute.textSize, '标准'),
-            ].where((item) => _visible(controller, item.$2)).toList(),
-          ),
-          _SettingsGroup(
-            title: '隐私、存储与支持',
-            items: [
-              ('隐私设置', AppRoute.privacy, null),
-              ('权限管理', AppRoute.permissions, null),
-              ('存储与缓存', AppRoute.storage, _cacheLabel),
-              ('帮助与反馈', AppRoute.helpFeedback, null),
-              ('协议与政策', AppRoute.legal, null),
-              ('关于与版本', AppRoute.about, '1.0.0'),
-              ('注销账号', AppRoute.deleteAccount, null),
-            ].where((item) => _visible(controller, item.$2)).toList(),
-          ),
-        ],
+            const SizedBox(height: AppSpacing.x5),
+            const _SettingsGroup(
+              title: '账户与服务',
+              items: [
+                ('账户与安全', AppRoute.accountSecurity, null),
+                ('登录设备管理', AppRoute.devices, null),
+                ('会员与订阅', AppRoute.membership, null),
+              ],
+            ),
+            _SettingsGroup(
+              title: '应用偏好',
+              items: [
+                ('通知设置', AppRoute.notificationSettings, null),
+                ('通用设置', AppRoute.general, null),
+                ('外观主题', AppRoute.appearance, '跟随系统'),
+                ('语言', AppRoute.language, '简体中文'),
+                ('字体大小', AppRoute.textSize, '标准'),
+              ].where((item) => _visible(controller, item.$2)).toList(),
+            ),
+            _SettingsGroup(
+              title: '隐私、存储与支持',
+              items: [
+                ('隐私设置', AppRoute.privacy, null),
+                ('权限管理', AppRoute.permissions, null),
+                ('存储与缓存', AppRoute.storage, _cacheLabel),
+                ('帮助与反馈', AppRoute.helpFeedback, null),
+                ('协议与政策', AppRoute.legal, null),
+                ('关于与版本', AppRoute.about, '1.0.0'),
+                ('注销账号', AppRoute.deleteAccount, null),
+              ].where((item) => _visible(controller, item.$2)).toList(),
+            ),
+          ],
+        ),
       ),
     );
   }

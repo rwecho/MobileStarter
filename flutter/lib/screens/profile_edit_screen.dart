@@ -44,54 +44,57 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
   @override
   Widget build(BuildContext context) {
     final controller = AppScope.of(context);
-    return AppPage(
-      title: '个人资料',
-      child: Align(
-        alignment: Alignment.topCenter,
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 640),
-          child: ListView(
-            padding: const EdgeInsets.all(AppSpacing.x4),
-            children: [
-              ProfileIdentityCard(
-                displayName: displayName.text,
-                username: controller.user?.username ?? '',
-                email: controller.user?.email ?? '',
-                bio: bio.text,
-                avatarUrl: avatarUrl,
-                onAvatarTap: _pickAvatar,
-              ),
-              const SizedBox(height: AppSpacing.x3),
-              Text('显示名称', style: Theme.of(context).textTheme.titleMedium),
-              const SizedBox(height: AppSpacing.x2),
-              TextField(
-                controller: displayName,
-                decoration: const InputDecoration(hintText: '请输入显示名称'),
-                maxLength: 40,
-                onChanged: (_) => setState(() {}),
-              ),
-              const SizedBox(height: AppSpacing.x3),
-              Text('个人简介', style: Theme.of(context).textTheme.titleMedium),
-              const SizedBox(height: AppSpacing.x2),
-              TextField(
-                controller: bio,
-                decoration: const InputDecoration(hintText: '介绍一下自己'),
-                maxLength: 160,
-                minLines: 4,
-                maxLines: 6,
-                onChanged: (_) => setState(() {}),
-              ),
-              Text(
-                '用户名不可修改；头像仅在你主动选择后更新。',
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
-              const SizedBox(height: AppSpacing.x4),
-              AppButton(
-                label: controller.busy ? '保存中…' : '保存资料',
-                icon: AppIconName.check,
-                onPressed: _save,
-              ),
-            ],
+    return ListenableBuilder(
+      listenable: controller,
+      builder: (context, _) => AppPage(
+        title: '个人资料',
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 640),
+            child: ListView(
+              padding: const EdgeInsets.all(AppSpacing.x4),
+              children: [
+                ProfileIdentityCard(
+                  displayName: displayName.text,
+                  username: controller.user?.username ?? '',
+                  email: controller.user?.email ?? '',
+                  bio: bio.text,
+                  avatarUrl: avatarUrl,
+                  onAvatarTap: _pickAvatar,
+                ),
+                const SizedBox(height: AppSpacing.x3),
+                Text('显示名称', style: Theme.of(context).textTheme.titleMedium),
+                const SizedBox(height: AppSpacing.x2),
+                TextField(
+                  controller: displayName,
+                  decoration: const InputDecoration(hintText: '请输入显示名称'),
+                  maxLength: 40,
+                  onChanged: (_) => setState(() {}),
+                ),
+                const SizedBox(height: AppSpacing.x3),
+                Text('个人简介', style: Theme.of(context).textTheme.titleMedium),
+                const SizedBox(height: AppSpacing.x2),
+                TextField(
+                  controller: bio,
+                  decoration: const InputDecoration(hintText: '介绍一下自己'),
+                  maxLength: 160,
+                  minLines: 4,
+                  maxLines: 6,
+                  onChanged: (_) => setState(() {}),
+                ),
+                Text(
+                  '用户名不可修改；头像仅在你主动选择后更新。',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+                const SizedBox(height: AppSpacing.x4),
+                AppButton(
+                  label: controller.busy ? '保存中…' : '保存资料',
+                  icon: AppIconName.check,
+                  onPressed: _save,
+                ),
+              ],
+            ),
           ),
         ),
       ),

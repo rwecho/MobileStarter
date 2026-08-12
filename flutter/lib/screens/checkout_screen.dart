@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../app/app_controller.dart';
 import '../app/app_scope.dart';
 import '../navigation/app_route.dart';
+import '../navigation/app_route_paths.dart';
 import '../app/runtime_models.dart';
 import '../design_system/components.dart';
 import '../payment/payment_controller.dart';
@@ -48,7 +50,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         title: const Text('确认订阅'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => AppScope.of(context).navigate(AppRoute.membership),
+          onPressed: () => context.push(pathFor(AppRoute.membership)),
         ),
       ),
       body: AnimatedBuilder(
@@ -118,10 +120,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             const SizedBox(height: 8),
             Text('订阅成功（订单 ${data.id}）', textAlign: TextAlign.center),
             const SizedBox(height: 16),
-            AppButton(
-              label: '完成',
-              onPressed: () => Navigator.of(context).maybePop(),
-            ),
+            AppButton(label: '完成', onPressed: () => context.pop()),
           ],
         ),
         OrderStatus.failed => Column(

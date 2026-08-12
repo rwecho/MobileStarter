@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import '../app/app_scope.dart';
+import 'package:go_router/go_router.dart';
 import '../design_system/components.dart';
 import '../navigation/app_route.dart';
+import '../navigation/app_route_paths.dart';
 import '../support/support_controller.dart';
 import '../support/support_models.dart';
 import '../support/support_scope.dart';
@@ -96,7 +97,7 @@ class _NewSupportTicketScreenState extends State<NewSupportTicketScreen> {
       message: message.text.trim(),
     );
     if (success && mounted) {
-      AppScope.of(context).navigate(AppRoute.supportTicket);
+      context.push(pathFor(AppRoute.supportTicket));
     }
   }
 }
@@ -192,7 +193,7 @@ class _ProductFeedbackScreenState extends State<ProductFeedbackScreen> {
       rating: rating,
       screenshots: screenshots,
     );
-    if (success && mounted) AppScope.of(context).back();
+    if (success && mounted) context.pop();
   }
 }
 

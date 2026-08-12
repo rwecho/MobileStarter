@@ -31,42 +31,45 @@ class _TextSizeScreenState extends State<TextSizeScreen> {
   Widget build(BuildContext context) {
     final controller = AppScope.of(context);
     final options = <double, String>{0.9: '较小', 1: '标准', 1.15: '较大', 1.3: '特大'};
-    return AppPage(
-      title: '字体大小',
-      child: ListView(
-        padding: const EdgeInsets.all(AppSpacing.x4),
-        children: [
-          AppCard(
-            child: Padding(
-              padding: const EdgeInsets.all(AppSpacing.x4),
-              child: Text(
-                '这是当前字体大小的实时预览。',
-                style: TextStyle(fontSize: 16 * scale),
+    return ListenableBuilder(
+      listenable: controller,
+      builder: (context, _) => AppPage(
+        title: '字体大小',
+        child: ListView(
+          padding: const EdgeInsets.all(AppSpacing.x4),
+          children: [
+            AppCard(
+              child: Padding(
+                padding: const EdgeInsets.all(AppSpacing.x4),
+                child: Text(
+                  '这是当前字体大小的实时预览。',
+                  style: TextStyle(fontSize: 16 * scale),
+                ),
               ),
             ),
-          ),
-          const SizedBox(height: AppSpacing.x3),
-          AppCard(
-            child: Column(
-              children: options.entries
-                  .map(
-                    (entry) => ListTile(
-                      title: Text(entry.value),
-                      trailing: scale == entry.key ? const Text('已选择') : null,
-                      onTap: () => setState(() => scale = entry.key),
-                    ),
-                  )
-                  .toList(),
+            const SizedBox(height: AppSpacing.x3),
+            AppCard(
+              child: Column(
+                children: options.entries
+                    .map(
+                      (entry) => ListTile(
+                        title: Text(entry.value),
+                        trailing: scale == entry.key ? const Text('已选择') : null,
+                        onTap: () => setState(() => scale = entry.key),
+                      ),
+                    )
+                    .toList(),
+              ),
             ),
-          ),
-          const SizedBox(height: AppSpacing.x4),
-          AppButton(
-            label: controller.busy ? '保存中…' : '保存字体大小',
-            onPressed: controller.busy || controller.user == null
-                ? null
-                : _save,
-          ),
-        ],
+            const SizedBox(height: AppSpacing.x4),
+            AppButton(
+              label: controller.busy ? '保存中…' : '保存字体大小',
+              onPressed: controller.busy || controller.user == null
+                  ? null
+                  : _save,
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../app/app_scope.dart';
 import '../design_system/app_icon.dart';
 import '../design_system/components.dart';
 import '../design_system/feedback.dart';
 import '../navigation/app_route.dart';
+import '../navigation/app_route_paths.dart';
 import '../theme/app_tokens.dart';
 
 class DeleteAccountScreen extends StatefulWidget {
@@ -59,7 +61,7 @@ class _DeleteAccountScreenState extends State<DeleteAccountScreen> {
     final deleted = await controller.deleteAccount(password.text);
     if (!mounted) return;
     if (deleted) {
-      controller.replaceAll(AppRoute.home);
+      context.go(pathFor(AppRoute.home));
     } else {
       showAppToast(context, controller.consumeError() ?? '删除失败', error: true);
     }

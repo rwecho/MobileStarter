@@ -459,7 +459,79 @@ AppRoute? _routeFor(Uri uri) {
 }
 ```
 
-- [ ] **Step 2: Commit**
+- [ ] **Step 2: Add the remaining flat GoRoutes (required — every AppRoute needs a builder)**
+
+The block above covers the auth/profile/settings/support/legal routes, but 11 AppRoutes still have NO GoRoute (they'd 404 via go_router). Add these GoRoutes (same style as the others, placed before the `StatefulShellRoute`), restoring the imports they need (`sessions_screen.dart`, `preference_screen.dart`, `settings_utility_screen.dart`, `text_size_screen.dart`, plus `membership_screen.dart` if not already imported):
+
+```dart
+      GoRoute(
+        path: pathFor(AppRoute.membershipPlans),
+        builder: (context, state) => const MembershipScreen(),
+      ),
+      GoRoute(
+        path: pathFor(AppRoute.devices),
+        builder: (context, state) => const SessionsScreen(),
+      ),
+      GoRoute(
+        path: pathFor(AppRoute.notificationSettings),
+        builder: (context, state) => const PreferenceScreen(
+          kind: PreferenceKind.notifications,
+          title: '通知设置',
+        ),
+      ),
+      GoRoute(
+        path: pathFor(AppRoute.privacy),
+        builder: (context, state) => const PreferenceScreen(
+          kind: PreferenceKind.privacy,
+          title: '隐私设置',
+        ),
+      ),
+      GoRoute(
+        path: pathFor(AppRoute.general),
+        builder: (context, state) => const PreferenceScreen(
+          kind: PreferenceKind.general,
+          title: '通用设置',
+        ),
+      ),
+      GoRoute(
+        path: pathFor(AppRoute.appearance),
+        builder: (context, state) => const PreferenceScreen(
+          kind: PreferenceKind.appearance,
+          title: '外观主题',
+        ),
+      ),
+      GoRoute(
+        path: pathFor(AppRoute.language),
+        builder: (context, state) => const PreferenceScreen(
+          kind: PreferenceKind.language,
+          title: '语言',
+        ),
+      ),
+      GoRoute(
+        path: pathFor(AppRoute.textSize),
+        builder: (context, state) => const TextSizeScreen(),
+      ),
+      GoRoute(
+        path: pathFor(AppRoute.storage),
+        builder: (context, state) => const SettingsUtilityScreen(
+          kind: SettingsUtilityKind.storage,
+        ),
+      ),
+      GoRoute(
+        path: pathFor(AppRoute.permissions),
+        builder: (context, state) => const SettingsUtilityScreen(
+          kind: SettingsUtilityKind.permissions,
+        ),
+      ),
+      GoRoute(
+        path: pathFor(AppRoute.about),
+        builder: (context, state) => const SettingsUtilityScreen(
+          kind: SettingsUtilityKind.about,
+        ),
+      ),
+```
+
+- [ ] **Step 3: Commit**
 
 ```bash
 cd flutter && git add lib/navigation/app_router_config.dart && git commit -m "feat(flutter): GoRouter config (shell + redirect + observer)"

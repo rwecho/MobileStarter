@@ -554,8 +554,7 @@ In `flutter/lib/app/app_controller.dart`:
 - Delete the `part 'app_controller_navigation.dart';` line (top of file).
 - Delete field `final List<AppRoute> _stack = <AppRoute>[AppRoute.logo];` and `AppRoute? _pendingRoute;`.
 - Delete getters `route`, `canGoBack`.
-- Delete methods `navigate`, `replaceAll`, `replaceTop`, `completeAuthentication`, `back`.
-- Keep `openEntryName` (its body will move to the router layer — see Task 6). Remove the `import '../navigation/app_route.dart';` if now unused; keep `route_guard.dart` only if still referenced.
+- Delete methods `navigate`, `replaceAll`, `replaceTop`, `completeAuthentication`, `back`, and `openEntryName` (its body manipulated `_stack`, which is being removed; URL/entry-intent handling moves to the router layer in Task 6). Keep the `import '../navigation/app_route.dart';` (the auth-redirect methods added in Task 4 use it) and `route_guard.dart` only if still referenced.
 - **Add** the auth-redirect target so the router's `redirect` can remember where a signed-out user was headed, and the auth screens can resume it after login (replaces the old `_pendingRoute` + `completeAuthentication()`). In `flutter/lib/app/app_controller.dart`, add a private field + two methods, keeping `import '../navigation/app_route.dart';`:
 
 ```dart
@@ -604,13 +603,17 @@ class _RouterHost extends StatefulWidget {
 }
 
 class _RouterHostState extends State<_RouterHost> {
-  late final GoRouter _router = buildAppRouter(widget.controller);
+  // routerRefresh: controller — a ChangeNotifier — so the redirect re-evaluates
+  // whenever auth state changes (e.g. after login/sign-out).
+  late final GoRouter _router =
+      buildAppRouter(widget.controller, routerRefresh: widget.controller);
 
   @override
   void didUpdateWidget(_RouterHost oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.controller != widget.controller) {
-      setState(() => _router = buildAppRouter(widget.controller));
+      setState(() =>
+          _router = buildAppRouter(widget.controller, routerRefresh: widget.controller));
     }
   }
 
@@ -625,12 +628,21 @@ class _RouterHostState extends State<_RouterHost> {
       locale: _localeOf(widget.controller),
       supportedLocales: const [Locale('zh', 'CN'), Locale('en', 'US')],
       localizationsDelegates: GlobalMaterialLocalizations.delegates,
+      builder: (context, child) {
+        final mediaQuery = MediaQuery.of(context);
+        return MediaQuery(
+          data: mediaQuery.copyWith(
+            textScaler: TextScaler.linear(_textScaleOf(widget.controller)),
+          ),
+          child: child ?? const SizedBox.shrink(),
+        );
+      },
     );
   }
 }
 ```
 
-> Note: the `builder:` (MediaQuery text-scaler) and `didPushRouteInformation` deep-link handling move into `_RouterHost` (go_router's `routerConfig` already handles deep links via `RouteInformationProvider`; keep `didPushRouteInformation` only if notification deep-links are URL-based — see Task 6).
+> Note: `didPushRouteInformation`/`_routeName` in `_MobileUiAppState` are REMOVED — go_router's own `RouteInformationProvider` handles URL deep links natively (Task 6 re-adds any app-specific entry-intent mapping on top). The `_initialize()` body no longer calls `openEntryName`; the initial deep link is go_router's `initialLocation`. `_themeModeOf`/`_localeOf`/`_textScaleOf` are static helpers already on `_MobileUiAppState` — move them (or leave as-is and reference via the same file).
 
 - [ ] **Step 5: Analyze to catch dangling references**
 

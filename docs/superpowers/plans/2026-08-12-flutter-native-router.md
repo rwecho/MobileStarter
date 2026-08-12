@@ -30,7 +30,7 @@ This plan migrates **only the Flutter client** (`flutter/`). ArkTS and RN are se
 - **Create** `flutter/lib/navigation/shell_scaffold.dart` — `ShellScaffold` widget: `Scaffold` + `NavigationBar` + `StatefulNavigationShell` body (this replaces `primary_navigation.dart`'s inline nav bar usage and owns tab switching).
 - **Create** `flutter/lib/navigation/route_observer.dart` — `AppRouteObserver extends NavigatorObserver` for screen telemetry.
 - **Modify** `flutter/lib/app/mobile_ui_app.dart` — `MaterialApp.router(routerConfig: _router)`; remove `home: AppRouter.screenFor(...)`.
-- **Modify** `flutter/lib/app/app_controller.dart` — remove `_stack`, `route`, `canGoBack`, `navigate`, `replaceAll`, `replaceTop`, `back`, `completeAuthentication`; keep business state + guard-relevant getters (`signedIn`, `config`, `user`).
+- **Modify** `flutter/lib/app/app_controller.dart` — remove `_stack`, `route`, `canGoBack`, `navigate`, `replaceAll`, `replaceTop`, `back`, `completeAuthentication`; keep business state + guard-relevant getters (`signedIn`, `config`, `user`); add `setAuthRedirectTarget`/`consumeAuthRedirectTarget` for the router's auth-redirect resume.
 - **Delete** `flutter/lib/app/app_controller_navigation.dart` — fake-stack extension.
 - **Delete** `flutter/lib/app/app_router.dart` — switch renderer.
 - **Modify** 12 screens + `design_system/components.dart` — `navigate(...)` → `context.push(...)`; `replaceAll(...)` → `context.go(...)`; `back()` → `context.pop()`.
@@ -302,6 +302,9 @@ GoRouter buildAppRouter(
       );
       if (decision.unavailable) return pathFor(AppRoute.home);
       if (decision.pending != null) {
+        // Remember what the user was trying to reach so the auth screens can
+        // resume it after a successful login (see consumeAuthRedirectTarget).
+        controller.setAuthRedirectTarget(route);
         return pathFor(AppRoute.signIn);
       }
       return null;
@@ -481,6 +484,23 @@ In `flutter/lib/app/app_controller.dart`:
 - Delete getters `route`, `canGoBack`.
 - Delete methods `navigate`, `replaceAll`, `replaceTop`, `completeAuthentication`, `back`.
 - Keep `openEntryName` (its body will move to the router layer — see Task 6). Remove the `import '../navigation/app_route.dart';` if now unused; keep `route_guard.dart` only if still referenced.
+- **Add** the auth-redirect target so the router's `redirect` can remember where a signed-out user was headed, and the auth screens can resume it after login (replaces the old `_pendingRoute` + `completeAuthentication()`). In `flutter/lib/app/app_controller.dart`, add a private field + two methods, keeping `import '../navigation/app_route.dart';`:
+
+```dart
+  AppRoute? _authRedirectTarget;
+
+  /// Called by the router redirect when a signed-out user hits a protected
+  /// route; remembers the target so auth screens can resume it after login.
+  void setAuthRedirectTarget(AppRoute route) => _authRedirectTarget = route;
+
+  /// Returns and clears the pre-login target (or null if none) so auth screens
+  /// can `context.go(pathFor(target ?? AppRoute.home))` after a successful sign-in.
+  AppRoute? consumeAuthRedirectTarget() {
+    final target = _authRedirectTarget;
+    _authRedirectTarget = null;
+    return target;
+  }
+```
 
 - [ ] **Step 2: Delete the fake-stack extension file**
 
@@ -652,6 +672,14 @@ if (success) context.push(pathFor(AppRoute.resetPassword));
 onPressed: () => context.push(pathFor(AppRoute.forgotPassword)),
 // auth_screens.dart:194
 onPressed: () => context.push(pathFor(AppRoute.signUp)),
+
+// auth completion (auth_screens.dart:67, 74, 83, 223): resume the pre-login
+// target if the user was redirected from a protected route, else go home.
+// Replace each `controller.completeAuthentication();` with:
+if (success) {
+  final target = controller.consumeAuthRedirectTarget() ?? AppRoute.home;
+  context.go(pathFor(target));
+}
 
 // profile_screens.dart:128
 onPressed: () => context.push(pathFor(AppRoute.signIn)),

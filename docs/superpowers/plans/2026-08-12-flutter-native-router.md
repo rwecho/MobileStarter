@@ -776,15 +776,15 @@ context.push(pathFor(AppRoute.signIn));
 // profile_screens.dart:293
 context.push(pathFor(AppRoute.checkout));
 
-// checkout_screen.dart:51
-onPressed: () => context.push(pathFor(AppRoute.membership)),
+// checkout_screen.dart back arrow: context.pop() (checkout is pushed from the
+// membership tab; push(membership) would nest a second shell).
 
 // home_screen.dart:35
 onPressed: () => context.push(pathFor(AppRoute.notificationCenter)),
-// home_screen.dart:44
-onTap: () => context.push(pathFor(AppRoute.membership)),
-// home_screen.dart:156
-onTap: () => context.push(pathFor(item.$3)),
+// home_screen.dart:44 (membership banner) — membership is a SHELL BRANCH ROOT:
+// use context.go(pathFor(AppRoute.membership)), NOT push (push nests a 2nd shell)
+// home_screen.dart:156 (quick actions): if item.$3 is a shell branch root
+// (home/membership/profile), use context.go; else context.push(pathFor(item.$3)).
 
 // support_home_screen.dart:44
 AppScope.of(context).navigate(AppRoute.supportNewTicket) → context.push(pathFor(AppRoute.supportNewTicket))

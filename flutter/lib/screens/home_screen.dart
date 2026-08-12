@@ -46,7 +46,7 @@ class HomeScreen extends StatelessWidget {
             children: [
               if (controller.config?.features['membership'] != false) ...[
                 _MembershipBanner(
-                  onTap: () => context.push(pathFor(AppRoute.membership)),
+                  onTap: () => context.go(pathFor(AppRoute.membership)),
                 ),
                 const SizedBox(height: AppSpacing.x5),
               ],
@@ -158,7 +158,20 @@ class _QuickActions extends StatelessWidget {
       children: items
           .map(
             (item) => InkWell(
-              onTap: () => context.push(pathFor(item.$3)),
+              onTap: () {
+                // Shell-branch roots are already inside ShellScaffold; jumping
+                // avoids nesting a second shell. Other destinations push.
+                const shellRoots = {
+                  AppRoute.home,
+                  AppRoute.membership,
+                  AppRoute.profile,
+                };
+                if (shellRoots.contains(item.$3)) {
+                  context.go(pathFor(item.$3));
+                } else {
+                  context.push(pathFor(item.$3));
+                }
+              },
               child: Column(
                 children: [
                   DecoratedBox(

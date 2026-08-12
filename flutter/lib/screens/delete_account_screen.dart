@@ -22,29 +22,32 @@ class _DeleteAccountScreenState extends State<DeleteAccountScreen> {
   @override
   Widget build(BuildContext context) {
     final controller = AppScope.of(context);
-    return AppPage(
-      title: '注销账号',
-      child: ListView(
-        padding: const EdgeInsets.all(AppSpacing.x4),
-        children: [
-          const Text('请输入当前密码重新认证。账户、会话、通知和订单关联将被永久删除。'),
-          const SizedBox(height: AppSpacing.x4),
-          TextField(
-            controller: password,
-            obscureText: true,
-            onChanged: (_) => setState(() {}),
-            decoration: const InputDecoration(labelText: '当前密码'),
-          ),
-          const SizedBox(height: AppSpacing.x4),
-          AppButton(
-            label: controller.busy ? '删除中…' : '永久删除账号',
-            icon: AppIconName.trash,
-            destructive: true,
-            onPressed: controller.busy || password.text.isEmpty
-                ? null
-                : _confirm,
-          ),
-        ],
+    return ListenableBuilder(
+      listenable: controller,
+      builder: (context, _) => AppPage(
+        title: '注销账号',
+        child: ListView(
+          padding: const EdgeInsets.all(AppSpacing.x4),
+          children: [
+            const Text('请输入当前密码重新认证。账户、会话、通知和订单关联将被永久删除。'),
+            const SizedBox(height: AppSpacing.x4),
+            TextField(
+              controller: password,
+              obscureText: true,
+              onChanged: (_) => setState(() {}),
+              decoration: const InputDecoration(labelText: '当前密码'),
+            ),
+            const SizedBox(height: AppSpacing.x4),
+            AppButton(
+              label: controller.busy ? '删除中…' : '永久删除账号',
+              icon: AppIconName.trash,
+              destructive: true,
+              onPressed: controller.busy || password.text.isEmpty
+                  ? null
+                  : _confirm,
+            ),
+          ],
+        ),
       ),
     );
   }

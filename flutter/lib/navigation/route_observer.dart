@@ -1,8 +1,8 @@
 import 'package:flutter/widgets.dart';
 import '../telemetry/telemetry.dart';
 
-/// Reports every pushed route as a screen-view event. `didPop` is a no-op —
-/// screen events fire on push/focus, not pop.
+/// Reports every pushed route as a screen-view event. Screen events fire on
+/// push, replace, and pop-return.
 class AppRouteObserver extends NavigatorObserver {
   @override
   void didPush(Route route, Route? previousRoute) {
@@ -12,6 +12,11 @@ class AppRouteObserver extends NavigatorObserver {
   @override
   void didReplace({Route? newRoute, Route? oldRoute}) {
     telemetry.screen(_nameOf(newRoute));
+  }
+
+  @override
+  void didPop(Route route, Route? previousRoute) {
+    telemetry.screen(_nameOf(previousRoute));
   }
 
   String _nameOf(Route<dynamic>? route) {

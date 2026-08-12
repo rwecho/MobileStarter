@@ -287,8 +287,10 @@ GoRouter buildAppRouter(
 }) {
   final routeObserver = AppRouteObserver();
 
+  // Note: go_router 14.x renamed the constructor param to `observers`
+  // (NavigatorObserver list) — `navigatorObservers` no longer exists.
   return GoRouter(
-    navigatorObservers: [routeObserver],
+    observers: [routeObserver],
     refreshListenable: routerRefresh,
     redirect: (context, state) {
       final route = _routeFor(state.uri);
@@ -839,7 +841,7 @@ cd flutter && git add -A && git commit -m "fix(flutter): manual acceptance fixes
 - Auth gate → Task 4 (`redirect:`). ✔
 - Secondary pages push to originating tab stack → Task 4 (branch sub-routes), Task 7 (push). ✔
 - Deep-link/entry-intent → Task 6. ✔
-- Guard/telemetry → Task 4 (`redirect` + `navigatorObservers`), Task 2 (observer). ✔
+- Guard/telemetry → Task 4 (`redirect` + `observers`), Task 2 (observer). ✔
 - Delete fake stack + switch → Task 5. ✔
 - Tests → Tasks 8, 9. ✔
 

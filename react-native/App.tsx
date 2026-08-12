@@ -1,9 +1,15 @@
 import React, { useCallback } from 'react';
 import { Platform, SafeAreaView } from 'react-native';
 import * as ExpoSplashScreen from 'expo-splash-screen';
-import { AppRouter } from './src/navigation/AppRouter';
+import { NavigationContainer } from '@react-navigation/native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { RootNavigator } from './src/navigation/RootNavigator';
+import { navigationRef } from './src/navigation/navigationRef';
+import { AppRoute } from './src/navigation/routes';
 import { AppProvider } from './src/state/AppStore';
+import { FeedbackHost } from './src/design-system/FeedbackHost';
 import { styles } from './src/theme/styles';
+import { telemetry } from './src/telemetry/Telemetry';
 import { AppErrorBoundary } from './src/telemetry/AppErrorBoundary';
 import { SupportProvider } from './src/support/SupportStore';
 import { AuthRecoveryProvider } from './src/auth/AuthRecoveryStore';
@@ -43,8 +49,22 @@ function AppSurface() {
   const resume = useCallback(() => { void refreshBootstrap(); }, [refreshBootstrap]);
   useEntryIntents(openEntryRoute, resume);
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: palette.background }]}>
-      <AppRouter />
-    </SafeAreaView>
+    <SafeAreaProvider>
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: palette.background }]}>
+        <NavigationContainer
+          ref={navigationRef}
+          onStateChange={() => {
+            // Screen-view telemetry fires on every navigation state change
+            // (push/pop/replace/tab switch). Replaces the old
+            // useEffect([navigation.route]) in AppStore.
+            const current = navigationRef.getCurrentRoute();
+            if (current?.name) telemetry.screen(current.name as AppRoute);
+          }}
+        >
+          <RootNavigator />
+        </NavigationContainer>
+        <FeedbackHost />
+      </SafeAreaView>
+    </SafeAreaProvider>
   );
 }

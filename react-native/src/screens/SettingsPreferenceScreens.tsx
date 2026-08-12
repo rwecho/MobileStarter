@@ -5,7 +5,7 @@ import { usePreferences } from '../preferences/PreferencesProvider';
 import { useApp } from '../state/AppStore';
 import { styles } from '../theme/styles';
 
-type PreferenceKind = 'notifications' | 'general' | 'privacy' | 'appearance' | 'language';
+export type PreferenceKind = 'notifications' | 'general' | 'privacy' | 'appearance' | 'language';
 
 export function PreferenceScreen({ kind, title }: Readonly<{
   kind: PreferenceKind;

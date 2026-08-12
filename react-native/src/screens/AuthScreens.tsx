@@ -7,7 +7,7 @@ import { styles } from '../theme/styles';
 import { useAuthRecovery } from '../auth/AuthRecoveryStore';
 import { SocialAuthButtons } from '../auth/SocialAuthButtons';
 
-type AuthMode = 'signIn' | 'signUp' | 'phone' | 'forgot' | 'verify' | 'reset';
+export type AuthMode = 'signIn' | 'signUp' | 'phone' | 'forgot' | 'verify' | 'reset';
 
 const authCopy: Record<AuthMode, Readonly<{ title: string; action: string }>> = {
   signIn: { title: '欢迎回来', action: '登录' },

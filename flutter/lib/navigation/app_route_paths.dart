@@ -1,0 +1,50 @@
+import 'app_route.dart';
+
+/// Stable URL path for each [AppRoute]. Kept explicit (not generated) so the
+/// path strings are reviewable and deep-linkable.
+const Map<AppRoute, String> appRoutePaths = {
+  AppRoute.logo: '/',
+  AppRoute.promo: '/promo',
+  AppRoute.onboarding: '/onboarding',
+  AppRoute.home: '/home',
+  AppRoute.signIn: '/auth/sign-in',
+  AppRoute.signUp: '/auth/sign-up',
+  AppRoute.phoneSignIn: '/auth/phone-sign-in',
+  AppRoute.forgotPassword: '/auth/forgot-password',
+  AppRoute.verifyEmail: '/auth/verify-email',
+  AppRoute.resetPassword: '/auth/reset-password',
+  AppRoute.profile: '/profile',
+  AppRoute.profileEdit: '/profile/edit',
+  AppRoute.statistics: '/profile/statistics',
+  AppRoute.invite: '/profile/invite',
+  AppRoute.coupons: '/profile/coupons',
+  AppRoute.membership: '/membership',
+  AppRoute.membershipPlans: '/membership/plans',
+  AppRoute.checkout: '/membership/checkout',
+  AppRoute.orders: '/membership/orders',
+  AppRoute.settings: '/settings',
+  AppRoute.accountSecurity: '/settings/account-security',
+  AppRoute.devices: '/settings/devices',
+  AppRoute.notificationSettings: '/settings/notification-preferences',
+  AppRoute.privacy: '/settings/privacy',
+  AppRoute.general: '/settings/general',
+  AppRoute.appearance: '/settings/appearance',
+  AppRoute.language: '/settings/language',
+  AppRoute.textSize: '/settings/text-size',
+  AppRoute.storage: '/settings/storage',
+  AppRoute.permissions: '/settings/permissions',
+  AppRoute.helpFeedback: '/support',
+  AppRoute.supportNewTicket: '/support/new-ticket',
+  AppRoute.supportTicket: '/support/ticket',
+  AppRoute.supportFeedback: '/support/feedback',
+  AppRoute.legal: '/settings/legal',
+  AppRoute.termsOfService: '/settings/legal/terms',
+  AppRoute.privacyPolicy: '/settings/legal/privacy',
+  AppRoute.about: '/settings/about',
+  AppRoute.deleteAccount: '/settings/delete-account',
+  AppRoute.notificationCenter: '/settings/notification-center',
+  AppRoute.stateGallery: '/settings/state-gallery',
+};
+
+/// Path for a route, with a safe fallback.
+String pathFor(AppRoute route) => appRoutePaths[route] ?? '/home';

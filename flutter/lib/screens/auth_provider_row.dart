@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:go_router/go_router.dart';
 
 import '../app/app_scope.dart';
 import '../navigation/app_route.dart';
+import '../navigation/app_route_paths.dart';
 import '../theme/app_tokens.dart';
 
 class AuthProviderDivider extends StatelessWidget {
@@ -56,7 +58,7 @@ class AuthProviderRow extends StatelessWidget {
           asset: 'assets/icons/phone.svg',
           label: '手机号',
           enabled: controller.authProviders['phone'] == true,
-          onPressed: () => controller.navigate(AppRoute.phoneSignIn),
+          onPressed: () => context.push(pathFor(AppRoute.phoneSignIn)),
         ),
       ],
     );

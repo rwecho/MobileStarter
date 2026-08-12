@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
-import '../app/app_scope.dart';
 import '../navigation/app_route.dart';
+import '../navigation/app_route_paths.dart';
 import '../theme/app_tokens.dart';
 
 class AuthConsent extends StatelessWidget {
@@ -57,7 +58,7 @@ class _LegalLink extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return TextButton(
-      onPressed: () => AppScope.of(context).navigate(route),
+      onPressed: () => context.push(pathFor(route)),
       style: TextButton.styleFrom(
         minimumSize: const Size(44, 44),
         padding: const EdgeInsets.symmetric(horizontal: AppSpacing.x1),

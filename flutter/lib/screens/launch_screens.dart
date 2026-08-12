@@ -2,12 +2,14 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:go_router/go_router.dart';
 import 'package:video_player/video_player.dart';
 import '../app/app_controller.dart';
 import '../app/app_scope.dart';
 import '../app/runtime_models.dart';
 import '../design_system/components.dart';
 import '../navigation/app_route.dart';
+import '../navigation/app_route_paths.dart';
 import '../theme/app_tokens.dart';
 
 // ── Splash screen ─────────────────────────────────────────────────────────
@@ -83,8 +85,10 @@ class _SplashScreenState extends State<SplashScreen> {
   Future<void> _preloadAndEnter(SplashCampaign splash) async {
     // loading 阶段预加载图片，进入闪屏时秒显，消除等待
     if (splash.imageUrl != null && splash.imageUrl!.isNotEmpty) {
-      await precacheImage(NetworkImage(splash.imageUrl!), context)
-          .catchError((Object _) => const <Object>[]);
+      await precacheImage(
+        NetworkImage(splash.imageUrl!),
+        context,
+      ).catchError((Object _) => const <Object>[]);
     }
     if (!mounted || _done) return;
     setState(() => _countdown = splash.durationSeconds);
@@ -102,7 +106,7 @@ class _SplashScreenState extends State<SplashScreen> {
   void _goHome() {
     if (_done || !mounted) return;
     _done = true;
-    _controller.replaceAll(AppRoute.home);
+    context.go(pathFor(AppRoute.home));
   }
 
   @override
@@ -116,73 +120,87 @@ class _SplashScreenState extends State<SplashScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final config = _controller.config;
-    final background = Theme.of(context).colorScheme.surface;
-    if (_countdown == null) {
-      // 阶段 loading：logo + appName + tagline + 加载指示 + "加载中…"
-      return Scaffold(
-        backgroundColor: background,
-        body: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const _LogoMark(),
-              const SizedBox(height: AppSpacing.x4),
-              Text(
-                config?.appName ?? 'MobileStarter',
-                style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w700),
+    return ListenableBuilder(
+      listenable: _controller,
+      builder: (context, _) {
+        final config = _controller.config;
+        final background = Theme.of(context).colorScheme.surface;
+        if (_countdown == null) {
+          // 阶段 loading：logo + appName + tagline + 加载指示 + "加载中…"
+          return Scaffold(
+            backgroundColor: background,
+            body: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const _LogoMark(),
+                  const SizedBox(height: AppSpacing.x4),
+                  Text(
+                    config?.appName ?? 'MobileStarter',
+                    style: const TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.x1),
+                  Text(
+                    config?.tagline ?? '',
+                    style: const TextStyle(
+                      color: AppColors.secondaryText,
+                      fontSize: 14,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.x5),
+                  const SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: AppColors.brand,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.x2),
+                  const Text(
+                    '加载中…',
+                    style: TextStyle(color: AppColors.brand, fontSize: 14),
+                  ),
+                ],
               ),
-              const SizedBox(height: AppSpacing.x1),
-              Text(
-                config?.tagline ?? '',
-                style: const TextStyle(color: AppColors.secondaryText, fontSize: 14),
-              ),
-              const SizedBox(height: AppSpacing.x5),
-              const SizedBox(
-                width: 24,
-                height: 24,
-                child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.brand),
-              ),
-              const SizedBox(height: AppSpacing.x2),
-              const Text(
-                '加载中…',
-                style: TextStyle(color: AppColors.brand, fontSize: 14),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
+            ),
+          );
+        }
 
-    // countdown 非空即已确认有 splash 配置
-    final splash = config!.splash!;
-    final canSkip = splash.skippable != false;
-    return Scaffold(
-      backgroundColor: background,
-      body: Stack(
-        children: [
-          Positioned.fill(child: _SplashMedia(splash: splash)),
-          Positioned(
-            top: 0,
-            right: 0,
-            left: 0,
-            child: SafeArea(
-              bottom: false,
-              child: Align(
-                alignment: Alignment.topRight,
-                child: Padding(
-                  padding: const EdgeInsets.all(AppSpacing.x3),
-                  child: _SkipCapsule(
-                    countdown: _countdown ?? 0,
-                    canSkip: canSkip,
-                    onSkip: _goHome,
+        // countdown 非空即已确认有 splash 配置
+        final splash = config!.splash!;
+        final canSkip = splash.skippable != false;
+        return Scaffold(
+          backgroundColor: background,
+          body: Stack(
+            children: [
+              Positioned.fill(child: _SplashMedia(splash: splash)),
+              Positioned(
+                top: 0,
+                right: 0,
+                left: 0,
+                child: SafeArea(
+                  bottom: false,
+                  child: Align(
+                    alignment: Alignment.topRight,
+                    child: Padding(
+                      padding: const EdgeInsets.all(AppSpacing.x3),
+                      child: _SkipCapsule(
+                        countdown: _countdown ?? 0,
+                        canSkip: canSkip,
+                        onSkip: _goHome,
+                      ),
+                    ),
                   ),
                 ),
               ),
-            ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
@@ -219,7 +237,11 @@ class _SkipCapsule extends StatelessWidget {
             ),
             child: Text(
               canSkip ? '$countdown s 跳过' : '$countdown s',
-              style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600),
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
         ),
@@ -288,15 +310,18 @@ class _SplashVideoState extends State<_SplashVideo> {
   void initState() {
     super.initState();
     _controller = VideoPlayerController.networkUrl(Uri.parse(widget.url));
-    _controller.initialize().then((_) {
-      if (!mounted) return;
-      _controller.setLooping(true);
-      _controller.setVolume(0);
-      _controller.play();
-      setState(() => _initialized = true);
-    }).catchError((Object _) {
-      if (mounted) setState(() => _failed = true);
-    });
+    _controller
+        .initialize()
+        .then((_) {
+          if (!mounted) return;
+          _controller.setLooping(true);
+          _controller.setVolume(0);
+          _controller.play();
+          setState(() => _initialized = true);
+        })
+        .catchError((Object _) {
+          if (mounted) setState(() => _failed = true);
+        });
   }
 
   @override
@@ -310,7 +335,12 @@ class _SplashVideoState extends State<_SplashVideo> {
     if (_failed) return widget.fallback;
     if (!_initialized) {
       // 初始化中：显示 app 背景色，避免黑屏
-      return SizedBox.expand(child: ColoredBox(color: Theme.of(context).colorScheme.surface, child: const SizedBox.shrink()));
+      return SizedBox.expand(
+        child: ColoredBox(
+          color: Theme.of(context).colorScheme.surface,
+          child: const SizedBox.shrink(),
+        ),
+      );
     }
     return SizedBox.expand(
       child: FittedBox(
@@ -348,15 +378,25 @@ class _SplashFallback extends StatelessWidget {
           const SizedBox(height: AppSpacing.x4),
           Text(
             splash.badge,
-            style: const TextStyle(color: AppColors.brand, fontSize: 13, fontWeight: FontWeight.w700),
+            style: const TextStyle(
+              color: AppColors.brand,
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+            ),
           ),
           const SizedBox(height: AppSpacing.x2),
-          Text(splash.title, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700)),
+          Text(
+            splash.title,
+            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700),
+          ),
           const SizedBox(height: AppSpacing.x2),
           Text(
             splash.description,
             textAlign: TextAlign.center,
-            style: const TextStyle(color: AppColors.secondaryText, fontSize: 14),
+            style: const TextStyle(
+              color: AppColors.secondaryText,
+              fontSize: 14,
+            ),
           ),
         ],
       ),
@@ -378,7 +418,7 @@ class OnboardingScreen extends StatelessWidget {
           padding: const EdgeInsets.all(AppSpacing.x6),
           child: AppButton(
             label: '完成引导',
-            onPressed: () => AppScope.of(context).replaceAll(AppRoute.home),
+            onPressed: () => context.go(pathFor(AppRoute.home)),
           ),
         ),
       ),

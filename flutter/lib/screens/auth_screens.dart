@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../app/app_controller.dart';
 import '../app/app_scope.dart';
 import '../design_system/components.dart';
 import '../design_system/feedback.dart';
 import '../navigation/app_route.dart';
+import '../navigation/app_route_paths.dart';
 import '../theme/app_tokens.dart';
 import 'auth_consent.dart';
 import 'auth_provider_row.dart';
@@ -44,15 +46,15 @@ class _AuthScreenState extends State<AuthScreen> {
     switch (widget.mode) {
       case AuthMode.forgot:
         success = await controller.requestPasswordReset(emailController.text);
-        if (success) controller.navigate(AppRoute.verifyEmail);
+        if (success && mounted) context.push(pathFor(AppRoute.verifyEmail));
         break;
       case AuthMode.verify:
         success = await controller.verifyPasswordReset(passwordController.text);
-        if (success) controller.navigate(AppRoute.resetPassword);
+        if (success && mounted) context.push(pathFor(AppRoute.resetPassword));
         break;
       case AuthMode.reset:
         success = await controller.resetPassword(passwordController.text);
-        if (success) controller.replaceAll(AppRoute.signIn);
+        if (success && mounted) context.go(pathFor(AppRoute.signIn));
         break;
       case AuthMode.phone:
         if (!phoneCodeSent) {
@@ -64,14 +66,14 @@ class _AuthScreenState extends State<AuthScreen> {
           emailController.text,
           passwordController.text,
         );
-        if (success) controller.completeAuthentication();
+        if (success) _completeAuthentication(controller);
         break;
       case AuthMode.signIn:
         success = await controller.signIn(
           emailController.text,
           passwordController.text,
         );
-        if (success) controller.completeAuthentication();
+        if (success) _completeAuthentication(controller);
         break;
       case AuthMode.signUp:
         success = await controller.signUp(
@@ -80,7 +82,7 @@ class _AuthScreenState extends State<AuthScreen> {
           usernameController.text,
           _termsRevision(controller),
         );
-        if (success) controller.completeAuthentication();
+        if (success) _completeAuthentication(controller);
         break;
     }
     if (!success && mounted) {
@@ -126,83 +128,86 @@ class _AuthScreenState extends State<AuthScreen> {
   @override
   Widget build(BuildContext context) {
     final copy = _copyFor(widget.mode);
-    return AppPage(
-      title: copy.$1,
-      child: ListView(
-        padding: const EdgeInsets.all(AppSpacing.x6),
-        children: [
-          const SizedBox(height: AppSpacing.x8),
-          Text(copy.$1, style: Theme.of(context).textTheme.headlineMedium),
-          const SizedBox(height: AppSpacing.x2),
-          Text(
-            '安全同步你的会员、订单与偏好设置。',
-            style: Theme.of(context).textTheme.bodyMedium,
-          ),
-          const SizedBox(height: AppSpacing.x6),
-          TextField(
-            controller: emailController,
-            keyboardType: widget.mode == AuthMode.phone
-                ? TextInputType.phone
-                : TextInputType.emailAddress,
-            decoration: InputDecoration(
-              labelText: _accountLabel(),
-              errorText: accountError,
+    final controller = AppScope.of(context);
+    return ListenableBuilder(
+      listenable: controller,
+      builder: (context, _) => AppPage(
+        title: copy.$1,
+        child: ListView(
+          padding: const EdgeInsets.all(AppSpacing.x6),
+          children: [
+            const SizedBox(height: AppSpacing.x8),
+            Text(copy.$1, style: Theme.of(context).textTheme.headlineMedium),
+            const SizedBox(height: AppSpacing.x2),
+            Text(
+              '安全同步你的会员、订单与偏好设置。',
+              style: Theme.of(context).textTheme.bodyMedium,
             ),
-          ),
-          if (widget.mode == AuthMode.signUp) ...[
-            const SizedBox(height: AppSpacing.x3),
+            const SizedBox(height: AppSpacing.x6),
             TextField(
-              controller: usernameController,
+              controller: emailController,
+              keyboardType: widget.mode == AuthMode.phone
+                  ? TextInputType.phone
+                  : TextInputType.emailAddress,
               decoration: InputDecoration(
-                labelText: '用户名',
-                errorText: usernameError,
+                labelText: _accountLabel(),
+                errorText: accountError,
               ),
             ),
-          ],
-          const SizedBox(height: AppSpacing.x3),
-          if (widget.mode != AuthMode.forgot &&
-              (widget.mode != AuthMode.phone || phoneCodeSent)) ...[
-            TextField(
-              controller: passwordController,
-              obscureText: widget.mode != AuthMode.verify,
-              decoration: InputDecoration(
-                labelText:
-                    widget.mode == AuthMode.verify ||
-                        widget.mode == AuthMode.phone
-                    ? '验证码'
-                    : '密码',
-                errorText: passwordError,
+            if (widget.mode == AuthMode.signUp) ...[
+              const SizedBox(height: AppSpacing.x3),
+              TextField(
+                controller: usernameController,
+                decoration: InputDecoration(
+                  labelText: '用户名',
+                  errorText: usernameError,
+                ),
               ),
-            ),
-            const SizedBox(height: AppSpacing.x4),
-          ],
-          AppButton(
-            label: AppScope.of(context).busy ? '正在处理…' : copy.$2,
-            onPressed: () => submit(),
-          ),
-          if (widget.mode == AuthMode.signIn) ...[
-            const SizedBox(height: AppSpacing.x5),
-            const AuthProviderDivider(),
+            ],
             const SizedBox(height: AppSpacing.x3),
-            AuthProviderRow(onPressed: _socialSignIn),
-            TextButton(
-              onPressed: () =>
-                  AppScope.of(context).navigate(AppRoute.forgotPassword),
-              child: const Text('忘记密码'),
+            if (widget.mode != AuthMode.forgot &&
+                (widget.mode != AuthMode.phone || phoneCodeSent)) ...[
+              TextField(
+                controller: passwordController,
+                obscureText: widget.mode != AuthMode.verify,
+                decoration: InputDecoration(
+                  labelText:
+                      widget.mode == AuthMode.verify ||
+                          widget.mode == AuthMode.phone
+                      ? '验证码'
+                      : '密码',
+                  errorText: passwordError,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.x4),
+            ],
+            AppButton(
+              label: controller.busy ? '正在处理…' : copy.$2,
+              onPressed: () => submit(),
             ),
-            TextButton(
-              onPressed: () => AppScope.of(context).navigate(AppRoute.signUp),
-              child: const Text('创建账号'),
-            ),
+            if (widget.mode == AuthMode.signIn) ...[
+              const SizedBox(height: AppSpacing.x5),
+              const AuthProviderDivider(),
+              const SizedBox(height: AppSpacing.x3),
+              AuthProviderRow(onPressed: _socialSignIn),
+              TextButton(
+                onPressed: () => context.push(pathFor(AppRoute.forgotPassword)),
+                child: const Text('忘记密码'),
+              ),
+              TextButton(
+                onPressed: () => context.push(pathFor(AppRoute.signUp)),
+                child: const Text('创建账号'),
+              ),
+            ],
+            if (_requiresConsent) ...[
+              const SizedBox(height: AppSpacing.x4),
+              AuthConsent(
+                value: consentAgreed,
+                onChanged: (value) => setState(() => consentAgreed = value),
+              ),
+            ],
           ],
-          if (_requiresConsent) ...[
-            const SizedBox(height: AppSpacing.x4),
-            AuthConsent(
-              value: consentAgreed,
-              onChanged: (value) => setState(() => consentAgreed = value),
-            ),
-          ],
-        ],
+        ),
       ),
     );
   }
@@ -220,7 +225,15 @@ class _AuthScreenState extends State<AuthScreen> {
     if (!_ensureConsent()) return;
     final controller = AppScope.of(context);
     final success = await controller.socialSignIn(provider);
-    if (success) controller.completeAuthentication();
+    if (success) _completeAuthentication(controller);
+  }
+
+  /// Resume the pre-login target if the user was redirected from a protected
+  /// route; otherwise go to the home shell branch.
+  void _completeAuthentication(AppController controller) {
+    if (!mounted) return;
+    final target = controller.consumeAuthRedirectTarget() ?? AppRoute.home;
+    context.go(pathFor(target));
   }
 
   String _termsRevision(AppController controller) {

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import '../app/app_scope.dart';
+import 'package:go_router/go_router.dart';
 import '../navigation/app_route.dart';
+import '../navigation/app_route_paths.dart';
 import '../theme/app_tokens.dart';
 import 'app_icon.dart';
 
@@ -18,16 +19,15 @@ class AppPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final controller = AppScope.of(context);
     return Scaffold(
       appBar: AppBar(
         centerTitle: true,
         title: Text(title),
-        leading: controller.canGoBack
+        leading: context.canPop()
             ? AppIconButton(
                 label: '返回',
                 icon: AppIconName.arrowLeft,
-                onPressed: controller.back,
+                onPressed: () => context.pop(),
               )
             : const SizedBox.shrink(),
       ),
@@ -154,7 +154,7 @@ class AppListTile extends StatelessWidget {
       trailing: route == null
           ? null
           : AppIcon(AppIconName.chevronRight, color: muted, size: 18),
-      onTap: route == null ? null : () => AppScope.of(context).navigate(route!),
+      onTap: route == null ? null : () => context.push(pathFor(route!)),
     );
   }
 }

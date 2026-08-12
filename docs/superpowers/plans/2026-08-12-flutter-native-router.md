@@ -30,7 +30,7 @@ This plan migrates **only the Flutter client** (`flutter/`). ArkTS and RN are se
 - **Create** `flutter/lib/navigation/shell_scaffold.dart` — `ShellScaffold` widget: `Scaffold` + `NavigationBar` + `StatefulNavigationShell` body (this replaces `primary_navigation.dart`'s inline nav bar usage and owns tab switching).
 - **Create** `flutter/lib/navigation/route_observer.dart` — `AppRouteObserver extends NavigatorObserver` for screen telemetry.
 - **Modify** `flutter/lib/app/mobile_ui_app.dart` — `MaterialApp.router(routerConfig: _router)`; remove `home: AppRouter.screenFor(...)`.
-- **Modify** `flutter/lib/app/app_controller.dart` — remove `_stack`, `route`, `canGoBack`, `navigate`, `replaceAll`, `replaceTop`, `back`, `completeAuthentication`; keep business state + guard-relevant getters (`signedIn`, `config`, `user`).
+- **Modify** `flutter/lib/app/app_controller.dart` — remove `_stack`, `route`, `canGoBack`, `navigate`, `replaceAll`, `replaceTop`, `back`, `completeAuthentication`; keep business state + guard-relevant getters (`signedIn`, `config`, `user`); add `setAuthRedirectTarget`/`consumeAuthRedirectTarget` for the router's auth-redirect resume.
 - **Delete** `flutter/lib/app/app_controller_navigation.dart` — fake-stack extension.
 - **Delete** `flutter/lib/app/app_router.dart` — switch renderer.
 - **Modify** 12 screens + `design_system/components.dart` — `navigate(...)` → `context.push(...)`; `replaceAll(...)` → `context.go(...)`; `back()` → `context.pop()`.
@@ -120,10 +120,10 @@ const Map<AppRoute, String> appRoutePaths = {
   AppRoute.home: '/home',
   AppRoute.signIn: '/auth/sign-in',
   AppRoute.signUp: '/auth/sign-up',
-  AppRoute.phoneSignIn: '/auth/phone',
-  AppRoute.forgotPassword: '/auth/forgot',
-  AppRoute.verifyEmail: '/auth/verify',
-  AppRoute.resetPassword: '/auth/reset',
+  AppRoute.phoneSignIn: '/auth/phone-sign-in',
+  AppRoute.forgotPassword: '/auth/forgot-password',
+  AppRoute.verifyEmail: '/auth/verify-email',
+  AppRoute.resetPassword: '/auth/reset-password',
   AppRoute.profile: '/profile',
   AppRoute.profileEdit: '/profile/edit',
   AppRoute.statistics: '/profile/statistics',
@@ -136,7 +136,7 @@ const Map<AppRoute, String> appRoutePaths = {
   AppRoute.settings: '/settings',
   AppRoute.accountSecurity: '/settings/account-security',
   AppRoute.devices: '/settings/devices',
-  AppRoute.notificationSettings: '/settings/notifications',
+  AppRoute.notificationSettings: '/settings/notification-preferences',
   AppRoute.privacy: '/settings/privacy',
   AppRoute.general: '/settings/general',
   AppRoute.appearance: '/settings/appearance',
@@ -144,7 +144,7 @@ const Map<AppRoute, String> appRoutePaths = {
   AppRoute.textSize: '/settings/text-size',
   AppRoute.storage: '/settings/storage',
   AppRoute.permissions: '/settings/permissions',
-  AppRoute.helpFeedback: '/settings/help-feedback',
+  AppRoute.helpFeedback: '/support',
   AppRoute.supportNewTicket: '/support/new-ticket',
   AppRoute.supportTicket: '/support/ticket',
   AppRoute.supportFeedback: '/support/feedback',
@@ -287,8 +287,10 @@ GoRouter buildAppRouter(
 }) {
   final routeObserver = AppRouteObserver();
 
+  // Note: go_router 14.x renamed the constructor param to `observers`
+  // (NavigatorObserver list) — `navigatorObservers` no longer exists.
   return GoRouter(
-    navigatorObservers: [routeObserver],
+    observers: [routeObserver],
     refreshListenable: routerRefresh,
     redirect: (context, state) {
       final route = _routeFor(state.uri);
@@ -300,6 +302,9 @@ GoRouter buildAppRouter(
       );
       if (decision.unavailable) return pathFor(AppRoute.home);
       if (decision.pending != null) {
+        // Remember what the user was trying to reach so the auth screens can
+        // resume it after a successful login (see consumeAuthRedirectTarget).
+        controller.setAuthRedirectTarget(route);
         return pathFor(AppRoute.signIn);
       }
       return null;
@@ -454,7 +459,79 @@ AppRoute? _routeFor(Uri uri) {
 }
 ```
 
-- [ ] **Step 2: Commit**
+- [ ] **Step 2: Add the remaining flat GoRoutes (required — every AppRoute needs a builder)**
+
+The block above covers the auth/profile/settings/support/legal routes, but 11 AppRoutes still have NO GoRoute (they'd 404 via go_router). Add these GoRoutes (same style as the others, placed before the `StatefulShellRoute`), restoring the imports they need (`sessions_screen.dart`, `preference_screen.dart`, `settings_utility_screen.dart`, `text_size_screen.dart`, plus `membership_screen.dart` if not already imported):
+
+```dart
+      GoRoute(
+        path: pathFor(AppRoute.membershipPlans),
+        builder: (context, state) => const MembershipScreen(),
+      ),
+      GoRoute(
+        path: pathFor(AppRoute.devices),
+        builder: (context, state) => const SessionsScreen(),
+      ),
+      GoRoute(
+        path: pathFor(AppRoute.notificationSettings),
+        builder: (context, state) => const PreferenceScreen(
+          kind: PreferenceKind.notifications,
+          title: '通知设置',
+        ),
+      ),
+      GoRoute(
+        path: pathFor(AppRoute.privacy),
+        builder: (context, state) => const PreferenceScreen(
+          kind: PreferenceKind.privacy,
+          title: '隐私设置',
+        ),
+      ),
+      GoRoute(
+        path: pathFor(AppRoute.general),
+        builder: (context, state) => const PreferenceScreen(
+          kind: PreferenceKind.general,
+          title: '通用设置',
+        ),
+      ),
+      GoRoute(
+        path: pathFor(AppRoute.appearance),
+        builder: (context, state) => const PreferenceScreen(
+          kind: PreferenceKind.appearance,
+          title: '外观主题',
+        ),
+      ),
+      GoRoute(
+        path: pathFor(AppRoute.language),
+        builder: (context, state) => const PreferenceScreen(
+          kind: PreferenceKind.language,
+          title: '语言',
+        ),
+      ),
+      GoRoute(
+        path: pathFor(AppRoute.textSize),
+        builder: (context, state) => const TextSizeScreen(),
+      ),
+      GoRoute(
+        path: pathFor(AppRoute.storage),
+        builder: (context, state) => const SettingsUtilityScreen(
+          kind: SettingsUtilityKind.storage,
+        ),
+      ),
+      GoRoute(
+        path: pathFor(AppRoute.permissions),
+        builder: (context, state) => const SettingsUtilityScreen(
+          kind: SettingsUtilityKind.permissions,
+        ),
+      ),
+      GoRoute(
+        path: pathFor(AppRoute.about),
+        builder: (context, state) => const SettingsUtilityScreen(
+          kind: SettingsUtilityKind.about,
+        ),
+      ),
+```
+
+- [ ] **Step 3: Commit**
 
 ```bash
 cd flutter && git add lib/navigation/app_router_config.dart && git commit -m "feat(flutter): GoRouter config (shell + redirect + observer)"
@@ -477,8 +554,24 @@ In `flutter/lib/app/app_controller.dart`:
 - Delete the `part 'app_controller_navigation.dart';` line (top of file).
 - Delete field `final List<AppRoute> _stack = <AppRoute>[AppRoute.logo];` and `AppRoute? _pendingRoute;`.
 - Delete getters `route`, `canGoBack`.
-- Delete methods `navigate`, `replaceAll`, `replaceTop`, `completeAuthentication`, `back`.
-- Keep `openEntryName` (its body will move to the router layer — see Task 6). Remove the `import '../navigation/app_route.dart';` if now unused; keep `route_guard.dart` only if still referenced.
+- Delete methods `navigate`, `replaceAll`, `replaceTop`, `completeAuthentication`, `back`, and `openEntryName` (its body manipulated `_stack`, which is being removed; URL/entry-intent handling moves to the router layer in Task 6). Keep the `import '../navigation/app_route.dart';` (the auth-redirect methods added in Task 4 use it) and `route_guard.dart` only if still referenced.
+- **Add** the auth-redirect target so the router's `redirect` can remember where a signed-out user was headed, and the auth screens can resume it after login (replaces the old `_pendingRoute` + `completeAuthentication()`). In `flutter/lib/app/app_controller.dart`, add a private field + two methods, keeping `import '../navigation/app_route.dart';`:
+
+```dart
+  AppRoute? _authRedirectTarget;
+
+  /// Called by the router redirect when a signed-out user hits a protected
+  /// route; remembers the target so auth screens can resume it after login.
+  void setAuthRedirectTarget(AppRoute route) => _authRedirectTarget = route;
+
+  /// Returns and clears the pre-login target (or null if none) so auth screens
+  /// can `context.go(pathFor(target ?? AppRoute.home))` after a successful sign-in.
+  AppRoute? consumeAuthRedirectTarget() {
+    final target = _authRedirectTarget;
+    _authRedirectTarget = null;
+    return target;
+  }
+```
 
 - [ ] **Step 2: Delete the fake-stack extension file**
 
@@ -510,13 +603,17 @@ class _RouterHost extends StatefulWidget {
 }
 
 class _RouterHostState extends State<_RouterHost> {
-  late final GoRouter _router = buildAppRouter(widget.controller);
+  // routerRefresh: controller — a ChangeNotifier — so the redirect re-evaluates
+  // whenever auth state changes (e.g. after login/sign-out).
+  late final GoRouter _router =
+      buildAppRouter(widget.controller, routerRefresh: widget.controller);
 
   @override
   void didUpdateWidget(_RouterHost oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.controller != widget.controller) {
-      setState(() => _router = buildAppRouter(widget.controller));
+      setState(() =>
+          _router = buildAppRouter(widget.controller, routerRefresh: widget.controller));
     }
   }
 
@@ -531,12 +628,21 @@ class _RouterHostState extends State<_RouterHost> {
       locale: _localeOf(widget.controller),
       supportedLocales: const [Locale('zh', 'CN'), Locale('en', 'US')],
       localizationsDelegates: GlobalMaterialLocalizations.delegates,
+      builder: (context, child) {
+        final mediaQuery = MediaQuery.of(context);
+        return MediaQuery(
+          data: mediaQuery.copyWith(
+            textScaler: TextScaler.linear(_textScaleOf(widget.controller)),
+          ),
+          child: child ?? const SizedBox.shrink(),
+        );
+      },
     );
   }
 }
 ```
 
-> Note: the `builder:` (MediaQuery text-scaler) and `didPushRouteInformation` deep-link handling move into `_RouterHost` (go_router's `routerConfig` already handles deep links via `RouteInformationProvider`; keep `didPushRouteInformation` only if notification deep-links are URL-based — see Task 6).
+> Note: `didPushRouteInformation`/`_routeName` in `_MobileUiAppState` are REMOVED — go_router's own `RouteInformationProvider` handles URL deep links natively (Task 6 re-adds any app-specific entry-intent mapping on top). The `_initialize()` body no longer calls `openEntryName`; the initial deep link is go_router's `initialLocation`. `_themeModeOf`/`_localeOf`/`_textScaleOf` are static helpers already on `_MobileUiAppState` — move them (or leave as-is and reference via the same file).
 
 - [ ] **Step 5: Analyze to catch dangling references**
 
@@ -624,6 +730,10 @@ cd flutter && git add lib/app/mobile_ui_app.dart lib/navigation/app_router_confi
 
 For each `AppScope.of(context).navigate(route)` → `context.push(pathFor(route))`; for `controller.navigate(route)` (when `controller` is from `AppScope.of(context)`) → `context.push(pathFor(route))`.
 
+**Stale-read rule (from Task 5/6 code review):** go_router does NOT re-run the active route page's `build()` when the top-level `AnimatedBuilder` notifies (route Elements are preserved). So any screen that reads `controller.user` / `signedIn` / `config` directly in `build()` and expects it to refresh on notify must switch to self-listening — wrap the state-dependent subtree in `ListenableBuilder(listenable: controller, builder: ...)` (or read inside a `didChangeDependencies`/`ListenableBuilder`). Concretely affected: `profile_screens.dart` (`if (!controller.signedIn) return _SignedOutProfile()`), `home_screen.dart` (user data), settings/checkout screens reading `config` or `user`. The old `MaterialApp.home` contract ("notify → rebuild whole page") is gone.
+
+**`openEntryWarm` shell-branch edge (from the same review):** pushing a shell-branch route (`home`/`membership`/`profile`) would nest a second `ShellScaffold`. Guard it: in `notifications_screen.dart`, if the target is one of the 3 branch roots, use `context.go(pathFor(target))` instead of `push`.
+
 Replacements (per file):
 
 ```dart
@@ -651,6 +761,14 @@ onPressed: () => context.push(pathFor(AppRoute.forgotPassword)),
 // auth_screens.dart:194
 onPressed: () => context.push(pathFor(AppRoute.signUp)),
 
+// auth completion (auth_screens.dart:67, 74, 83, 223): resume the pre-login
+// target if the user was redirected from a protected route, else go home.
+// Replace each `controller.completeAuthentication();` with:
+if (success) {
+  final target = controller.consumeAuthRedirectTarget() ?? AppRoute.home;
+  context.go(pathFor(target));
+}
+
 // profile_screens.dart:128
 onPressed: () => context.push(pathFor(AppRoute.signIn)),
 // profile_screens.dart:281
@@ -658,15 +776,15 @@ context.push(pathFor(AppRoute.signIn));
 // profile_screens.dart:293
 context.push(pathFor(AppRoute.checkout));
 
-// checkout_screen.dart:51
-onPressed: () => context.push(pathFor(AppRoute.membership)),
+// checkout_screen.dart back arrow: context.pop() (checkout is pushed from the
+// membership tab; push(membership) would nest a second shell).
 
 // home_screen.dart:35
 onPressed: () => context.push(pathFor(AppRoute.notificationCenter)),
-// home_screen.dart:44
-onTap: () => context.push(pathFor(AppRoute.membership)),
-// home_screen.dart:156
-onTap: () => context.push(pathFor(item.$3)),
+// home_screen.dart:44 (membership banner) — membership is a SHELL BRANCH ROOT:
+// use context.go(pathFor(AppRoute.membership)), NOT push (push nests a 2nd shell)
+// home_screen.dart:156 (quick actions): if item.$3 is a shell branch root
+// (home/membership/profile), use context.go; else context.push(pathFor(item.$3)).
 
 // support_home_screen.dart:44
 AppScope.of(context).navigate(AppRoute.supportNewTicket) → context.push(pathFor(AppRoute.supportNewTicket))
@@ -839,7 +957,7 @@ cd flutter && git add -A && git commit -m "fix(flutter): manual acceptance fixes
 - Auth gate → Task 4 (`redirect:`). ✔
 - Secondary pages push to originating tab stack → Task 4 (branch sub-routes), Task 7 (push). ✔
 - Deep-link/entry-intent → Task 6. ✔
-- Guard/telemetry → Task 4 (`redirect` + `navigatorObservers`), Task 2 (observer). ✔
+- Guard/telemetry → Task 4 (`redirect` + `observers`), Task 2 (observer). ✔
 - Delete fake stack + switch → Task 5. ✔
 - Tests → Tasks 8, 9. ✔
 

@@ -2,8 +2,14 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 const _apiBase = String.fromEnvironment('MOBILEUI_API_URL', defaultValue: 'http://localhost:3210');
-const _appId = String.fromEnvironment('MOBILEUI_APP_ID');
-const _appEnv = String.fromEnvironment('MOBILEUI_APP_ENVIRONMENT');
+// Defaults mirror the local dev server (README + payment plan): tenant
+// `zhongbei`, env `development`. Tests otherwise fail with APP_ID_REQUIRED
+// because an unset const String.fromEnvironment is an empty string.
+const _appId = String.fromEnvironment('MOBILEUI_APP_ID', defaultValue: 'zhongbei');
+const _appEnv = String.fromEnvironment(
+  'MOBILEUI_APP_ENVIRONMENT',
+  defaultValue: 'development',
+);
 
 /// Signs up a fresh test user against the real server; returns the access token.
 Future<String> signUpAndGetToken(String email, {String password = 'Test1234'}) async {

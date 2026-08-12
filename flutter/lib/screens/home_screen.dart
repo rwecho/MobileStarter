@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../app/app_scope.dart';
 import '../design_system/app_icon.dart';
 import '../design_system/components.dart';
-import '../design_system/primary_navigation.dart';
 import '../navigation/app_route.dart';
+import '../navigation/app_route_paths.dart';
 import '../l10n/localized_text.dart';
 import '../theme/app_tokens.dart';
 
@@ -13,67 +14,72 @@ class HomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final controller = AppScope.of(context);
-    final appName = controller.config?.appName ?? 'MobileStarter';
-    final scheme = Theme.of(context).colorScheme;
-    return Scaffold(
-      backgroundColor: scheme.surface,
-      appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              localizedText(context, '欢迎回来', 'Welcome back'),
-              style: const TextStyle(fontSize: 13),
+    return ListenableBuilder(
+      listenable: controller,
+      builder: (context, _) {
+        final appName = controller.config?.appName ?? 'MobileStarter';
+        final scheme = Theme.of(context).colorScheme;
+        return Scaffold(
+          backgroundColor: scheme.surface,
+          appBar: AppBar(
+            title: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  localizedText(context, '欢迎回来', 'Welcome back'),
+                  style: const TextStyle(fontSize: 13),
+                ),
+                Text(appName),
+              ],
             ),
-            Text(appName),
-          ],
-        ),
-        actions: [
-          AppIconButton(
-            label: '通知中心',
-            icon: AppIconName.bell,
-            onPressed: () => controller.navigate(AppRoute.notificationCenter),
-          ),
-        ],
-      ),
-      body: ListView(
-        padding: const EdgeInsets.all(AppSpacing.x4),
-        children: [
-          if (controller.config?.features['membership'] != false) ...[
-            _MembershipBanner(
-              onTap: () => controller.navigate(AppRoute.membership),
-            ),
-            const SizedBox(height: AppSpacing.x5),
-          ],
-          _QuickActions(features: controller.config?.features ?? const {}),
-          const SizedBox(height: AppSpacing.x6),
-          Text(
-            localizedText(context, '最近动态', 'Recent activity'),
-            style: Theme.of(context).textTheme.titleLarge,
-          ),
-          const SizedBox(height: AppSpacing.x3),
-          const AppCard(
-            child: Padding(
-              padding: EdgeInsets.all(AppSpacing.x4),
-              child: ListTile(
-                contentPadding: EdgeInsets.zero,
-                title: Text('模板已准备完成'),
-                subtitle: Text('三端共享页面、状态、路由与设计令牌。'),
+            actions: [
+              AppIconButton(
+                label: '通知中心',
+                icon: AppIconName.bell,
+                onPressed: () =>
+                    context.push(pathFor(AppRoute.notificationCenter)),
               ),
-            ),
+            ],
           ),
-          const SizedBox(height: AppSpacing.x3),
-          const AppCard(
-            child: AppListTile(
-              label: '检查全部状态',
-              value: '加载、空数据、错误、离线与未授权',
-              route: AppRoute.stateGallery,
-              icon: AppIconName.alert,
-            ),
+          body: ListView(
+            padding: const EdgeInsets.all(AppSpacing.x4),
+            children: [
+              if (controller.config?.features['membership'] != false) ...[
+                _MembershipBanner(
+                  onTap: () => context.go(pathFor(AppRoute.membership)),
+                ),
+                const SizedBox(height: AppSpacing.x5),
+              ],
+              _QuickActions(features: controller.config?.features ?? const {}),
+              const SizedBox(height: AppSpacing.x6),
+              Text(
+                localizedText(context, '最近动态', 'Recent activity'),
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              const SizedBox(height: AppSpacing.x3),
+              const AppCard(
+                child: Padding(
+                  padding: EdgeInsets.all(AppSpacing.x4),
+                  child: ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text('模板已准备完成'),
+                    subtitle: Text('三端共享页面、状态、路由与设计令牌。'),
+                  ),
+                ),
+              ),
+              const SizedBox(height: AppSpacing.x3),
+              const AppCard(
+                child: AppListTile(
+                  label: '检查全部状态',
+                  value: '加载、空数据、错误、离线与未授权',
+                  route: AppRoute.stateGallery,
+                  icon: AppIconName.alert,
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
-      bottomNavigationBar: const PrimaryNavigation(selectedIndex: 0),
+        );
+      },
     );
   }
 }
@@ -131,7 +137,6 @@ class _QuickActions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final controller = AppScope.of(context);
     final items = <(String, AppIconName, AppRoute, bool)>[
       (
         '会员',
@@ -153,7 +158,20 @@ class _QuickActions extends StatelessWidget {
       children: items
           .map(
             (item) => InkWell(
-              onTap: () => controller.navigate(item.$3),
+              onTap: () {
+                // Shell-branch roots are already inside ShellScaffold; jumping
+                // avoids nesting a second shell. Other destinations push.
+                const shellRoots = {
+                  AppRoute.home,
+                  AppRoute.membership,
+                  AppRoute.profile,
+                };
+                if (shellRoots.contains(item.$3)) {
+                  context.go(pathFor(item.$3));
+                } else {
+                  context.push(pathFor(item.$3));
+                }
+              },
               child: Column(
                 children: [
                   DecoratedBox(

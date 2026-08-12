@@ -38,21 +38,24 @@ class _PreferenceScreenState extends State<PreferenceScreen> {
   @override
   Widget build(BuildContext context) {
     final controller = AppScope.of(context);
-    return AppPage(
-      title: widget.title,
-      child: ListView(
-        padding: const EdgeInsets.all(AppSpacing.x4),
-        children: [
-          AppCard(child: _editor()),
-          const SizedBox(height: AppSpacing.x4),
-          AppButton(
-            label: controller.busy ? '保存中…' : '保存设置',
-            icon: AppIconName.check,
-            onPressed: controller.busy || controller.user == null
-                ? null
-                : _save,
-          ),
-        ],
+    return ListenableBuilder(
+      listenable: controller,
+      builder: (context, _) => AppPage(
+        title: widget.title,
+        child: ListView(
+          padding: const EdgeInsets.all(AppSpacing.x4),
+          children: [
+            AppCard(child: _editor()),
+            const SizedBox(height: AppSpacing.x4),
+            AppButton(
+              label: controller.busy ? '保存中…' : '保存设置',
+              icon: AppIconName.check,
+              onPressed: controller.busy || controller.user == null
+                  ? null
+                  : _save,
+            ),
+          ],
+        ),
       ),
     );
   }

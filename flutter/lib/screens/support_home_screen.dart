@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import '../app/app_scope.dart';
+import 'package:go_router/go_router.dart';
 import '../design_system/components.dart';
 import '../navigation/app_route.dart';
+import '../navigation/app_route_paths.dart';
 import '../state/async_state.dart';
 import '../support/support_models.dart';
 import '../support/support_scope.dart';
@@ -40,13 +41,11 @@ class _SupportHomeScreenState extends State<SupportHomeScreen> {
           children: [
             AppButton(
               label: '联系客服',
-              onPressed: () =>
-                  AppScope.of(context).navigate(AppRoute.supportNewTicket),
+              onPressed: () => context.push(pathFor(AppRoute.supportNewTicket)),
             ),
             const SizedBox(height: AppSpacing.x3),
             OutlinedButton(
-              onPressed: () =>
-                  AppScope.of(context).navigate(AppRoute.supportFeedback),
+              onPressed: () => context.push(pathFor(AppRoute.supportFeedback)),
               child: const Text('产品反馈'),
             ),
             const SizedBox(height: AppSpacing.x5),
@@ -159,7 +158,7 @@ class _TicketState extends StatelessWidget {
                   final controller = SupportScope.of(context);
                   await controller.openTicket(ticket.id);
                   if (context.mounted) {
-                    AppScope.of(context).navigate(AppRoute.supportTicket);
+                    context.push(pathFor(AppRoute.supportTicket));
                   }
                 },
               ),

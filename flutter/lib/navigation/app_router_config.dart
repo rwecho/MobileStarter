@@ -18,13 +18,17 @@ import '../screens/launch_screens.dart';
 import '../screens/legal_screen.dart';
 import '../screens/notifications_screen.dart';
 import '../screens/orders_screen.dart';
+import '../screens/preference_screen.dart';
 import '../screens/profile_edit_screen.dart';
 import '../screens/profile_screens.dart';
+import '../screens/sessions_screen.dart';
 import '../screens/settings_screens.dart';
+import '../screens/settings_utility_screen.dart';
 import '../screens/state_gallery_screen.dart';
 import '../screens/statistics_screen.dart';
 import '../screens/support_form_screens.dart';
 import '../screens/support_home_screen.dart';
+import '../screens/text_size_screen.dart';
 
 /// Builds the app's GoRouter. `controller` drives auth state (redirect uses
 /// `signedIn`/`config`); `routerRefresh` re-evaluates redirects when it fires.
@@ -166,6 +170,62 @@ GoRouter buildAppRouter(
       GoRoute(
         path: pathFor(AppRoute.settings),
         builder: (context, state) => const SettingsScreen(),
+      ),
+      GoRoute(
+        path: pathFor(AppRoute.membershipPlans),
+        builder: (context, state) => const MembershipScreen(),
+      ),
+      GoRoute(
+        path: pathFor(AppRoute.devices),
+        builder: (context, state) => const SessionsScreen(),
+      ),
+      GoRoute(
+        path: pathFor(AppRoute.notificationSettings),
+        builder: (context, state) => const PreferenceScreen(
+          kind: PreferenceKind.notifications,
+          title: '通知设置',
+        ),
+      ),
+      GoRoute(
+        path: pathFor(AppRoute.privacy),
+        builder: (context, state) =>
+            const PreferenceScreen(kind: PreferenceKind.privacy, title: '隐私设置'),
+      ),
+      GoRoute(
+        path: pathFor(AppRoute.general),
+        builder: (context, state) =>
+            const PreferenceScreen(kind: PreferenceKind.general, title: '通用设置'),
+      ),
+      GoRoute(
+        path: pathFor(AppRoute.appearance),
+        builder: (context, state) => const PreferenceScreen(
+          kind: PreferenceKind.appearance,
+          title: '外观主题',
+        ),
+      ),
+      GoRoute(
+        path: pathFor(AppRoute.language),
+        builder: (context, state) =>
+            const PreferenceScreen(kind: PreferenceKind.language, title: '语言'),
+      ),
+      GoRoute(
+        path: pathFor(AppRoute.textSize),
+        builder: (context, state) => const TextSizeScreen(),
+      ),
+      GoRoute(
+        path: pathFor(AppRoute.storage),
+        builder: (context, state) =>
+            const SettingsUtilityScreen(kind: SettingsUtilityKind.storage),
+      ),
+      GoRoute(
+        path: pathFor(AppRoute.permissions),
+        builder: (context, state) =>
+            const SettingsUtilityScreen(kind: SettingsUtilityKind.permissions),
+      ),
+      GoRoute(
+        path: pathFor(AppRoute.about),
+        builder: (context, state) =>
+            const SettingsUtilityScreen(kind: SettingsUtilityKind.about),
       ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) =>

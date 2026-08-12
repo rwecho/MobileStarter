@@ -13,6 +13,11 @@ void main() {
     for (final route in AppRoute.values) {
       expect(appRoutePaths[route], isNotNull, reason: 'no path for $route');
     }
+    expect(
+      appRoutePaths.values.toSet().length,
+      appRoutePaths.length,
+      reason: 'duplicate paths',
+    );
   });
 
   testWidgets('signed-out push to a protected route redirects to sign-in and remembers target', (
@@ -34,6 +39,8 @@ void main() {
     expect(find.text('用户名、邮箱或手机号'), findsOneWidget);
     // The redirect remembered what the signed-out user was trying to reach.
     expect(controller.consumeAuthRedirectTarget(), AppRoute.profileEdit);
+    // consume clears the target — resume-once semantics.
+    expect(controller.consumeAuthRedirectTarget(), isNull);
   });
 
   testWidgets('signed-out push to a public route is not redirected', (tester) async {

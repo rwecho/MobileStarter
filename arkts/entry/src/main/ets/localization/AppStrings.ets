@@ -29,6 +29,8 @@ export enum AppString {
   Storage,
   HelpFeedback,
   Legal,
+  TermsOfService,
+  PrivacyPolicy,
   About,
   DeleteAccount,
   ThemeSystem,
@@ -85,6 +87,8 @@ function resName(key: AppString): string {
     case AppString.Storage: return 'storage'
     case AppString.HelpFeedback: return 'help_feedback'
     case AppString.Legal: return 'legal'
+    case AppString.TermsOfService: return 'terms_of_service'
+    case AppString.PrivacyPolicy: return 'privacy_policy'
     case AppString.About: return 'about'
     case AppString.DeleteAccount: return 'delete_account'
     case AppString.ThemeSystem: return 'theme_system'

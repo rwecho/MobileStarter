@@ -27,6 +27,8 @@
     { "name": "storage", "value": "Storage & cache" },
     { "name": "help_feedback", "value": "Help & feedback" },
     { "name": "legal", "value": "Terms & policies" },
+    { "name": "terms_of_service", "value": "Terms of Service" },
+    { "name": "privacy_policy", "value": "Privacy Policy" },
     { "name": "about", "value": "About" },
     { "name": "delete_account", "value": "Delete account" },
     { "name": "theme_system", "value": "Follow system" },

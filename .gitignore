@@ -32,7 +32,7 @@ flutter/lib/firebase_options.dart
 tool/mobileui/.dart_tool/
 
 # HarmonyOS
-arkts/oh_modules/
+arkts/**/oh_modules/
 arkts/build/
 arkts/**/build/
 arkts/.hvigor/

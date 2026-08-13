@@ -42,7 +42,8 @@ export struct SettingsPage {
               AppRoute.Permissions,
               AppRoute.Storage,
               AppRoute.HelpFeedback,
-              AppRoute.Legal,
+              AppRoute.TermsOfService,
+              AppRoute.PrivacyPolicy,
               AppRoute.About,
               AppRoute.DeleteAccount
             ])
@@ -120,6 +121,10 @@ struct SettingsGroup {
       case AppRoute.Storage: return appString(AppString.Storage, this.store.language)
       case AppRoute.HelpFeedback: return appString(AppString.HelpFeedback, this.store.language)
       case AppRoute.Legal: return appString(AppString.Legal, this.store.language)
+      case AppRoute.TermsOfService:
+        return appString(AppString.TermsOfService, this.store.language)
+      case AppRoute.PrivacyPolicy:
+        return appString(AppString.PrivacyPolicy, this.store.language)
       case AppRoute.About: return appString(AppString.About, this.store.language)
       case AppRoute.DeleteAccount: return appString(AppString.DeleteAccount, this.store.language)
       default: return routeTitle(route)

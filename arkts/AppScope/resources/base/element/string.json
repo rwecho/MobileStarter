@@ -27,6 +27,8 @@
     { "name": "storage", "value": "存储与缓存" },
     { "name": "help_feedback", "value": "帮助与反馈" },
     { "name": "legal", "value": "协议与政策" },
+    { "name": "terms_of_service", "value": "用户协议" },
+    { "name": "privacy_policy", "value": "隐私政策" },
     { "name": "about", "value": "关于与版本" },
     { "name": "delete_account", "value": "注销账号" },
     { "name": "theme_system", "value": "跟随系统" },

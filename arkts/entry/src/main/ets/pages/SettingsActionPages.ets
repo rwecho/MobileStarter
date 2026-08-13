@@ -7,6 +7,7 @@ import { AppColors, AppRadii, AppSpacing } from '../theme/AppTokens'
 import { LegalDocument } from '../domain/Models'
 import { pickAvatarDataUrl } from '../media/AvatarPicker'
 import { appString, AppString } from '../localization/AppStrings'
+import { lvMarkdownIn } from '@luvi/lv-markdown-in'
 
 @Component
 export struct AccountSecurityPage {
@@ -145,17 +146,31 @@ export struct LegalPage {
       List({ space: AppSpacing.x3 }) {
         ForEach(this.store.config?.legal ?? [], (document: LegalDocument) => {
           ListItem() {
-            Column({ space: AppSpacing.x2 }) {
-              Text(document.title).fontSize(18).fontWeight(FontWeight.Bold)
-              Text(`版本 ${document.revision}`).fontColor(AppColors.textSecondary)
-              Text(document.content).fontColor(AppColors.text)
+            Row() {
+              Column({ space: AppSpacing.x2 }) {
+                Text(document.title).fontSize(16).fontWeight(FontWeight.Bold)
+                Text(`版本 ${document.revision}`).fontSize(13).fontColor(AppColors.textSecondary)
+              }
+              .alignItems(HorizontalAlign.Start).layoutWeight(1)
+              AppIcon({ name: AppIconName.ChevronRight, color: AppColors.textSecondary })
             }
-            .alignItems(HorizontalAlign.Start).padding(AppSpacing.x4)
+            .padding(AppSpacing.x4)
             .backgroundColor(AppColors.surface).borderRadius(AppRadii.card)
+            .onClick(() => this.openDocument(document))
           }
         })
       }.padding(AppSpacing.x4).layoutWeight(1)
     }.width('100%').height('100%')
+  }
+
+  // 入口列表：点进单篇。privacy/terms 有独立路由，其它类型（subscription）暂
+  // 无专属路由，退回 LegalPage 自身不跳转。
+  private openDocument(document: LegalDocument): void {
+    if (document.type === 'privacy') {
+      this.store.navigate(AppRoute.PrivacyPolicy)
+    } else if (document.type === 'terms') {
+      this.store.navigate(AppRoute.TermsOfService)
+    }
   }
 }
 
@@ -173,7 +188,7 @@ export struct LegalDocumentPage {
             Text('当前 App 尚未配置该协议文档。').fontColor(AppColors.textSecondary)
           } else {
             Text(`版本 ${this.document()?.revision ?? ''}`).fontColor(AppColors.textSecondary)
-            Text(this.document()?.content ?? '').fontColor(AppColors.text)
+            lvMarkdownIn({ text: this.document()?.content ?? '', loadMode: 'text' })
           }
         }.alignItems(HorizontalAlign.Start).padding(AppSpacing.x4)
       }.layoutWeight(1)

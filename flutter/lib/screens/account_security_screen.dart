@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 import '../app/app_scope.dart';
 import '../design_system/app_icon.dart';
 import '../design_system/components.dart';
-import '../design_system/feedback.dart';
 import '../navigation/app_route.dart';
 import '../navigation/app_route_paths.dart';
 import '../theme/app_tokens.dart';
@@ -19,6 +18,8 @@ class AccountSecurityScreen extends StatefulWidget {
 class _AccountSecurityScreenState extends State<AccountSecurityScreen> {
   final current = TextEditingController();
   final next = TextEditingController();
+  // 新密码字段校验/服务端错误，内联显示在字段下方（见 issue #12 模式）。
+  String? nextError;
 
   @override
   Widget build(BuildContext context) {
@@ -51,7 +52,11 @@ class _AccountSecurityScreenState extends State<AccountSecurityScreen> {
             TextField(
               controller: next,
               obscureText: true,
-              decoration: const InputDecoration(labelText: '至少 8 位新密码'),
+              decoration: InputDecoration(
+                labelText: '至少 8 位新密码',
+                errorText: nextError,
+              ),
+              onChanged: (_) => setState(() => nextError = null),
             ),
             const SizedBox(height: AppSpacing.x4),
             AppButton(
@@ -70,16 +75,16 @@ class _AccountSecurityScreenState extends State<AccountSecurityScreen> {
   Future<void> _submit() async {
     final controller = AppScope.of(context);
     if (next.text.length < 8) {
-      showAppToast(context, '新密码至少需要 8 位', error: true);
+      setState(() => nextError = '新密码至少需要 8 位');
       return;
     }
     final changed = await controller.changePassword(current.text, next.text);
     if (!mounted) return;
     if (!changed) {
-      showAppToast(context, controller.consumeError() ?? '修改失败', error: true);
+      setState(() => nextError = controller.consumeError() ?? '修改失败');
       return;
     }
-    showAppToast(context, '密码已修改，请重新登录');
+    // 修改成功 → 跳登录（跳转本身即反馈，不再 toast）。
     context.go(pathFor(AppRoute.signIn));
   }
 

@@ -185,6 +185,7 @@ export struct NewSupportTicketPage {
   @State message: string = ''
   @State category: string = TICKET_CATEGORIES[0].id
   @State severity: string = 'normal'
+  @State formError: string = ''
 
   build() {
     Column() {
@@ -193,7 +194,10 @@ export struct NewSupportTicketPage {
         Column({ space: AppSpacing.x4 }) {
           TextInput({ placeholder: '主题（至少 4 字）', text: this.subject })
             .height(52).backgroundColor(AppColors.surface).borderRadius(AppRadii.control)
-            .onChange(value => this.subject = value)
+            .onChange(value => {
+              this.subject = value
+              this.formError = ''
+            })
           TextArea({ placeholder: '描述你遇到的问题（至少 4 字）', text: this.message })
             .height(140).backgroundColor(AppColors.surface).borderRadius(AppRadii.control)
             .onChange(value => this.message = value)
@@ -211,6 +215,10 @@ export struct NewSupportTicketPage {
             selected: this.severity,
             onSelect: value => this.severity = value
           })
+          if (this.formError.length > 0) {
+            Text(this.formError)
+              .fontSize(13).fontColor(AppColors.error).width('100%')
+          }
           AppButton({
             label: this.store.busy ? '提交中…' : '提交工单',
             onTap: () => this.submit()
@@ -226,9 +234,10 @@ export struct NewSupportTicketPage {
 
   private async submit(): Promise<void> {
     if (this.subject.trim().length < 4 || this.message.trim().length < 4) {
-      this.store.showToast('主题和描述至少各 4 字', true)
+      this.formError = '主题和描述至少各 4 字'
       return
     }
+    this.formError = ''
     await this.store.createTicket(this.category, this.severity, this.subject, this.message)
   }
 }
@@ -240,6 +249,7 @@ export struct ProductFeedbackPage {
   @State body: string = ''
   @State category: string = FEEDBACK_CATEGORIES[0].id
   @State rating: number = 5
+  @State formError: string = ''
 
   build() {
     Column() {
@@ -248,10 +258,16 @@ export struct ProductFeedbackPage {
         Column({ space: AppSpacing.x4 }) {
           TextInput({ placeholder: '标题（至少 4 字）', text: this.title })
             .height(52).backgroundColor(AppColors.surface).borderRadius(AppRadii.control)
-            .onChange(value => this.title = value)
+            .onChange(value => {
+              this.title = value
+              this.formError = ''
+            })
           TextArea({ placeholder: '你的反馈（至少 4 字）', text: this.body })
             .height(160).backgroundColor(AppColors.surface).borderRadius(AppRadii.control)
-            .onChange(value => this.body = value)
+            .onChange(value => {
+              this.body = value
+              this.formError = ''
+            })
           Text('类别').fontSize(13).fontColor(AppColors.textSecondary).width('100%')
           OptionRow({
             options: FEEDBACK_CATEGORIES.map(c => c.id),
@@ -266,6 +282,10 @@ export struct ProductFeedbackPage {
             selected: String(this.rating),
             onSelect: value => this.rating = Number(value)
           })
+          if (this.formError.length > 0) {
+            Text(this.formError)
+              .fontSize(13).fontColor(AppColors.error).width('100%')
+          }
           AppButton({
             label: this.store.busy ? '提交中…' : '提交反馈',
             onTap: () => this.submit()
@@ -277,9 +297,10 @@ export struct ProductFeedbackPage {
 
   private async submit(): Promise<void> {
     if (this.title.trim().length < 4 || this.body.trim().length < 4) {
-      this.store.showToast('标题和反馈至少各 4 字', true)
+      this.formError = '标题和反馈至少各 4 字'
       return
     }
+    this.formError = ''
     if (await this.store.submitFeedback(this.title, this.body, this.category, this.rating)) {
       this.store.back()
     }

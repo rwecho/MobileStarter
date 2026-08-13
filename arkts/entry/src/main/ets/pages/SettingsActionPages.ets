@@ -14,6 +14,8 @@ export struct AccountSecurityPage {
   @ObjectLink store: AppStore
   @State currentPassword: string = ''
   @State newPassword: string = ''
+  // 字段校验错误内联显示在对应输入框下方（见 issue #12 的模式）。
+  @State newPasswordError: string = ''
 
   build() {
     Column() {
@@ -24,7 +26,14 @@ export struct AccountSecurityPage {
         PasswordInput({ label: '当前密码', value: this.currentPassword,
           changed: value => this.currentPassword = value })
         PasswordInput({ label: '至少 8 位新密码', value: this.newPassword,
-          changed: value => this.newPassword = value })
+          changed: value => {
+            this.newPassword = value
+            this.newPasswordError = ''
+          } })
+        if (this.newPasswordError.length > 0) {
+          Text(this.newPasswordError)
+            .fontSize(13).fontColor(AppColors.error).width('100%')
+        }
         AppButton({ label: this.store.busy ? '修改中…' : '修改密码',
           icon: AppIconName.Lock, onTap: () => this.submit() })
         AppButton({ label: '退出全部设备',
@@ -36,9 +45,10 @@ export struct AccountSecurityPage {
 
   private async submit(): Promise<void> {
     if (this.newPassword.length < 8) {
-      this.store.showToast('新密码至少需要 8 位', true)
+      this.newPasswordError = '新密码至少需要 8 位'
       return
     }
+    this.newPasswordError = ''
     if (await this.store.changePassword(this.currentPassword, this.newPassword)) {
       this.store.replaceAll(AppRoute.SignIn)
     }

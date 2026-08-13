@@ -13,6 +13,7 @@ export struct SettingsUtilityPage {
   @State title: string = ''
   @State body: string = ''
   @State cacheBytes: number = 0
+  @State formError: string = ''
 
   aboutToAppear(): void {
     this.cacheBytes = localStore.configBytes()
@@ -44,10 +45,20 @@ export struct SettingsUtilityPage {
         Column({ space: AppSpacing.x4 }) {
           TextInput({ placeholder: '反馈标题', text: this.title })
             .height(52).backgroundColor(AppColors.surface).borderRadius(AppRadii.control)
-            .onChange(value => this.title = value)
+            .onChange(value => {
+              this.title = value
+              this.formError = ''
+            })
           TextInput({ placeholder: '告诉我们哪里可以做得更好', text: this.body })
             .height(160).backgroundColor(AppColors.surface).borderRadius(AppRadii.control)
-            .onChange(value => this.body = value)
+            .onChange(value => {
+              this.body = value
+              this.formError = ''
+            })
+          if (this.formError.length > 0) {
+            Text(this.formError)
+              .fontSize(13).fontColor(AppColors.error).width('100%')
+          }
           AppButton({ label: this.store.busy ? '提交中…' : '提交意见反馈',
             icon: AppIconName.Check, onTap: () => this.submit() })
         }.padding(AppSpacing.x4).layoutWeight(1)
@@ -74,9 +85,10 @@ export struct SettingsUtilityPage {
 
   private async submit(): Promise<void> {
     if (this.title.length < 4 || this.body.length < 4) {
-      this.store.showToast('标题和内容至少需要 4 个字符', true)
+      this.formError = '标题和内容至少需要 4 个字符'
       return
     }
+    this.formError = ''
     if (await this.store.submitFeedback(this.title, this.body)) {
       this.title = ''
       this.body = ''

@@ -88,7 +88,7 @@ export type RuntimeConfig = Readonly<{
   support: SupportConfig;
   auth: Readonly<{
     providers: ReadonlyArray<Readonly<{
-      id: 'password' | 'phone' | 'apple' | 'google' | 'github' | 'wechat';
+      id: 'password' | 'phone' | 'apple' | 'google' | 'github' | 'huawei' | 'wechat';
       enabled: boolean;
       platforms: readonly ('ios' | 'android' | 'harmonyos' | 'web')[];
       clientIds?: Readonly<Partial<Record<'ios' | 'android' | 'harmonyos' | 'web', string>>>;
@@ -194,6 +194,7 @@ export const defaultConfig: RuntimeConfig = {
       { id: 'apple', enabled: true, platforms: ['ios', 'android', 'web'] },
       { id: 'google', enabled: true, platforms: ['ios', 'android', 'web'] },
       { id: 'github', enabled: true, platforms: ['ios', 'android', 'harmonyos', 'web'] },
+      { id: 'huawei', enabled: true, platforms: ['harmonyos'], clientIds: {} },
       { id: 'wechat', enabled: false, platforms: ['ios', 'android', 'harmonyos'] },
     ],
     passwordPolicy: {

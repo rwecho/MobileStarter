@@ -60,7 +60,7 @@ export const resetPasswordSchema = z.object({
 });
 
 export const socialSignInSchema = z.object({
-  provider: z.enum(['apple', 'google', 'github']),
+  provider: z.enum(['apple', 'google', 'github', 'huawei']),
   idToken: z.string().min(20).optional(),
   authorizationCode: z.string().min(3).optional(),
   redirectUri: z.url().optional(),
@@ -240,7 +240,7 @@ export const runtimeConfigSchema = z.object({
   }),
   auth: z.object({
     providers: z.array(z.object({
-      id: z.enum(['password', 'phone', 'apple', 'google', 'github', 'wechat']),
+      id: z.enum(['password', 'phone', 'apple', 'google', 'github', 'huawei', 'wechat']),
       enabled: z.boolean(),
       platforms: z.array(z.enum(['ios', 'android', 'harmonyos', 'web'])),
       clientIds: z.object({

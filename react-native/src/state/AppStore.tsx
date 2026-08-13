@@ -55,6 +55,8 @@ type AppContextValue = Readonly<{
   setPendingPlanId: (planId: string | null) => void;
   toast: ToastState | null;
   confirm: ConfirmState | null;
+  lastAuthError: string | null;
+  clearAuthError: () => void;
   navigate: (route: AppRoute) => void;
   replace: (route: AppRoute) => void;
   back: () => void;
@@ -102,6 +104,9 @@ export function AppProvider({ children }: Readonly<{ children: ReactNode }>) {
   const [purchaseState, setPurchaseState] = useState<PurchaseState>({ kind: 'idle' });
   const [pendingPlanId, setPendingPlanId] = useState<string | null>(null);
   const [pendingRoute, setPendingRoute] = useState<AppRoute | null>(null);
+  // 最近一次请求失败的错误信息（认证失败内联显示在表单，见 issue #12）。
+  const [lastAuthError, setLastAuthError] = useState<string | null>(null);
+  const clearAuthError = useCallback(() => setLastAuthError(null), []);
 
   const refreshBootstrap = useCallback(async () => {
     const cached = await readCachedConfig();
@@ -137,10 +142,12 @@ export function AppProvider({ children }: Readonly<{ children: ReactNode }>) {
     try {
       const result = await operation();
       setOnline(true);
+      setLastAuthError(null);
       return result;
     } catch (error) {
       if (!(error instanceof ApiClientError)) setOnline(false);
-      feedback.showToast(error instanceof Error ? error.message : '操作失败', 'error');
+      const message = error instanceof Error ? error.message : '操作失败';
+      setLastAuthError(message);
       throw error;
     } finally {
       setBusy(false);
@@ -233,6 +240,8 @@ export function AppProvider({ children }: Readonly<{ children: ReactNode }>) {
     online,
     bootstrapped,
     busy,
+    lastAuthError,
+    clearAuthError,
     purchaseState,
     setPurchaseState,
     pendingPlanId,
@@ -257,6 +266,8 @@ export function AppProvider({ children }: Readonly<{ children: ReactNode }>) {
     openEntryRoute,
     refreshBootstrap,
     replace,
+    lastAuthError,
+    clearAuthError,
     user,
   ]);
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

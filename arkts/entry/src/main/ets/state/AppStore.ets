@@ -70,6 +70,9 @@ export class AppStore {
   user: AppUser | null = null
   toastMessage: string = ''
   toastError: boolean = false
+  // 最近一次认证失败的错误信息（内联显示在表单字段下方，见 AuthPage）。
+  // 认证成功后清空；输入变化时由页面清空。
+  lastAuthError: string = ''
   authProviders: Record<string, boolean> = {}
   authProviderPolicy: Record<string, boolean> = {}
   authProviderConfig: Record<string, Object> = {}
@@ -596,13 +599,22 @@ export class AppStore {
       this.user = payload.user
       this.signedIn = true
       this.online = true
+      this.lastAuthError = ''
       return true
     } catch (error) {
-      this.showApiError(error)
+      this.lastAuthError = this.authErrorMessage(error)
       return false
     } finally {
       this.busy = false
     }
+  }
+
+  private authErrorMessage(error: Error): string {
+    if (error instanceof ApiFailure) {
+      return error.message
+    }
+    this.online = false
+    return '网络连接失败，请稍后重试'
   }
 
   private showApiError(error: Error): void {

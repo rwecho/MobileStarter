@@ -28,6 +28,8 @@ export function AuthScreen({ mode }: Readonly<{ mode: AuthMode }>) {
     showToast,
     busy: accountBusy,
     config,
+    lastAuthError,
+    clearAuthError,
   } = useApp();
   const recovery = useAuthRecovery();
   const [email, setEmail] = useState('');
@@ -124,7 +126,7 @@ export function AuthScreen({ mode }: Readonly<{ mode: AuthMode }>) {
           <TextInput
             accessibilityLabel={mode === 'signIn' ? '账号' : '邮箱'}
             autoCapitalize="none"
-            onChangeText={setEmail}
+            onChangeText={(value) => { setEmail(value); clearAuthError(); }}
             placeholder={mode === 'signIn' ? '用户名 / 邮箱 / 手机号' : '邮箱'}
             style={styles.input}
             value={email}
@@ -136,7 +138,7 @@ export function AuthScreen({ mode }: Readonly<{ mode: AuthMode }>) {
         {mode !== 'forgot' && mode !== 'verify' && mode !== 'phone' ? (
           <TextInput
             accessibilityLabel="密码"
-            onChangeText={setPassword}
+            onChangeText={(value) => { setPassword(value); clearAuthError(); }}
             placeholder={mode === 'reset' ? '新密码' : '密码'}
             secureTextEntry
             style={styles.input}
@@ -153,6 +155,9 @@ export function AuthScreen({ mode }: Readonly<{ mode: AuthMode }>) {
             style={styles.input}
             value={code}
           />
+        ) : null}
+        {lastAuthError ? (
+          <Text style={authStyles.errorText}>{lastAuthError}</Text>
         ) : null}
         <AppButton
           disabled={busy || !isValid({ mode, email, password, username, code, phone, phoneCodeSent })}
@@ -251,4 +256,5 @@ const authStyles = StyleSheet.create({
   checkboxTarget: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
   consentText: { flexShrink: 1 },
   legalLinkInline: { color: colors.brand },
+  errorText: { color: colors.error, fontSize: 13 },
 });

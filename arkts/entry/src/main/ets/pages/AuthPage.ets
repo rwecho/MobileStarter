@@ -45,7 +45,10 @@ export struct AuthPage {
             .height(52)
             .backgroundColor(AppColors.surface)
             .borderRadius(AppRadii.control)
-            .onChange(value => this.email = value)
+            .onChange(value => {
+              this.email = value
+              this.store.lastAuthError = ''
+            })
         } else {
           Text(this.store.recoveryEmail)
             .fontColor(AppColors.textSecondary)
@@ -64,7 +67,10 @@ export struct AuthPage {
               this.mode === AuthMode.Phone ? InputType.Number : InputType.Password)
             .backgroundColor(AppColors.surface)
             .borderRadius(AppRadii.control)
-            .onChange(value => this.password = value)
+            .onChange(value => {
+              this.password = value
+              this.store.lastAuthError = ''
+            })
         }
         if (this.mode === AuthMode.SignUp) {
           TextInput({ placeholder: '用户名', text: this.username })
@@ -72,6 +78,14 @@ export struct AuthPage {
             .backgroundColor(AppColors.surface)
             .borderRadius(AppRadii.control)
             .onChange(value => this.username = value)
+        }
+        // 内联认证错误：紧贴表单显示，持久停留直到用户修改输入（替代底部 toast，
+        // 避免被键盘遮挡/一闪而过）。见 issue #12。
+        if (this.store.lastAuthError.length > 0) {
+          Text(this.store.lastAuthError)
+            .fontSize(13)
+            .fontColor(AppColors.error)
+            .width('100%')
         }
         AppButton({
           label: this.store.busy ? '正在处理…' : this.action(),
@@ -168,7 +182,6 @@ export struct AuthPage {
           return
         }
         if (await this.store.verifyPhoneCode(this.email, this.password)) {
-          this.store.showToast('手机号登录成功')
           this.store.completeAuthentication()
         }
         return
@@ -177,7 +190,6 @@ export struct AuthPage {
         if (!await this.store.signUp(this.email, this.password, this.username, this.termsRevision())) {
           return
         }
-        this.store.showToast('账号创建成功')
         this.store.completeAuthentication()
         return
       case AuthMode.SignIn:
@@ -185,7 +197,6 @@ export struct AuthPage {
         if (!await this.store.signIn(this.email, this.password)) {
           return
         }
-        this.store.showToast('登录成功')
         this.store.completeAuthentication()
     }
   }

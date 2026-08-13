@@ -29,6 +29,9 @@ class _AuthScreenState extends State<AuthScreen> {
   String? accountError;
   String? passwordError;
   String? usernameError;
+  // 服务端认证失败的错误信息，内联显示在提交按钮上方（替代底部 toast，避免
+  // 被键盘遮挡/一闪而过，见 issue #12）。输入变化时清空。
+  String? authError;
 
   @override
   void dispose() {
@@ -86,7 +89,11 @@ class _AuthScreenState extends State<AuthScreen> {
         break;
     }
     if (!success && mounted) {
-      showAppToast(context, controller.consumeError() ?? '操作失败');
+      // 认证失败：错误内联显示在表单（而非底部 toast），见 issue #12。
+      final message = controller.consumeError();
+      if (message != null) {
+        setState(() => authError = message);
+      }
     }
   }
 
@@ -153,6 +160,7 @@ class _AuthScreenState extends State<AuthScreen> {
                 labelText: _accountLabel(),
                 errorText: accountError,
               ),
+              onChanged: (_) => setState(() => authError = null),
             ),
             if (widget.mode == AuthMode.signUp) ...[
               const SizedBox(height: AppSpacing.x3),
@@ -162,6 +170,7 @@ class _AuthScreenState extends State<AuthScreen> {
                   labelText: '用户名',
                   errorText: usernameError,
                 ),
+                onChanged: (_) => setState(() => authError = null),
               ),
             ],
             const SizedBox(height: AppSpacing.x3),
@@ -178,8 +187,16 @@ class _AuthScreenState extends State<AuthScreen> {
                       : '密码',
                   errorText: passwordError,
                 ),
+                onChanged: (_) => setState(() => authError = null),
               ),
               const SizedBox(height: AppSpacing.x4),
+            ],
+            if (authError != null) ...[
+              Text(
+                authError!,
+                style: TextStyle(color: Theme.of(context).colorScheme.error, fontSize: 13),
+              ),
+              const SizedBox(height: AppSpacing.x2),
             ],
             AppButton(
               label: controller.busy ? '正在处理…' : copy.$2,

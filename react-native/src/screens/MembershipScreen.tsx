@@ -5,7 +5,6 @@ import { BillingPlan, MembershipTier } from '../domain/models';
 import { useApp } from '../state/AppStore';
 import { colors, membershipAccents, radii, spacing } from '../theme/tokens';
 import { styles } from '../theme/styles';
-import { PrimaryTabs } from '../navigation/PrimaryTabs';
 
 export function MembershipScreen() {
   const { config, user, navigate, busy, setPendingPlanId, setPurchaseState } = useApp();
@@ -59,7 +58,6 @@ export function MembershipScreen() {
         ) : <Text style={styles.secondary}>当前 App 暂未配置可售方案。</Text>}
         <ListRow label="查看订单记录" route="membership.orders" icon="gift" />
       </ScrollView>
-      <PrimaryTabs active="membership" />
     </View>
   );
 }

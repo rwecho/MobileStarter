@@ -269,7 +269,6 @@ export struct MembershipPage {
         .padding(AppSpacing.x4)
       }
       .layoutWeight(1)
-      BottomTabs({ store: this.store, selected: AppRoute.Membership })
     }
     .width('100%')
     .height('100%')

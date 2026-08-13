@@ -3,7 +3,6 @@ import { ScrollView, Text, View } from 'react-native';
 import { AppButton, AppCard, PageHeader } from '../design-system/components';
 import { useApp } from '../state/AppStore';
 import { styles } from '../theme/styles';
-import { PrimaryTabs } from '../navigation/PrimaryTabs';
 import { formatPrice } from './MembershipScreen';
 
 export function CheckoutScreen() {
@@ -34,7 +33,6 @@ export function CheckoutScreen() {
           <AppButton disabled={busy} label="确认订阅" icon="crown" onPress={() => void start()} />
         )}
       </ScrollView>
-      <PrimaryTabs active="membership" />
     </View>
   );
 }

@@ -5,21 +5,20 @@ import { usePreferences } from '../preferences/PreferencesProvider';
 import { useApp } from '../state/AppStore';
 import { spacing } from '../theme/tokens';
 
-type PrimaryTab = 'home' | 'membership' | 'profile';
+type PrimaryTab = 'home' | 'profile';
 
-// 悬浮胶囊 tab bar：圆角卡片 + 阴影 + 与屏幕边缘留白，仍占文档流（三屏内容区无需改 padding）。
+// 悬浮胶囊 tab bar：圆角卡片 + 阴影 + 与屏幕边缘留白，仍占文档流（两屏内容区无需改 padding）。
 // 选中项用 brandSoft 药丸背景高亮，观感更现代。
 export function PrimaryTabs({ active }: Readonly<{ active: PrimaryTab }>) {
   const { replace } = useApp();
   const { locale, palette } = usePreferences();
   const labels = locale === 'en-US'
-    ? { home: 'Home', membership: 'Membership', profile: 'Profile' }
-    : { home: '首页', membership: '会员', profile: '我的' };
+    ? { home: 'Home', profile: 'Profile' }
+    : { home: '首页', profile: '我的' };
   return (
     <View style={tabStyles.dock}>
       <View style={[tabStyles.bar, { backgroundColor: palette.surface }]}>
         <Tab active={active === 'home'} icon="home" label={labels.home} onPress={() => replace('home')} />
-        <Tab active={active === 'membership'} icon="crown" label={labels.membership} onPress={() => replace('membership.home')} />
         <Tab active={active === 'profile'} icon="user" label={labels.profile} onPress={() => replace('profile.home')} />
       </View>
     </View>

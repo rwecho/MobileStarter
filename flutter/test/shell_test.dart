@@ -51,10 +51,11 @@ void main() {
     expect(find.text('MobileStarter'), findsOneWidget, reason: 'home tab renders');
 
     // Switch tabs by going to another shell branch location (the mechanism
-    // ShellScaffold's NavigationBar drives via goBranch).
-    router.go(pathFor(AppRoute.membership));
+    // ShellScaffold's NavigationBar drives via goBranch). The shell now has two
+    // branches: home + profile (membership is a pushed child page).
+    router.go(pathFor(AppRoute.profile));
     await tester.pumpAndSettle();
-    expect(find.text('会员中心'), findsOneWidget, reason: 'membership tab renders');
+    expect(find.text('登录后同步你的数据'), findsOneWidget, reason: 'profile tab renders');
 
     router.go(pathFor(AppRoute.home));
     await tester.pumpAndSettle();

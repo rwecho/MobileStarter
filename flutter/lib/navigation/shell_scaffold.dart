@@ -24,7 +24,7 @@ class ShellScaffold extends StatelessWidget {
     if (_branchPaths.length > index) telemetry.screen(_branchPaths[index]);
   }
 
-  static const _branchPaths = ['/home', '/membership', '/profile'];
+  static const _branchPaths = ['/home', '/profile'];
 
   @override
   Widget build(BuildContext context) {
@@ -40,13 +40,6 @@ class ShellScaffold extends StatelessWidget {
               color: IconTheme.of(context).color,
             ),
             label: localizedText(context, '首页', 'Home'),
-          ),
-          NavigationDestination(
-            icon: AppIcon(
-              AppIconName.crown,
-              color: IconTheme.of(context).color,
-            ),
-            label: localizedText(context, '会员', 'Membership'),
           ),
           NavigationDestination(
             icon: AppIcon(

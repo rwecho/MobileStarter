@@ -172,6 +172,10 @@ GoRouter buildAppRouter(
         builder: (context, state) => const SettingsScreen(),
       ),
       GoRoute(
+        path: pathFor(AppRoute.membership),
+        builder: (context, state) => const MembershipScreen(),
+      ),
+      GoRoute(
         path: pathFor(AppRoute.membershipPlans),
         builder: (context, state) => const MembershipScreen(),
       ),
@@ -234,21 +238,13 @@ GoRouter buildAppRouter(
           // NOTE: do NOT add a shared NavigatorObserver to branches — a single
           // observer instance can only attach to ONE navigator (NavigatorState
           // asserts observer.navigator == null), so sharing it across the root
-          // + 3 branch navigators crashes. Tab-switch telemetry is emitted from
+          // + branch navigators crashes. Tab-switch telemetry is emitted from
           // ShellScaffold._goBranch instead.
           StatefulShellBranch(
             routes: [
               GoRoute(
                 path: pathFor(AppRoute.home),
                 builder: (context, state) => const HomeScreen(),
-              ),
-            ],
-          ),
-          StatefulShellBranch(
-            routes: [
-              GoRoute(
-                path: pathFor(AppRoute.membership),
-                builder: (context, state) => const MembershipScreen(),
               ),
             ],
           ),

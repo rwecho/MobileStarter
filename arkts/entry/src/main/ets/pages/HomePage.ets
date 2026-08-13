@@ -182,12 +182,6 @@ export struct BottomTabs {
         icon: AppIconName.Home, active: this.selected === AppRoute.Home,
         onTap: () => this.store.replaceAll(AppRoute.Home) })
       TabItem({
-        label: localized('会员', 'Membership', this.store.language),
-        icon: AppIconName.Crown,
-        active: this.selected === AppRoute.Membership,
-        onTap: () => this.store.replaceAll(AppRoute.Membership)
-      })
-      TabItem({
         label: localized('我的', 'Profile', this.store.language),
         icon: AppIconName.User,
         active: this.selected === AppRoute.Profile,

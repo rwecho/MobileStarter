@@ -78,25 +78,36 @@ export struct ChoicePreferencePage {
   @ObjectLink store: AppStore
   @Prop route: AppRoute
   @State selected: string = ''
+  @State textScale: number = 1
 
   aboutToAppear(): void {
     const settings = this.store.user?.settings
     if (this.route === AppRoute.Appearance) this.selected = this.store.theme
     if (this.route === AppRoute.Language) this.selected = this.store.language
-    if (this.route === AppRoute.TextSize) this.selected = String(this.store.textScale)
+    if (this.route === AppRoute.TextSize) this.textScale = this.store.textScale
   }
 
   build() {
     Column() {
       PageHeader({ store: this.store, title: this.title() })
       Column({ space: AppSpacing.x3 }) {
-        ForEach(this.options(), (option: string) => {
-          Button(this.label(option))
-            .width('100%').height(52)
-            .fontColor(option === this.selected ? AppColors.onBrand : AppColors.text)
-            .backgroundColor(option === this.selected ? AppColors.brand : AppColors.surface)
+        if (this.route === AppRoute.TextSize) {
+          this.textSizeSlider()
+        } else {
+          ForEach(this.options(), (option: string) => {
+            Row({ space: AppSpacing.x3 }) {
+              Radio({ group: 'choice_pref', value: option })
+                .checked(option === this.selected)
+                .onChange((checked: boolean) => {
+                  if (checked) this.selected = option
+                })
+              Text(this.label(option)).fontSize(16).fontColor(AppColors.text)
+            }
+            .width('100%').height(52).padding({ left: AppSpacing.x4 })
+            .backgroundColor(AppColors.surface).borderRadius(AppRadii.card)
             .onClick(() => this.selected = option)
-        })
+          })
+        }
         AppButton({ label: this.store.busy
           ? appString(AppString.Saving, this.store.language)
           : appString(AppString.SaveSettings, this.store.language),
@@ -105,16 +116,37 @@ export struct ChoicePreferencePage {
     }.width('100%').height('100%')
   }
 
+  @Builder
+  textSizeSlider() {
+    Column({ space: AppSpacing.x4 }) {
+      Text(`${this.textScale.toFixed(2)}×`).fontSize(16).fontWeight(FontWeight.Bold)
+      Slider({ value: this.textScale, min: 0.85, max: 1.3, step: 0.05 })
+        .blockColor(AppColors.brand)
+        .selectedColor(AppColors.brand)
+        .onChange((value: number) => {
+          this.textScale = value
+        })
+      Row() {
+        Text(appString(AppString.TextSmall, this.store.language))
+          .fontSize(12).fontColor(AppColors.textSecondary)
+        Blank()
+        Text(appString(AppString.TextExtraLarge, this.store.language))
+          .fontSize(12).fontColor(AppColors.textSecondary)
+      }.width('100%')
+    }
+    .width('100%')
+  }
+
   private save(): void {
     if (this.route === AppRoute.Appearance) this.store.saveSetting('theme', this.selected)
     if (this.route === AppRoute.Language) this.store.saveSetting('language', this.selected)
-    if (this.route === AppRoute.TextSize) this.store.saveSetting('textScale', Number(this.selected))
+    if (this.route === AppRoute.TextSize) this.store.saveSetting('textScale', this.textScale)
   }
 
   private options(): string[] {
     if (this.route === AppRoute.Appearance) return ['system', 'light', 'dark']
     if (this.route === AppRoute.Language) return ['zh-CN', 'en-US']
-    return ['0.9', '1', '1.15', '1.3']
+    return []
   }
 
   private label(value: string): string {

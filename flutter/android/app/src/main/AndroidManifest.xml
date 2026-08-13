@@ -31,6 +31,15 @@
                 <data android:scheme="mobilestarter" android:host="open"/>
                 <data android:scheme="mobileui" android:host="open"/>
             </intent-filter>
+            <!-- Android App Link: opens https://auth.zhongbei.tech/* into this app.
+                 autoVerify + server assetlinks.json (SHA-256 signing fingerprint)
+                 make it a verified app link. Requires the release-signed APK. -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="https" android:host="auth.zhongbei.tech" android:pathPrefix="/"/>
+            </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->

@@ -30,6 +30,16 @@
           "scheme": "mobileui",
           "host": "open"
         }]
+      }, {
+        // https deep link (HarmonyOS web intent / App Linking). Opens
+        // https://auth.zhongbei.tech/* into this app. Full App Linking
+        // verification requires AGC (AppGallery Connect) domain association.
+        "entities": ["entity.system.browsable"],
+        "actions": ["ohos.want.action.viewData"],
+        "uris": [{
+          "scheme": "https",
+          "host": "auth.zhongbei.tech"
+        }]
       }]
     }],
     "requestPermissions": [{

@@ -34,7 +34,10 @@
     "ios": {
       "usesAppleSignIn": true,
       "bundleIdentifier": "com.mobileui.mobilestarter",
-      "googleServicesFile": "./GoogleService-Info.plist"
+      "googleServicesFile": "./GoogleService-Info.plist",
+      "associatedDomains": [
+        "applinks:auth.zhongbei.tech"
+      ]
     },
     "android": {
       "package": "com.mobileui.mobilestarter",
@@ -42,7 +45,22 @@
         "foregroundImage": "./assets/splash-icon.png",
         "backgroundColor": "#A84444"
       },
-      "googleServicesFile": "./google-services.json"
+      "googleServicesFile": "./google-services.json",
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "data": [
+            {
+              "scheme": "https",
+              "host": "auth.zhongbei.tech"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
+      ]
     }
   }
 }

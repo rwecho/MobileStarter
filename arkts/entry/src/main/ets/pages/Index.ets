@@ -118,8 +118,15 @@ struct Index {
         ProductFeedbackPage({ store: this.store })
       } else if (name === 'StateGallery') {
         StateGalleryPage({ store: this.store })
-      } else {
+      } else if (name === 'DeleteAccount' || name === 'NotificationSettings' ||
+        name === 'Privacy' || name === 'General') {
+        // 通用设置路由（注销账号 / 通知 / 隐私分析 / 通用开关）走 SettingDetailPage。
         SettingDetailPage({ store: this.store, route: this.routeFromName(name) })
+      } else {
+        // 未注册路由：明确 404 提示，避免静默落到错误页（issue #9）。
+        Column() {
+          Text(`页面不存在（${name}）`).fontSize(16).fontColor(AppColors.textSecondary)
+        }.width('100%').height('100%').justifyContent(FlexAlign.Center)
       }
     }
     .hideTitleBar(true)

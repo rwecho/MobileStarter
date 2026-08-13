@@ -1,3 +1,4 @@
+import { createHmac, randomUUID } from 'node:crypto';
 import { database, nowIso, runTransaction } from './database';
 import { createUserSession } from './auth';
 import { ApiError } from './http';
@@ -96,6 +97,54 @@ async function findOrCreatePhoneUser(appId: string, phone: string) {
   return userId;
 }
 
+/** 阿里云 RPC 签名（percentEncode），Node 自带 crypto 实现，无额外依赖。 */
+function percentEncode(s: string): string {
+  return encodeURIComponent(s)
+    .replace(/\+/g, '%20')
+    .replace(/\*/g, '%2A')
+    .replace(/%7E/g, '~');
+}
+
+/** 直接用阿里云短信（dysmsapi）发送验证码。 */
+async function sendSmsAliyun(phone: string, code: string): Promise<void> {
+  const accessKeyId = process.env.MOBILEUI_ALIYUN_ACCESS_KEY_ID;
+  const accessKeySecret = process.env.MOBILEUI_ALIYUN_ACCESS_KEY_SECRET;
+  const signName = process.env.MOBILEUI_ALIYUN_SIGN_NAME;
+  const templateCode = process.env.MOBILEUI_ALIYUN_TEMPLATE_CODE;
+  if (!accessKeyId || !accessKeySecret || !signName || !templateCode) {
+    throw new Error('aliyun_sms_not_configured');
+  }
+  const params: Record<string, string> = {
+    Action: 'SendSms',
+    Version: '2017-05-25',
+    RegionId: process.env.MOBILEUI_ALIYUN_REGION ?? 'cn-hangzhou',
+    PhoneNumbers: phone.replace(/^\+86/, ''),
+    SignName: signName,
+    TemplateCode: templateCode,
+    TemplateParam: JSON.stringify({ code, time: '5' }),
+    AccessKeyId: accessKeyId,
+    Format: 'JSON',
+    SignatureMethod: 'HMAC-SHA1',
+    SignatureVersion: '1.0',
+    SignatureNonce: randomUUID(),
+    Timestamp: new Date().toISOString().replace(/\.\d{3}Z$/, 'Z'),
+  };
+  const canonical = Object.keys(params).sort()
+    .map((k) => `${percentEncode(k)}=${percentEncode(params[k]!)}`)
+    .join('&');
+  const stringToSign = `POST&%2F&${percentEncode(canonical)}`;
+  const signature = createHmac('sha1', `${accessKeySecret}&`).update(stringToSign).digest('base64');
+  params.Signature = signature;
+  const url = `https://dysmsapi.aliyuncs.com/?${Object.keys(params)
+    .map((k) => `${encodeURIComponent(k)}=${encodeURIComponent(params[k]!)}`)
+    .join('&')}`;
+  const response = await fetch(url, { method: 'POST', signal: AbortSignal.timeout(8000) });
+  const body = await response.json() as { Code?: string; Message?: string };
+  if (!response.ok || body.Code !== 'OK') {
+    throw new Error(`aliyun_sms_${body.Code ?? 'HTTP_' + response.status} ${body.Message ?? ''}`.trim());
+  }
+}
+
 async function deliverPhoneCode(appId: string, phone: string, code: string) {
   const messageId = createId();
   const payload = JSON.stringify({ code, expiresInMinutes: challengeMinutes });
@@ -104,26 +153,32 @@ async function deliverPhoneCode(appId: string, phone: string, code: string) {
       id, app_id, channel, recipient, template, payload, status, created_at
     ) VALUES (?, ?, 'sms', ?, 'phone_login_code', ?, 'pending', ?)
   `).run(messageId, appId, phone, payload, nowIso());
-  const endpoint = process.env.MOBILEUI_SMS_ENDPOINT;
-  if (!endpoint) return;
   try {
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        authorization: `Bearer ${process.env.MOBILEUI_SMS_API_KEY ?? ''}`,
-      },
-      body: JSON.stringify({ appId, to: phone, template: 'phone_login_code', code }),
-      signal: AbortSignal.timeout(8000),
-    });
-    if (!response.ok) throw new Error(`HTTP_${response.status}`);
+    // 优先：auth 内直接阿里云短信。未配置则回退到自建网关 endpoint（MOBILEUI_SMS_ENDPOINT）。
+    if (process.env.MOBILEUI_ALIYUN_ACCESS_KEY_ID) {
+      await sendSmsAliyun(phone, code);
+    } else {
+      const endpoint = process.env.MOBILEUI_SMS_ENDPOINT;
+      if (!endpoint) return;
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          authorization: `Bearer ${process.env.MOBILEUI_SMS_API_KEY ?? ''}`,
+        },
+        body: JSON.stringify({ appId, to: phone, template: 'phone_login_code', code }),
+        signal: AbortSignal.timeout(8000),
+      });
+      if (!response.ok) throw new Error(`HTTP_${response.status}`);
+    }
     await database.prepare(
       'UPDATE outbound_messages SET status = ?, sent_at = ? WHERE id = ?',
     ).run('sent', nowIso(), messageId);
-  } catch {
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : 'DELIVERY_FAILED';
     await database.prepare(`
       UPDATE outbound_messages SET status = ?, error_code = ? WHERE id = ?
-    `).run('failed', 'DELIVERY_FAILED', messageId);
+    `).run('failed', reason.slice(0, 100), messageId);
   }
 }
 

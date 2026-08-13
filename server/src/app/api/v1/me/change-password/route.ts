@@ -9,8 +9,13 @@ export async function POST(request: NextRequest) {
   try {
     const { user } = await requireAuth(request);
     const input = passwordSchema.parse(await request.json());
-    const valid = await verifyPassword(user.password_hash, input.currentPassword);
-    if (!valid) throw new ApiError(403, 'CURRENT_PASSWORD_INVALID', '当前密码不正确');
+    // 无密码账号（手机号/华为登录，password_hash 为 external$xxx）没有"当前密码"，
+    // 允许直接设置新密码；有密码账号才校验当前密码。
+    const hasRealPassword = !user.password_hash.startsWith('external$');
+    if (hasRealPassword) {
+      const valid = await verifyPassword(user.password_hash, input.currentPassword ?? '');
+      if (!valid) throw new ApiError(403, 'CURRENT_PASSWORD_INVALID', '当前密码不正确');
+    }
     const nextHash = await hashPassword(input.newPassword);
     await database.prepare(
       'UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?',

@@ -163,6 +163,8 @@ export function toPublicUser(row: UserRow): PublicUser {
     emailVerified: row.email_verified === 1,
     consentVersion: row.consent_version,
     createdAt: row.created_at,
+    // 华为/手机号登录生成伪邮箱（xxx@phone.invalid / xxx@invalid.local），不算真实邮箱
+    hasEmail: !row.email.endsWith('@phone.invalid') && !row.email.endsWith('@invalid.local'),
   };
 }
 

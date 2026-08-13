@@ -70,13 +70,16 @@ export const socialSignInSchema = z.object({
 });
 
 export const profileSchema = z.object({
+  // 支持修改 username（手机号登录自动生成的"手机用户 xxxx"等可自定义）
+  username: z.string().trim().min(2).max(24).optional(),
   displayName: z.string().trim().min(1).max(40).optional(),
   bio: z.string().trim().max(160).optional(),
   avatarUrl: z.union([z.url(), z.string().startsWith('data:image/')]).nullable().optional(),
 }).strict();
 
 export const passwordSchema = z.object({
-  currentPassword: z.string().min(1).max(72),
+  // 当前密码可选：无密码账号（手机号/华为登录，password_hash=external$xxx）首次设置密码时可不填
+  currentPassword: z.string().min(1).max(72).optional(),
   newPassword: z.string().min(8).max(72),
 });
 

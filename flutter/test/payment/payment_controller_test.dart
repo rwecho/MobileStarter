@@ -1,3 +1,6 @@
+@Tags(['integration'])
+library;
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mobilestarter_flutter/app/runtime_models.dart';
 import 'package:mobilestarter_flutter/payment/mock_payment_provider.dart';

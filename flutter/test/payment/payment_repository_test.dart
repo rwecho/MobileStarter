@@ -1,3 +1,6 @@
+@Tags(['integration'])
+library;
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mobilestarter_flutter/payment/payment_repository.dart';
 import 'package:mobilestarter_flutter/payment/token_store.dart';

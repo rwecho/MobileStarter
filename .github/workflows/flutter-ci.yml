@@ -30,4 +30,14 @@ jobs:
           cache: true
       - run: flutter pub get
       - run: flutter analyze
-      - run: flutter test
+      # Runs unit + widget tests (incl. MockClient-driven bootstrap). Excludes
+      # the @Tags(['integration']) payment tests, which hit the live dev server
+      # (localhost:3210) and can't run in CI. defines are needed because the
+      # HTTP client sends x-app-id/x-app-environment from String.fromEnvironment.
+      - run: >-
+          flutter test
+          --dart-define=MOBILEUI_API_URL=http://localhost:3210
+          --dart-define=MOBILEUI_APP_ID=zhongbei
+          --dart-define=MOBILEUI_APP_ENVIRONMENT=development
+          --dart-define=MOBILEUI_PLATFORM=ios
+          --exclude-tags integration

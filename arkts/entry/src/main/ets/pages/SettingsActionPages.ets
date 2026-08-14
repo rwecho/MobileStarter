@@ -5,7 +5,8 @@ import { AppButton, AppListRow, PageHeader } from '../design_system/Components'
 import { AppIcon, AppIconName } from '../design_system/AppIcon'
 import { AppColors, AppRadii, AppSpacing } from '../theme/AppTokens'
 import { LegalDocument } from '../domain/Models'
-import { pickAvatarDataUrl } from '../media/AvatarPicker'
+import { pickAvatarDataUrl, pickAvatarUri } from '../media/AvatarPicker'
+import { AvatarEditor } from './AvatarEditor'
 import { appString, AppString } from '../localization/AppStrings'
 import { lvMarkdownIn } from '@luvi/lv-markdown-in'
 
@@ -275,6 +276,9 @@ export struct ProfileEditPage {
   @State displayName: string = ''
   @State bio: string = ''
   @State avatarUrl: string = ''
+  // 头像编辑 sheet：选图后置 true 弹出 AvatarEditor（约 2/3 屏高）。
+  @State showAvatarEditor: boolean = false
+  @State editorImageUri: string = ''
 
   aboutToAppear(): void {
     this.displayName = this.store.user?.displayName ?? ''
@@ -323,16 +327,37 @@ export struct ProfileEditPage {
         .constraintSize({ minHeight: '100%' })
         .justifyContent(FlexAlign.Start)
       }.layoutWeight(1)
-    }.width('100%').height('100%')
+    }
+    .width('100%').height('100%')
+    .bindSheet($$this.showAvatarEditor, this.avatarEditorBuilder(), {
+      height: SheetSize.LARGE
+    })
+  }
+
+  @Builder
+  avatarEditorBuilder() {
+    AvatarEditor({
+      store: this.store,
+      imageUri: this.editorImageUri,
+      onDone: (url: string) => {
+        this.showAvatarEditor = false
+        this.avatarUrl = url
+      },
+      onCancel: () => {
+        this.showAvatarEditor = false
+      }
+    })
   }
 
   private async pickAvatar(): Promise<void> {
-    const context = this.getUIContext().getHostContext() as common.UIAbilityContext
     try {
-      const dataUrl = await pickAvatarDataUrl(context)
-      if (dataUrl !== null) this.avatarUrl = dataUrl
+      const uri = await pickAvatarUri()
+      if (uri !== null) {
+        this.editorImageUri = uri
+        this.showAvatarEditor = true
+      }
     } catch (error) {
-      this.store.showToast('头像处理失败，请重试', true)
+      this.store.showToast('选择图片失败，请重试', true)
     }
   }
 }

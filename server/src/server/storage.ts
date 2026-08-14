@@ -116,12 +116,15 @@ export interface SignUploadResult {
   method: 'PUT';
   headers: Record<string, string>;
   objectKey: string;
-  downloadUrl: string;
+  // Access URL for the stored object — permanent public URL when S3_PUBLIC_BASE
+  // is set, otherwise an opaque `s3://` reference the client resolves via
+  // GET /urls?key=. The client uses this for <img>/<video>/preview/download.
+  url: string;
 }
 
 // Returns a short-lived presigned PUT URL the client uploads the file to
 // directly (server never streams the bytes). The object key is opaque to the
-// client; it stores `downloadUrl` (or objectKey) as the persisted reference.
+// client; it stores `url` (or objectKey) as the persisted reference.
 export async function signUpload(params: {
   appId: string;
   environment: string;
@@ -142,13 +145,14 @@ export async function signUpload(params: {
     method: 'PUT',
     headers: { 'content-type': params.contentType },
     objectKey: key,
-    downloadUrl: publicOrPresigned(bucket, key),
+    url: urlFor(bucket, key),
   };
 }
 
-// Returns a download URL: a direct public/CDN URL if S3_PUBLIC_BASE is set,
-// otherwise a presigned GET URL (private bucket).
-export async function signDownload(params: {
+// Returns an access URL for the object: a direct public/CDN URL if
+// S3_PUBLIC_BASE is set, otherwise a short-lived presigned GET URL. The client
+// decides the use (download / preview / stream / embed).
+export async function resolveObjectUrl(params: {
   appId: string;
   objectKey: string;
 }): Promise<{ url: string }> {
@@ -161,9 +165,8 @@ export async function signDownload(params: {
   return { url };
 }
 
-function publicOrPresigned(bucket: string, key: string): string {
+function urlFor(bucket: string, key: string): string {
   if (PUBLIC_BASE) return `${PUBLIC_BASE}/${bucket}/${key}`;
-  // No public base: return a relative reference the server resolves on
-  // download. Clients should call sign-download for a fresh presigned URL.
+  // No public base: opaque reference the client resolves via GET /urls?key=.
   return `s3://${bucket}/${key}`;
 }

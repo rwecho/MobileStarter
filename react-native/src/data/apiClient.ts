@@ -48,7 +48,31 @@ export class ApiClientError extends Error {
   }
 }
 
+// S3 storage upload (BaaS): presigned PUT 直传 OSS。url 为对象访问 URL，
+// avatar 等场景存它（base64 退役）。
+interface SignUploadResult {
+  uploadUrl: string;
+  url: string;
+  objectKey: string;
+}
+
+async function uploadAvatarToStorage(jpegBase64: string, userId: string): Promise<string> {
+  const sign = await request<SignUploadResult>('/api/v1/storage/uploads', jsonOptions(
+    'POST',
+    { path: `avatars/${userId}-${Date.now()}.jpg`, contentType: 'image/jpeg' },
+  ));
+  const binary = Uint8Array.from(atob(jpegBase64), c => c.charCodeAt(0));
+  const put = await fetch(sign.uploadUrl, {
+    method: 'PUT',
+    headers: { 'content-type': 'image/jpeg' },
+    body: binary,
+  });
+  if (!put.ok) throw new Error(`对象存储上传失败 ${put.status}`);
+  return sign.url;
+}
+
 export const apiClient = {
+  uploadAvatarToStorage,
   bootstrap: () => request<BootstrapPayload>('/api/v1/bootstrap'),
   signIn: (identifier: string, password: string) => requestAuth('/api/v1/auth/sign-in', {
     identifier,

@@ -4,6 +4,7 @@ import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import type { ImagePickerAsset } from 'expo-image-picker';
 import { AppButton } from '../design-system/components';
 import { AppIcon, IconName } from '../design-system/AppIcon';
+import { useApp } from '../state/AppStore';
 import { usePreferences } from '../preferences/PreferencesProvider';
 import { colors, radii, spacing } from '../theme/tokens';
 import { styles } from '../theme/styles';
@@ -25,6 +26,7 @@ export function AvatarCropEditor({
   onConfirm: (avatarUrl: string) => void;
 }>) {
   const { palette } = usePreferences();
+  const { user, showToast } = useApp();
   const [zoom, setZoom] = useState(initialZoom);
   const [offset, setOffset] = useState<Point>({ x: 0, y: 0 });
   const [processing, setProcessing] = useState(false);
@@ -74,7 +76,15 @@ export function AvatarCropEditor({
         [{ crop }, { resize: { width: 512, height: 512 } }],
         { base64: true, compress: 0.78, format: SaveFormat.JPEG },
       );
-      if (result.base64) onConfirm(`data:image/jpeg;base64,${result.base64}`);
+      if (!result.base64) throw new Error('裁剪失败');
+      // base64 → OSS：presigned PUT 直传，avatarUrl 存对象 URL（不再 data URL）。
+      const { apiClient } = await import('../data/apiClient');
+      const url = await apiClient.uploadAvatarToStorage(
+        result.base64, user?.id ?? 'anon',
+      );
+      onConfirm(url);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : '头像上传失败', 'error');
     } finally {
       setProcessing(false);
     }

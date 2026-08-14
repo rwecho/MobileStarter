@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -8,6 +6,7 @@ import '../design_system/app_icon.dart';
 import '../design_system/components.dart';
 import '../design_system/feedback.dart';
 import '../theme/app_tokens.dart';
+import 'avatar_editor_sheet.dart';
 import 'profile_identity_card.dart';
 
 class ProfileEditScreen extends StatefulWidget {
@@ -103,19 +102,15 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
 
   Future<void> _pickAvatar() async {
     final picker = ImagePicker();
-    final selection = await picker.pickImage(
-      source: ImageSource.gallery,
-      maxWidth: 512,
-      maxHeight: 512,
-      imageQuality: 78,
-    );
+    // 原图交给编辑 sheet 裁剪（选图时不预压缩，编辑后统一 512×512）。
+    final selection = await picker.pickImage(source: ImageSource.gallery);
     if (selection == null || !mounted) return;
-    // image_picker has already resized/compressed to JPEG; wrap as a data URL
-    // and persist via updateProfile (no separate upload endpoint, like RN).
     final bytes = await selection.readAsBytes();
-    setState(() {
-      avatarUrl = 'data:image/jpeg;base64,${base64Encode(bytes)}';
-    });
+    if (!mounted) return;
+    final url = await showAvatarEditorSheet(context, imageBytes: bytes);
+    if (url != null && mounted) {
+      setState(() => avatarUrl = url);
+    }
   }
 
   Future<void> _save() async {

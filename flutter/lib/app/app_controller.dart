@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/foundation.dart';
 
 import '../auth/social_auth.dart';
@@ -154,6 +156,20 @@ final class AppController extends ChangeNotifier {
     _user = result;
     notifyListeners();
     return true;
+  }
+
+  /// 头像上传：JPEG bytes → presigned PUT 直传 OSS → 返回对象 URL。
+  /// 编辑 sheet 裁剪完成后调用；avatarUrl 存返回的 url（不再 base64）。
+  Future<String?> uploadAvatar(Uint8List imageBytes) async {
+    try {
+      final userId = user?.id ?? 'anon';
+      final path = 'avatars/$userId-${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final sign = await _repository.signUpload(path, 'image/png');
+      await _repository.uploadToS3(sign.uploadUrl, imageBytes, 'image/png');
+      return sign.url;
+    } catch (_) {
+      return null;
+    }
   }
 
   Future<bool> saveSettings(JsonMap patch) async {

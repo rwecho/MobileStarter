@@ -135,7 +135,10 @@ export class ApiTransport {
         return this.request<T>(path, method, body, extraHeaders, true)
       }
       if (response.responseCode < 200 || response.responseCode >= 300) {
-        if (response.responseCode === 401 && !retried) {
+        // 401 仅在「已登录会话失效」时触发过期回调；auth 端点（登录/注册/
+        // 验证码等）的 401 是凭证错误，走正常错误展示（内联），不能切页。
+        if (response.responseCode === 401 && !retried &&
+          !path.startsWith('/api/v1/auth/')) {
           this.sessionExpiredCallback?.()
         }
         throw this.parseFailure(text, response.responseCode)

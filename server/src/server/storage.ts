@@ -8,20 +8,24 @@ import { ApiError } from './http';
 // S3 — configured purely via env. One BaaS (auth.zhongbei.tech) serves many
 // landing apps, each isolated into its own bucket: bucket = `${prefix}${appId}`.
 
-const ENDPOINT = process.env.S3_ENDPOINT?.trim();
-const REGION = process.env.S3_REGION?.trim() || 'us-east-1';
-const ACCESS_KEY_ID = process.env.S3_ACCESS_KEY_ID?.trim();
-const SECRET_ACCESS_KEY = process.env.S3_SECRET_ACCESS_KEY?.trim();
+// Accept either S3_* (standard) or ALIYUN_OSS_* (existing infra naming).
+const ENDPOINT = (process.env.S3_ENDPOINT ?? process.env.ALIYUN_OSS_ENDPOINT ?? '').trim();
+const ACCESS_KEY_ID = (process.env.S3_ACCESS_KEY_ID ?? process.env.ALIYUN_OSS_ACCESS_KEY ?? '').trim();
+const SECRET_ACCESS_KEY = (process.env.S3_SECRET_ACCESS_KEY ?? process.env.ALIYUN_OSS_SECRET_KEY ?? '').trim();
 // Two isolation modes (env-driven):
 //  • S3_BUCKET set      → single shared bucket; appId goes into the key prefix.
 //                         New landing apps need zero bucket provisioning.
 //  • S3_BUCKET_PREFIX   → one bucket per app: `${prefix}${appId}`. Strongest
 //                         isolation (per-bucket policy/quota/lifecycle) but each
 //                         app must be provisioned on the S3 backend.
-const FIXED_BUCKET = process.env.S3_BUCKET?.trim();
-const BUCKET_PREFIX = process.env.S3_BUCKET_PREFIX?.trim() || 'app-';
-// MinIO & most self-hosted S3 need path-style addressing; AWS S3 prefers
-// virtual-host. Default true fits the self-hosted BaaS orientation.
+const FIXED_BUCKET = (process.env.S3_BUCKET ?? process.env.ALIYUN_OSS_BUCKET_NAME ?? '').trim();
+const BUCKET_PREFIX = (process.env.S3_BUCKET_PREFIX ?? 'app-').trim();
+// Region: OSS/COS SigV4 expects the prefixed region (oss-cn-beijing, not
+// cn-beijing). Derive from the endpoint when possible; fall back to env.
+const DERIVED_REGION = /((?:oss|cos)-[a-z]+-[a-z-]+)/.exec(ENDPOINT)?.[1];
+const REGION = (DERIVED_REGION ?? process.env.S3_REGION ?? process.env.ALIYUN_OSS_REGION ?? 'us-east-1').trim();
+// MinIO & most self-hosted S3 need path-style addressing; AWS S3 / Alibaba OSS
+// prefer virtual-host. Default true fits the self-hosted BaaS orientation.
 const FORCE_PATH_STYLE = process.env.S3_FORCE_PATH_STYLE !== 'false';
 // Optional public base for direct CDN/object URLs (skip presigned download).
 // e.g. https://cdn.zhongbei.tech — object URLs become `${PUBLIC_BASE}/${bucket}/${key}`.

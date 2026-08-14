@@ -58,6 +58,9 @@ export class AppStore {
 
   navStack: NavPathStack = new NavPathStack()
   currentRoute: AppRoute = AppRoute.Logo
+  // 底部 tab：0=首页, 1=我的。首页/我的 常驻在一个 'tabs' NavDestination 里用
+  // Tabs 组件保活（切换无转场、不重建），navStack 只承载子页面/登录/闪屏。
+  currentTab: number = 0
   signedIn: boolean = false
   online: boolean = true
   // bootstrapped：初始 bootstrap 是否完成（成功或失败）；品牌闪屏据此判断"配置拉取完成"。
@@ -216,10 +219,10 @@ export class AppStore {
     if (decision.pending !== null) this.pendingRoute = decision.pending
     if (decision.unavailable) this.showToast('当前 App 未启用此功能')
     if (cold) {
-      // Cold start: reset the stack to [Home] (+ target if not Home).
+      // Cold start: reset to the tab shell (Home) + push the target if deep.
       this.navStack.clear()
-      this.navStack.pushPath({ name: routeName(AppRoute.Home) })
-      if (decision.route !== AppRoute.Home) {
+      this.navStack.pushPath({ name: AppStore.TAB_NAME })
+      if (decision.route !== AppRoute.Home && decision.route !== AppRoute.Profile) {
         this.navStack.pushPath({ name: routeName(decision.route) })
       }
     } else if (this.currentRoute !== decision.route) {
@@ -233,10 +236,31 @@ export class AppStore {
     this.applyPreferences()
   }
 
+  // 底部 tab 的 NavDestination 名称：首页/我的 常驻其中，用 Tabs 保活。
+  static readonly TAB_NAME: string = 'tabs'
+
+  // 切到底部 tab（Home=0 / Profile=1）：清栈后 push tabs 容器（Tabs 保活，
+  // 切换无翻页转场）。子页面/登录/闪屏仍走 navStack push。
+  private resetToTabs(index: number): void {
+    this.currentTab = index
+    this.navStack.clear()
+    this.navStack.pushPath({ name: AppStore.TAB_NAME })
+    this.currentRoute = index === 0 ? AppRoute.Home : AppRoute.Profile
+    telemetry.screen(this.currentRoute.toString())
+  }
+
+  private isTabRoute(route: AppRoute): boolean {
+    return route === AppRoute.Home || route === AppRoute.Profile
+  }
+
   replaceAll(route: AppRoute): void {
     const decision = guardRoute(route, this.signedIn, this.config)
     if (decision.pending !== null) this.pendingRoute = decision.pending
     if (decision.unavailable) this.showToast('当前 App 未启用此功能')
+    if (this.isTabRoute(decision.route)) {
+      this.resetToTabs(decision.route === AppRoute.Home ? 0 : 1)
+      return
+    }
     this.navStack.clear()
     this.navStack.pushPath({ name: routeName(decision.route) })
     this.currentRoute = decision.route
@@ -247,6 +271,11 @@ export class AppStore {
     const decision = guardRoute(route, this.signedIn, this.config)
     if (decision.pending !== null) this.pendingRoute = decision.pending
     if (decision.unavailable) this.showToast('当前 App 未启用此功能')
+    if (this.isTabRoute(decision.route)) {
+      // 认证完成/登出后回到 tab 壳（Home tab）。
+      this.resetToTabs(decision.route === AppRoute.Home ? 0 : 1)
+      return
+    }
     this.navStack.pop()
     this.navStack.pushPath({ name: routeName(decision.route) })
     this.currentRoute = decision.route
@@ -265,8 +294,13 @@ export class AppStore {
     }
     this.navStack.pop()
     const names = this.navStack.getAllPathName()
-    const top = names.length > 0 ? routeByName(names[names.length - 1]) : undefined
-    this.currentRoute = top ?? AppRoute.Home
+    const top = names.length > 0 ? names[names.length - 1] : ''
+    if (top === AppStore.TAB_NAME) {
+      // 从子页面返回 tab 壳：当前 tab 由 currentTab 决定（Tabs 保活）。
+      this.currentRoute = this.currentTab === 0 ? AppRoute.Home : AppRoute.Profile
+    } else {
+      this.currentRoute = routeByName(top) ?? AppRoute.Home
+    }
     telemetry.screen(this.currentRoute.toString())
   }
 

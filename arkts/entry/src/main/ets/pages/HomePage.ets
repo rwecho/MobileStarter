@@ -101,7 +101,6 @@ export struct HomePage {
         .padding(AppSpacing.x4)
       }
       .layoutWeight(1)
-      BottomTabs({ store: this.store, selected: AppRoute.Home })
     }
     .width('100%')
     .height('100%')
@@ -171,49 +170,4 @@ struct QuickAction {
   }
 }
 
-@Component
-export struct BottomTabs {
-  @ObjectLink store: AppStore
-  @Prop selected: AppRoute
-
-  build() {
-    Row() {
-      TabItem({ label: localized('首页', 'Home', this.store.language),
-        icon: AppIconName.Home, active: this.selected === AppRoute.Home,
-        onTap: () => this.store.replaceAll(AppRoute.Home) })
-      TabItem({
-        label: localized('我的', 'Profile', this.store.language),
-        icon: AppIconName.User,
-        active: this.selected === AppRoute.Profile,
-        onTap: () => this.store.replaceAll(AppRoute.Profile)
-      })
-    }
-    .height(66)
-    .backgroundColor(AppColors.surface)
-    .border({ width: { top: 1 }, color: AppColors.border })
-  }
-}
-
-@Component
-struct TabItem {
-  @Prop label: string
-  @Prop icon: AppIconName
-  @Prop active: boolean = false
-  onTap: () => void = () => {}
-
-  build() {
-    Column({ space: AppSpacing.x1 }) {
-      AppIcon({
-        name: this.icon,
-        color: this.active ? AppColors.brand : AppColors.textSecondary,
-        iconSize: 22
-      })
-      Text(this.label)
-        .fontSize(12)
-        .fontColor(this.active ? AppColors.brand : AppColors.textSecondary)
-    }
-    .layoutWeight(1)
-    .onClick(this.onTap)
-  }
-}
 

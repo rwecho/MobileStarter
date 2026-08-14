@@ -13,10 +13,10 @@ import {
   AboutPage, AccountSecurityPage, ChoicePreferencePage,
   LegalDocumentPage, LegalPage, ProfileEditPage
 } from './SettingsActionPages'
-import { HomePage } from './HomePage'
+import { AppTabShell } from './AppTabShell'
 import { OnboardingPage, SplashPage } from './LaunchPages'
 import { CheckoutPage } from './CheckoutPage'
-import { MembershipPage, ProfilePage } from './ProfilePages'
+import { MembershipPage } from './ProfilePages'
 import { SettingDetailPage, SettingsPage } from './SettingsPages'
 import { SettingsUtilityPage } from './SettingsUtilityPage'
 import {
@@ -51,15 +51,16 @@ struct Index {
 
   // NavPathStack destination map: each route name → its page, wrapped in a
   // NavDestination so HarmonyOS keeps the source page alive on push (issue #2).
+  // 'tabs' 是底部 tab 壳（首页/我的 常驻 Tabs 保活）；其余为子页面/登录/闪屏。
   @Builder
   pageMap(name: string) {
     NavDestination() {
-      if (name === 'Logo' || name === 'Promo') {
+      if (name === 'tabs') {
+        AppTabShell({ store: this.store })
+      } else if (name === 'Logo' || name === 'Promo') {
         SplashPage({ store: this.store })
       } else if (name === 'Onboarding') {
         OnboardingPage({ store: this.store })
-      } else if (name === 'Home') {
-        HomePage({ store: this.store })
       } else if (name === 'SignIn') {
         AuthPage({ store: this.store, mode: AuthMode.SignIn })
       } else if (name === 'SignUp') {
@@ -72,8 +73,6 @@ struct Index {
         AuthPage({ store: this.store, mode: AuthMode.Verify })
       } else if (name === 'ResetPassword') {
         AuthPage({ store: this.store, mode: AuthMode.Reset })
-      } else if (name === 'Profile') {
-        ProfilePage({ store: this.store })
       } else if (name === 'ProfileEdit') {
         ProfileEditPage({ store: this.store })
       } else if (name === 'Statistics') {

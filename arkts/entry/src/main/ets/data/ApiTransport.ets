@@ -14,7 +14,7 @@ import {
   SignUpInput
 } from '../domain/Models'
 
-const API_BASE: string = 'http://192.168.20.110:3210'
+const API_BASE: string = 'https://auth.zhongbei.tech'
 const APP_ID: string = 'mobileui'
 const APP_ENVIRONMENT: string = 'development'
 

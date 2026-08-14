@@ -6,6 +6,7 @@
         "targetSdkVersion": "5.1.0(18)",
         "compatibleSdkVersion": "5.1.0(18)",
         "runtimeOS": "HarmonyOS",
+        "signingConfig": "default",
         "buildOption": {
           "strictMode": {
             "caseSensitiveCheck": true,
@@ -20,6 +21,21 @@
       },
       {
         "name": "release"
+      }
+    ],
+    "signingConfigs": [
+      {
+        "name": "default",
+        "type": "HarmonyOS",
+        "material": {
+          "certpath": "/Volumes/MacMiniDisk/Users/echo/.ohos/config/default_arkts_8r2TYgj9K6RIHEYSh8abT_vZNiEKgP9J6RpHudMokXM=.cer",
+          "keyAlias": "debugKey",
+          "keyPassword": "0000001B3D6EAC03304A4A04BC9285BDDB0E3648CBE9CD77ED459201F0EB4EC664D408DC9D19DFA068CC7B",
+          "profile": "/Volumes/MacMiniDisk/Users/echo/.ohos/config/default_arkts_8r2TYgj9K6RIHEYSh8abT_vZNiEKgP9J6RpHudMokXM=.p7b",
+          "signAlg": "SHA256withECDSA",
+          "storeFile": "/Volumes/MacMiniDisk/Users/echo/.ohos/config/default_arkts_8r2TYgj9K6RIHEYSh8abT_vZNiEKgP9J6RpHudMokXM=.p12",
+          "storePassword": "0000001B27C3D2A321846405148B0CEC01A766818D23E8B2A8943F5B23F7D0F243F39E69C9C9ADAA439024"
+        }
       }
     ]
   },

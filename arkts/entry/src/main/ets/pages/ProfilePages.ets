@@ -5,7 +5,6 @@ import { AppButton, AppListRow, PageHeader } from '../design_system/Components'
 import { AppColors, AppRadii, AppSpacing } from '../theme/AppTokens'
 import { BillingPlan, MembershipTier } from '../domain/Models'
 import { appString, AppString } from '../localization/AppStrings'
-import { BottomTabs } from './HomePage'
 
 // 方案价格展示：与 RN/Flutter 端保持一致（如 CNY 18.00/月）
 export function formatPlanPrice(plan: BillingPlan): string {
@@ -114,7 +113,6 @@ export struct ProfilePage {
         }
         .layoutWeight(1)
       }
-      BottomTabs({ store: this.store, selected: AppRoute.Profile })
     }
     .width('100%')
     .height('100%')

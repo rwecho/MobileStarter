@@ -1,0 +1,149 @@
+import { S3Client, HeadBucketCommand, CreateBucketCommand } from '@aws-sdk/client-s3';
+import { PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { ApiError } from './http';
+
+// Implementation-agnostic S3 adapter. Talks the standard S3 protocol, so the
+// backing store can be MinIO, Tencent COS, Alibaba OSS, Cloudflare R2, or AWS
+// S3 — configured purely via env. One BaaS (auth.zhongbei.tech) serves many
+// landing apps, each isolated into its own bucket: bucket = `${prefix}${appId}`.
+
+const ENDPOINT = process.env.S3_ENDPOINT?.trim();
+const REGION = process.env.S3_REGION?.trim() || 'us-east-1';
+const ACCESS_KEY_ID = process.env.S3_ACCESS_KEY_ID?.trim();
+const SECRET_ACCESS_KEY = process.env.S3_SECRET_ACCESS_KEY?.trim();
+const BUCKET_PREFIX = process.env.S3_BUCKET_PREFIX?.trim() || 'app-';
+// MinIO & most self-hosted S3 need path-style addressing; AWS S3 prefers
+// virtual-host. Default true fits the self-hosted BaaS orientation.
+const FORCE_PATH_STYLE = process.env.S3_FORCE_PATH_STYLE !== 'false';
+// Optional public base for direct CDN/object URLs (skip presigned download).
+// e.g. https://cdn.zhongbei.tech — object URLs become `${PUBLIC_BASE}/${bucket}/${key}`.
+const PUBLIC_BASE = process.env.S3_PUBLIC_BASE?.trim();
+
+let cached: S3Client | null = null;
+
+function isConfigured(): boolean {
+  return !!(ENDPOINT && ACCESS_KEY_ID && SECRET_ACCESS_KEY);
+}
+
+function client(): S3Client {
+  if (!isConfigured()) {
+    throw new ApiError(
+      503,
+      'STORAGE_NOT_CONFIGURED',
+      'S3 存储未配置：请设置 S3_ENDPOINT / S3_ACCESS_KEY_ID / S3_SECRET_ACCESS_KEY',
+      true,
+    );
+  }
+  if (cached) return cached;
+  cached = new S3Client({
+    endpoint: ENDPOINT,
+    region: REGION,
+    credentials: { accessKeyId: ACCESS_KEY_ID!, secretAccessKey: SECRET_ACCESS_KEY! },
+    forcePathStyle: FORCE_PATH_STYLE,
+  });
+  return cached;
+}
+
+// Bucket name for a landing app. S3 bucket names must be lower-case; appId is
+// lower-cased defensively. e.g. appId=geekread → app-geekread.
+export function bucketForApp(appId: string): string {
+  const name = `${BUCKET_PREFIX}${appId.toLowerCase()}`;
+  if (!/^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/.test(name)) {
+    throw new ApiError(400, 'INVALID_APP_ID', `app_id 衍生的 bucket 名不合法: ${name}`, false);
+  }
+  return name;
+}
+
+// Object key is namespaced by environment then the caller-supplied path, so
+// dev/staging/prod of the same app never collide inside one bucket.
+// e.g. env=development, path=avatars/u123.jpg → development/avatars/u123.jpg
+export function objectKey(environment: string, path: string): string {
+  const cleanPath = path.replace(/^\/+/, '');
+  return `${environment}/${cleanPath}`;
+}
+
+const ensuredBuckets = new Set<string>();
+
+// Lazily create the app's bucket on first use. MinIO/COS/OSS support
+// CreateBucket; R2 requires manual creation — if it 409s/403s we treat the
+// bucket as pre-existing (admin-created).
+export async function ensureBucket(bucket: string): Promise<void> {
+  if (ensuredBuckets.has(bucket)) return;
+  const s3 = client();
+  try {
+    await s3.send(new HeadBucketCommand({ Bucket: bucket }));
+    ensuredBuckets.add(bucket);
+    return;
+  } catch {
+    // Not found (or no permission to head) — attempt to create.
+  }
+  try {
+    await s3.send(new CreateBucketCommand({ Bucket: bucket }));
+  } catch (error) {
+    // BucketAlreadyOwnedByYou / 409 → fine. Anything else → surface so admin
+    // can pre-create the bucket manually on providers that forbid it.
+    const code = (error as { name?: string }).name ?? '';
+    if (!/BucketAlready|409|BucketAlreadyExists/i.test(code)) {
+      throw new ApiError(503, 'BUCKET_CREATE_FAILED', `无法创建 bucket ${bucket}：${code}`, true);
+    }
+  }
+  ensuredBuckets.add(bucket);
+}
+
+export interface SignUploadResult {
+  uploadUrl: string;
+  method: 'PUT';
+  headers: Record<string, string>;
+  objectKey: string;
+  downloadUrl: string;
+}
+
+// Returns a short-lived presigned PUT URL the client uploads the file to
+// directly (server never streams the bytes). The object key is opaque to the
+// client; it stores `downloadUrl` (or objectKey) as the persisted reference.
+export async function signUpload(params: {
+  appId: string;
+  environment: string;
+  path: string;
+  contentType: string;
+}): Promise<SignUploadResult> {
+  const bucket = bucketForApp(params.appId);
+  await ensureBucket(bucket);
+  const key = objectKey(params.environment, params.path);
+  const command = new PutObjectCommand({
+    Bucket: bucket,
+    Key: key,
+    ContentType: params.contentType,
+  });
+  const uploadUrl = await getSignedUrl(client(), command, { expiresIn: 300 });
+  return {
+    uploadUrl,
+    method: 'PUT',
+    headers: { 'content-type': params.contentType },
+    objectKey: key,
+    downloadUrl: publicOrPresigned(bucket, key),
+  };
+}
+
+// Returns a download URL: a direct public/CDN URL if S3_PUBLIC_BASE is set,
+// otherwise a presigned GET URL (private bucket).
+export async function signDownload(params: {
+  appId: string;
+  objectKey: string;
+}): Promise<{ url: string }> {
+  const bucket = bucketForApp(params.appId);
+  if (PUBLIC_BASE) {
+    return { url: `${PUBLIC_BASE}/${bucket}/${params.objectKey}` };
+  }
+  const command = new GetObjectCommand({ Bucket: bucket, Key: params.objectKey });
+  const url = await getSignedUrl(client(), command, { expiresIn: 3600 });
+  return { url };
+}
+
+function publicOrPresigned(bucket: string, key: string): string {
+  if (PUBLIC_BASE) return `${PUBLIC_BASE}/${bucket}/${key}`;
+  // No public base: return a relative reference the server resolves on
+  // download. Clients should call sign-download for a fresh presigned URL.
+  return `s3://${bucket}/${key}`;
+}

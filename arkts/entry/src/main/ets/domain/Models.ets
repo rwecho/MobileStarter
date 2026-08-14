@@ -286,6 +286,17 @@ export interface StoreProduct {
 // purchaseToken); Google/mock send a keyed record ({ productId, purchaseToken }).
 export type PurchaseReceipt = Record<string, string | boolean | null> | string
 
+// S3 storage upload result (POST /api/v1/storage/uploads). `url` is the
+// object's access URL (public permanent if S3_PUBLIC_BASE set, else opaque
+// s3:// ref resolved via GET /api/v1/storage/urls).
+export interface SignUploadResult {
+  uploadUrl: string
+  method: string
+  headers: Record<string, string>
+  objectKey: string
+  url: string
+}
+
 export interface PurchaseResult {
   storeProductId: string
   receipt: PurchaseReceipt

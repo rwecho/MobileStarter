@@ -22,6 +22,7 @@ import {
   NotificationView,
   OrderStatus,
   OrderView,
+  SignUploadResult,
   PhoneCodeInput,
   PhoneVerifyInput,
   PurchaseReceipt,
@@ -247,6 +248,38 @@ export class ApiClient {
     return this.request<Record<string, string[]>>(
       '/api/v1/purchases/restore', http.RequestMethod.POST, body
     ).then(result => result['entitlements'] ?? [])
+  }
+
+  // ── S3 storage (BaaS) ───────────────────────────────────────────────────
+  // 申请上传：server 用 app_id + environment 选 bucket/key，返回 presigned PUT URL。
+  signUpload(path: string, contentType: string): Promise<SignUploadResult> {
+    return this.request<SignUploadResult>(
+      '/api/v1/storage/uploads', http.RequestMethod.POST, { path, contentType }
+    )
+  }
+
+  // 直传到 OSS presigned URL（不经 API base；二进制 PUT）。
+  uploadToS3(uploadUrl: string, data: ArrayBuffer, contentType: string): Promise<void> {
+    const client = http.createHttp()
+    const headers: Record<string, string> = { 'Content-Type': contentType }
+    return client.request(uploadUrl, {
+      method: http.RequestMethod.PUT,
+      header: headers,
+      extraData: data,
+      expectDataType: http.HttpDataType.STRING,
+      connectTimeout: 10000,
+      readTimeout: 30000
+    }).then((response: http.HttpResponse) => {
+      client.destroy()
+      if (response.responseCode < 200 || response.responseCode >= 300) {
+        throw new ApiFailure('UPLOAD_FAILED', `对象存储上传失败 ${response.responseCode}`,
+          response.responseCode, false)
+      }
+    }).catch((error: Error) => {
+      client.destroy()
+      if (error instanceof ApiFailure) throw error
+      throw new ApiFailure('UPLOAD_FAILED', error.message ?? '上传失败', 0, false)
+    })
   }
 
   membershipCurrent(): Promise<MembershipCurrent> {

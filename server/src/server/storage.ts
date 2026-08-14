@@ -12,6 +12,13 @@ const ENDPOINT = process.env.S3_ENDPOINT?.trim();
 const REGION = process.env.S3_REGION?.trim() || 'us-east-1';
 const ACCESS_KEY_ID = process.env.S3_ACCESS_KEY_ID?.trim();
 const SECRET_ACCESS_KEY = process.env.S3_SECRET_ACCESS_KEY?.trim();
+// Two isolation modes (env-driven):
+//  • S3_BUCKET set      → single shared bucket; appId goes into the key prefix.
+//                         New landing apps need zero bucket provisioning.
+//  • S3_BUCKET_PREFIX   → one bucket per app: `${prefix}${appId}`. Strongest
+//                         isolation (per-bucket policy/quota/lifecycle) but each
+//                         app must be provisioned on the S3 backend.
+const FIXED_BUCKET = process.env.S3_BUCKET?.trim();
 const BUCKET_PREFIX = process.env.S3_BUCKET_PREFIX?.trim() || 'app-';
 // MinIO & most self-hosted S3 need path-style addressing; AWS S3 prefers
 // virtual-host. Default true fits the self-hosted BaaS orientation.
@@ -19,6 +26,10 @@ const FORCE_PATH_STYLE = process.env.S3_FORCE_PATH_STYLE !== 'false';
 // Optional public base for direct CDN/object URLs (skip presigned download).
 // e.g. https://cdn.zhongbei.tech — object URLs become `${PUBLIC_BASE}/${bucket}/${key}`.
 const PUBLIC_BASE = process.env.S3_PUBLIC_BASE?.trim();
+
+function singleBucketMode(): boolean {
+  return !!FIXED_BUCKET && FIXED_BUCKET.length > 0;
+}
 
 let cached: S3Client | null = null;
 
@@ -45,9 +56,11 @@ function client(): S3Client {
   return cached;
 }
 
-// Bucket name for a landing app. S3 bucket names must be lower-case; appId is
-// lower-cased defensively. e.g. appId=geekread → app-geekread.
+// Bucket for a landing app:
+//  • single-bucket mode → the shared S3_BUCKET (appId isolates via key prefix)
+//  • per-app mode       → `${prefix}${appId}` (lower-cased; S3 naming rules)
 export function bucketForApp(appId: string): string {
+  if (singleBucketMode()) return FIXED_BUCKET!;
   const name = `${BUCKET_PREFIX}${appId.toLowerCase()}`;
   if (!/^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/.test(name)) {
     throw new ApiError(400, 'INVALID_APP_ID', `app_id 衍生的 bucket 名不合法: ${name}`, false);
@@ -55,12 +68,15 @@ export function bucketForApp(appId: string): string {
   return name;
 }
 
-// Object key is namespaced by environment then the caller-supplied path, so
-// dev/staging/prod of the same app never collide inside one bucket.
-// e.g. env=development, path=avatars/u123.jpg → development/avatars/u123.jpg
-export function objectKey(environment: string, path: string): string {
+// Object key:
+//  • single-bucket mode → `${appId}/${env}/<path>` (appId in the key, since the
+//    bucket is shared)
+//  • per-app mode       → `${env}/<path>` (appId is already the bucket)
+export function objectKey(appId: string, environment: string, path: string): string {
   const cleanPath = path.replace(/^\/+/, '');
-  return `${environment}/${cleanPath}`;
+  return singleBucketMode()
+    ? `${appId.toLowerCase()}/${environment}/${cleanPath}`
+    : `${environment}/${cleanPath}`;
 }
 
 const ensuredBuckets = new Set<string>();
@@ -110,7 +126,7 @@ export async function signUpload(params: {
 }): Promise<SignUploadResult> {
   const bucket = bucketForApp(params.appId);
   await ensureBucket(bucket);
-  const key = objectKey(params.environment, params.path);
+  const key = objectKey(params.appId, params.environment, params.path);
   const command = new PutObjectCommand({
     Bucket: bucket,
     Key: key,

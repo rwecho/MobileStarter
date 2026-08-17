@@ -117,7 +117,10 @@ export async function loadNormalizedImage(uri: string): Promise<NormalizedImage>
 }
 
 // 转正空间方形区域 → 512×512 JPEG bytes（AvatarEditor 确认时调用）。
-// 每次基于 bytes 新建 source，可安全重试（不破坏显示用 PixelMap）。
+// 不用 createPixelMap({desiredRegion, desiredSize})——该组合在小 region
+// （缩放后）触发解码器 "unsupport options"（pixelformat/crop failed）。
+// 改为：全图解码 → PixelMap.crop(region) → PixelMap.scale(512) → 编码。
+// 每次新解码独立副本，可安全重试（不破坏显示用 PixelMap）。
 export async function cropToJpegBytes(img: NormalizedImage, region: CropRegion):
   Promise<ArrayBuffer> {
   const x = Math.max(0, Math.min(Math.floor(region.x), Math.max(0, img.width - region.width)))
@@ -126,15 +129,18 @@ export async function cropToJpegBytes(img: NormalizedImage, region: CropRegion):
   const cropRegion: image.Region = { x, y, size }
   const source = image.createImageSource(img.bytes)
   try {
-    const pixelMap = await source.createPixelMap({
-      desiredRegion: cropRegion,
-      desiredSize: { width: 512, height: 512 }
-    })
-    const packer = image.createImagePacker()
+    const pixelMap = await source.createPixelMap()
     try {
-      return await packer.packToData(pixelMap, { format: 'image/jpeg', quality: 80 })
+      await pixelMap.crop(cropRegion)
+      const ratio = 512 / region.width
+      await pixelMap.scale(ratio, ratio)
+      const packer = image.createImagePacker()
+      try {
+        return await packer.packToData(pixelMap, { format: 'image/jpeg', quality: 80 })
+      } finally {
+        packer.release()
+      }
     } finally {
-      packer.release()
       pixelMap.release()
     }
   } finally {

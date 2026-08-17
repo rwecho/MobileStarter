@@ -7,20 +7,14 @@ import { hilog } from '@kit.PerformanceAnalysisKit'
 const TAG = 'AvatarPicker'
 const DOMAIN = 0xC0DE
 
-// PhotoViewPicker 返回的是媒体库 uri（file://media/...，临时只读授权），
-// createImageSource 只认应用沙箱路径——必须先 fs.openSync 拿 fd 再创建，
-// 用完关闭。封装成统一工具，头像/截图等复用（issue #21）。
-//
-// EXIF 方向（issue：头像变形）：手机照片多带 Orientation（6=90°CW、8=270°CW）。
-// Image 组件显示时会自动转正，但 getImageInfo 拿到的是未旋转像素尺寸，
-// 两者不一致 → 宽高颠倒 → Fill 拉伸变形。本模块统一在「显示空间」工作：
-// meta.width/height 已按 EXIF 交换；裁剪时反向映射回原图像素空间并在
-// packer 前用 PixelMap.rotate 转回用户所见方向。
-export interface ImageSourceHandle {
-  source: image.ImageSource
-  file: fs.File
-}
-
+// ── 归一化管线（根治编辑器变形）──────────────────────────────────────────────
+// 媒体库 uri（file://media/...）直接交给 Image 组件时，其解码/EXIF 行为与
+// 我们 fd 解码的空间不一定一致（Image 会自动转正，getImageInfo 不会），
+// 宽高比颠倒 → 拉伸变形。因此进编辑器前先归一化：
+//   fd 打开 → 全图解码 → 按 EXIF rotate 转正 →
+//   产出显示用 PixelMap + 裁剪用 JPEG bytes（同一转正空间）
+// 显示（Image(pixelMap)）与裁剪（createImageSource(bytes).desiredRegion）
+// 共享同一空间，不存在任何映射/方向歧义。
 export interface CropRegion {
   x: number
   y: number
@@ -28,13 +22,16 @@ export interface CropRegion {
   height: number
 }
 
-// 显示空间元数据：width/height 为 EXIF 转正后的尺寸；orientation 1..8。
-export interface ImageMeta {
+export interface NormalizedImage {
+  pixelMap: image.PixelMap
+  bytes: ArrayBuffer
   width: number
   height: number
-  orientation: number
-  origWidth: number
-  origHeight: number
+}
+
+interface ImageSourceHandle {
+  source: image.ImageSource
+  file: fs.File
 }
 
 function openImageSource(uri: string): ImageSourceHandle {
@@ -61,12 +58,14 @@ function parseOrientation(raw: string): number {
   return n >= 1 && n <= 8 ? n : 1
 }
 
-// 是否 90/270（宽高颠倒）。
-function isSwapped(orientation: number): boolean {
-  return orientation === 5 || orientation === 6 || orientation === 7 || orientation === 8
+function rotationFor(orientation: number): number {
+  if (orientation === 6) return 90
+  if (orientation === 8) return 270
+  if (orientation === 3) return 180
+  return 0
 }
 
-// 选图（媒体库），返回原始 uri 供 AvatarEditor 编辑。
+// 选图（媒体库），返回原始 uri 供 AvatarEditor 归一化。
 export async function pickAvatarUri(): Promise<string | null> {
   const options = new photoAccessHelper.PhotoSelectOptions()
   options.MIMEType = photoAccessHelper.PhotoViewMIMETypes.IMAGE_TYPE
@@ -77,83 +76,69 @@ export async function pickAvatarUri(): Promise<string | null> {
   return selection.photoUris[0]
 }
 
-// 读取元数据（显示空间尺寸 + EXIF orientation + 原始像素尺寸）。
-export async function readImageMeta(uri: string): Promise<ImageMeta> {
+// 归一化：EXIF 转正的 PixelMap（显示）+ 同空间 JPEG bytes（裁剪源）。
+export async function loadNormalizedImage(uri: string): Promise<NormalizedImage> {
   const handle = openImageSource(uri)
+  let orientation = 1
   try {
-    const info = await handle.source.getImageInfo()
-    let orientation = 1
+    const raw = await handle.source.getImageProperty('Orientation')
+    orientation = parseOrientation(String(raw))
+  } catch (_) {
+    orientation = 1
+  }
+  // 全图解码（原尺寸；头像场景大图一次性内存可接受，用完即释放）。
+  const pixelMap = await handle.source.createPixelMap()
+  closeImageSource(handle)
+  try {
+    const deg = rotationFor(orientation)
+    if (deg > 0) {
+      await pixelMap.rotate(deg)
+    }
+    // 转正后重编码：既作裁剪源，也顺带抹掉 EXIF（输出方向即内容）。
+    let packer = image.createImagePacker()
+    let bytes: ArrayBuffer
     try {
-      const raw = await handle.source.getImageProperty('Orientation')
-      orientation = parseOrientation(String(raw))
-    } catch (_) {
-      orientation = 1
+      bytes = await packer.packToData(pixelMap, { format: 'image/jpeg', quality: 90 })
+    } finally {
+      packer.release()
     }
-    const meta: ImageMeta = {
-      width: isSwapped(orientation) ? info.size.height : info.size.width,
-      height: isSwapped(orientation) ? info.size.width : info.size.height,
-      orientation,
-      origWidth: info.size.width,
-      origHeight: info.size.height
+    const info = await pixelMap.getImageInfo()
+    const result: NormalizedImage = {
+      pixelMap: pixelMap,
+      bytes: bytes,
+      width: info.size.width,
+      height: info.size.height
     }
-    return meta
-  } finally {
-    closeImageSource(handle)
+    return result
+  } catch (error) {
+    pixelMap.release()
+    throw error instanceof Error ? error : new Error(`${error}`)
   }
 }
 
-// 显示空间方形区域 → 512×512 JPEG bytes。内部反向映射回原图像素空间，
-// 解码后按 EXIF 旋转回用户所见方向再编码（输出无 EXIF，方向即内容）。
-export async function cropToJpegBytes(uri: string, region: CropRegion, meta: ImageMeta):
+// 转正空间方形区域 → 512×512 JPEG bytes（AvatarEditor 确认时调用）。
+// 每次基于 bytes 新建 source，可安全重试（不破坏显示用 PixelMap）。
+export async function cropToJpegBytes(img: NormalizedImage, region: CropRegion):
   Promise<ArrayBuffer> {
-  const handle = openImageSource(uri)
+  const x = Math.max(0, Math.min(Math.floor(region.x), Math.max(0, img.width - region.width)))
+  const y = Math.max(0, Math.min(Math.floor(region.y), Math.max(0, img.height - region.height)))
+  const size: image.Size = { width: region.width, height: region.height }
+  const cropRegion: image.Region = { x, y, size }
+  const source = image.createImageSource(img.bytes)
   try {
-    // 显示空间 (dx,dy) → 原图空间 (ox,oy) 的方形映射（仅处理 90/180/270，
-    // 镜像 2/4/5/7 罕见于相册照片，按未旋转处理）。
-    let x = region.x
-    let y = region.y
-    let rotateDeg = 0
-    const s = region.width
-    if (meta.orientation === 6) {
-      // 90°CW：显示 = 原图顺转90。原图 (ox,oy) → 显示 (origH-1-oy, ox)
-      // 显示方形 [rx,ry,s] → 原图 [x=ry, y=origH-rx-s]
-      x = region.y
-      y = meta.origHeight - region.x - s
-      rotateDeg = 90
-    } else if (meta.orientation === 8) {
-      // 270°CW：原图 (ox,oy) → 显示 (oy, origW-1-ox)
-      x = meta.origWidth - region.y - s
-      y = region.x
-      rotateDeg = 270
-    } else if (meta.orientation === 3) {
-      x = meta.origWidth - region.x - s
-      y = meta.origHeight - region.y - s
-      rotateDeg = 180
-    }
-    x = Math.max(0, Math.min(Math.floor(x), Math.max(0, meta.origWidth - s)))
-    y = Math.max(0, Math.min(Math.floor(y), Math.max(0, meta.origHeight - s)))
-
-    const size: image.Size = { width: s, height: s }
-    const cropRegion: image.Region = { x, y, size }
-    const pixelMap = await handle.source.createPixelMap({
+    const pixelMap = await source.createPixelMap({
       desiredRegion: cropRegion,
       desiredSize: { width: 512, height: 512 }
     })
+    const packer = image.createImagePacker()
     try {
-      if (rotateDeg > 0) {
-        await pixelMap.rotate(rotateDeg)
-      }
-      const packer = image.createImagePacker()
-      try {
-        return await packer.packToData(pixelMap, { format: 'image/jpeg', quality: 80 })
-      } finally {
-        packer.release()
-      }
+      return await packer.packToData(pixelMap, { format: 'image/jpeg', quality: 80 })
     } finally {
+      packer.release()
       pixelMap.release()
     }
   } finally {
-    closeImageSource(handle)
+    source.release()
   }
 }
 
@@ -163,17 +148,21 @@ export async function pickAvatarDataUrl(context: Context): Promise<string | null
   const uri = await pickAvatarUri()
   if (uri === null) return null
   try {
-    const meta = await readImageMeta(uri)
-    const side = Math.min(meta.width, meta.height)
-    const centerRegion: CropRegion = {
-      x: Math.floor((meta.width - side) / 2),
-      y: Math.floor((meta.height - side) / 2),
-      width: side,
-      height: side
+    const normalized = await loadNormalizedImage(uri)
+    try {
+      const side = Math.min(normalized.width, normalized.height)
+      const centerRegion: CropRegion = {
+        x: Math.floor((normalized.width - side) / 2),
+        y: Math.floor((normalized.height - side) / 2),
+        width: side,
+        height: side
+      }
+      const bytes = await cropToJpegBytes(normalized, centerRegion)
+      const base64 = buffer.from(bytes).toString('base64')
+      return `data:image/jpeg;base64,${base64}`
+    } finally {
+      normalized.pixelMap.release()
     }
-    const bytes = await cropToJpegBytes(uri, centerRegion, meta)
-    const base64 = buffer.from(bytes).toString('base64')
-    return `data:image/jpeg;base64,${base64}`
   } catch (error) {
     hilog.error(DOMAIN, TAG, 'pickAvatarDataUrl failed: %{public}s', `${error}`)
     throw error instanceof Error ? error : new Error(`${error}`)

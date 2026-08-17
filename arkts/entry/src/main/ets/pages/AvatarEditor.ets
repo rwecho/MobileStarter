@@ -1,19 +1,22 @@
+import image from '@ohos.multimedia.image'
 import { AppStore } from '../state/AppStore'
 import { apiClient } from '../data/ApiClient'
 import { AppButton } from '../design_system/Components'
 import { AppIconName } from '../design_system/AppIcon'
 import { AppColors, AppRadii, AppSpacing } from '../theme/AppTokens'
-import { CropRegion, ImageMeta, cropToJpegBytes, readImageMeta } from '../media/AvatarPicker'
+import { CropRegion, NormalizedImage, cropToJpegBytes, loadNormalizedImage } from '../media/AvatarPicker'
 
 // 头像编辑 sheet 内容：方形预览 + 双指缩放 / 单指拖拽定位，确认后按手势
-// 计算原图方形区域 → 512×512 JPEG → POST /storage/uploads + PUT 直传 OSS。
+// 计算方形区域 → 512×512 JPEG → POST /storage/uploads + PUT 直传 OSS。
 // 由宿主页 bindSheet（约 2/3 屏高）承载。
+// 显示与裁剪共用归一化图（EXIF 已转正的 PixelMap + 同空间 bytes），
+// 彻底规避 Image(uri) 与 fd 解码的 EXIF/尺寸歧义（变形根因）。
 @Component
 export struct AvatarEditor {
   @ObjectLink store: AppStore
   imageUri: string = ''
-  // 上传完成（url = 对象访问 URL）；取消。
-  onDone: (url: string) => void = () => {}
+  // 上传完成（objectKey）；取消。
+  onDone: (objectKey: string) => void = () => {}
   onCancel: () => void = () => {}
 
   @State zoomScale: number = 1
@@ -21,24 +24,30 @@ export struct AvatarEditor {
   @State offsetY: number = 0
   @State busy: boolean = false
   @State side: number = 320
-  // 原图尺寸必须 @State：异步读回后驱动 UI 重算显示尺寸，否则图停留在
-  // 方形兜底（拉伸变形）。存的是 EXIF 转正后的「显示空间」尺寸。
+  // 归一化结果必须 @State：异步读回后驱动 UI 重算尺寸。
+  @State pixelMap: image.PixelMap | null = null
   @State origW: number = 0
   @State origH: number = 0
-  private imageMeta: ImageMeta | null = null
+  private normalized: NormalizedImage | null = null
   private baseScale: number = 1
   private baseOffsetX: number = 0
   private baseOffsetY: number = 0
 
   aboutToAppear(): void {
-    // 媒体库 uri 需经 fs.open → fd（issue #21）；meta 含 EXIF 方向（变形根因）。
-    readImageMeta(this.imageUri).then((meta: ImageMeta) => {
-      this.imageMeta = meta
-      this.origW = meta.width
-      this.origH = meta.height
+    loadNormalizedImage(this.imageUri).then((img: NormalizedImage) => {
+      this.normalized = img
+      this.pixelMap = img.pixelMap
+      this.origW = img.width
+      this.origH = img.height
     }).catch(() => {
-      // 读不到尺寸时 confirm 会因 origW=0 拒绝，不至于崩溃。
+      // 归一化失败时 confirm 因 origW=0 拒绝，不至于崩溃。
     })
+  }
+
+  aboutToDisappear(): void {
+    // 归一化 PixelMap 由编辑器持有，sheet 关闭即释放（bytes 随对象回收）。
+    this.normalized?.pixelMap.release()
+    this.normalized = null
   }
 
   // Contain 适配系数：图完整显示在 side×side 内的基础缩放。
@@ -69,10 +78,10 @@ export struct AvatarEditor {
   build() {
     Column({ space: AppSpacing.x4 }) {
       Text('编辑头像').fontSize(18).fontWeight(FontWeight.Bold).fontColor(AppColors.text)
-      // 方形编辑区。尺寸读回前显示 loading（避免 0×0/拉伸），读回后
-      // dispW/dispH 保持原图宽高比（@State origW/H 驱动刷新）。
+      // 方形编辑区。归一化完成前 loading；完成后显示转正 PixelMap
+      // （宽高比与裁剪空间严格一致）。
       Column() {
-        if (this.origW === 0 || this.origH === 0) {
+        if (this.pixelMap === null || this.origW === 0 || this.origH === 0) {
           Column({ space: AppSpacing.x2 }) {
             LoadingProgress().width(36).height(36).color(AppColors.brand)
             Text('读取图片…').fontSize(12).fontColor(AppColors.textSecondary)
@@ -83,7 +92,7 @@ export struct AvatarEditor {
           .justifyContent(FlexAlign.Center)
         } else {
           Stack() {
-            Image(this.imageUri)
+            Image(this.pixelMap)
               .width(this.dispW()).height(this.dispH())
               .objectFit(ImageFit.Fill)
               .translate({ x: this.offsetX, y: this.offsetY })
@@ -150,12 +159,11 @@ export struct AvatarEditor {
   }
 
   private async confirm(): Promise<void> {
-    if (this.busy || this.origW === 0 || this.imageMeta === null) return
+    if (this.busy || this.origW === 0 || this.normalized === null) return
     this.busy = true
     try {
-      // 手势 → 原图方形区域。图左上角显示坐标 = 中心 - 半尺寸 + 偏移；
-      // 反解到原图坐标除以总显示缩放（fitK × scale）。坐标在「显示空间」
-      // （EXIF 转正后），cropToJpegBytes 内部负责映射回原始像素空间。
+      // 手势 → 转正空间方形区域。图左上角显示坐标 = 中心 - 半尺寸 + 偏移；
+      // 反解除以总显示缩放（fitK × scale）。显示与裁剪同一空间，无映射。
       const k = this.fitK() * this.zoomScale
       const left = this.side / 2 - this.dispW() / 2 + this.offsetX
       const top = this.side / 2 - this.dispH() / 2 + this.offsetY
@@ -170,7 +178,7 @@ export struct AvatarEditor {
         x: rx, y: ry, width: sideOrig, height: sideOrig
       }
       const packed: ArrayBuffer =
-        await cropToJpegBytes(this.imageUri, cropRegion, this.imageMeta)
+        await cropToJpegBytes(this.normalized, cropRegion)
 
       // 上传：avatars/<userId>-<时间戳>.jpg（时间戳避免 URL 缓存）。
       const userId = this.store.user?.id ?? 'anon'

@@ -1,6 +1,7 @@
 export type PublicUser = Readonly<{
   id: string;
-  email: string;
+  // 可空：手机号/华为登录账号未绑定邮箱（issue #14）。hasEmail=false 时客户端不应展示 email。
+  email: string | null;
   username: string;
   displayName: string;
   bio: string;

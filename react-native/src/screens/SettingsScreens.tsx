@@ -53,7 +53,9 @@ export function SettingsScreen() {
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <AppCard>
           <Text style={styles.heading}>{user?.displayName ?? text('guest')}</Text>
-          <Text style={styles.secondary}>{user?.email ?? text('signInSync')}</Text>
+          <Text style={styles.secondary}>
+            {user ? (user.hasEmail && user.email ? user.email : '未绑定邮箱') : text('signInSync')}
+          </Text>
         </AppCard>
         {groups.map((group) => (
           <View key={group.title}>
@@ -105,7 +107,10 @@ export function AccountSecurityScreen() {
       <PageHeader title="账户与安全" />
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <AppCard>
-          <ListRow label="登录邮箱" value={user?.email ?? '未登录'} />
+          <ListRow
+            label="登录邮箱"
+            value={user ? (user.hasEmail && user.email ? user.email : '未绑定邮箱') : '未登录'}
+          />
           <ListRow label="身份绑定" value="邮箱密码" />
         </AppCard>
         <TextInput

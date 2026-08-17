@@ -149,7 +149,7 @@ export struct ProfileIdentityCard {
       Column({ space: AppSpacing.x1 }) {
         Text(this.store.user?.displayName ?? '')
           .fontSize(18).fontWeight(FontWeight.Bold).fontColor(AppColors.text)
-        Text(`@${this.store.user?.username ?? ''} · ${this.store.user?.email ?? ''}`)
+        Text(`@${this.store.user?.username ?? ''} · ${this.store.user?.hasEmail === true && this.store.user.email !== null ? this.store.user.email : '未绑定邮箱'}`)
           .fontSize(13).fontColor(AppColors.textSecondary)
         if ((this.store.user?.bio ?? '').length > 0) {
           Text(this.store.user?.bio ?? '').fontSize(13).fontColor(AppColors.textSecondary)

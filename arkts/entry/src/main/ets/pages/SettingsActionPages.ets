@@ -24,7 +24,8 @@ export struct AccountSecurityPage {
       PageHeader({ store: this.store, title: '账户与安全' })
       Column({ space: AppSpacing.x4 }) {
         AppListRow({ store: this.store, label: '登录邮箱',
-          value: this.store.user?.email ?? '未登录' })
+          value: this.store.user?.hasEmail === true && this.store.user.email !== null
+            ? this.store.user.email : '未绑定邮箱' })
         PasswordInput({ label: '当前密码', value: this.currentPassword,
           changed: value => this.currentPassword = value })
         PasswordInput({ label: '至少 8 位新密码', value: this.newPassword,

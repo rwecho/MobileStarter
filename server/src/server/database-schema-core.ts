@@ -28,7 +28,8 @@ export async function initializeCoreSchema(database: PostgresDatabase) {
       to_version INTEGER, metadata TEXT NOT NULL, created_at TEXT NOT NULL
     );
     CREATE TABLE IF NOT EXISTS users (
-      id TEXT PRIMARY KEY, app_id TEXT NOT NULL, email TEXT NOT NULL,
+      // email 可空：手机号/华为登录账号无真实邮箱（issue #14），NULL 即未绑定。
+      id TEXT PRIMARY KEY, app_id TEXT NOT NULL, email TEXT,
       password_hash TEXT NOT NULL, username TEXT NOT NULL, display_name TEXT,
       bio TEXT NOT NULL DEFAULT '', avatar_url TEXT,
       tier_id TEXT NOT NULL DEFAULT 'free', settings TEXT NOT NULL DEFAULT '{}',

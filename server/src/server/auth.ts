@@ -12,7 +12,8 @@ import { DEFAULT_APP_ID, SERVICE_NAME } from './service-identity';
 type UserRow = {
   id: string;
   app_id: string;
-  email: string;
+  // 可空：手机号/华为登录账号无真实邮箱（issue #14）。
+  email: string | null;
   password_hash: string;
   username: string;
   display_name: string | null;
@@ -164,7 +165,8 @@ export function toPublicUser(row: UserRow): PublicUser {
     consentVersion: row.consent_version,
     createdAt: row.created_at,
     // 华为/手机号登录生成伪邮箱（xxx@phone.invalid / xxx@invalid.local），不算真实邮箱
-    hasEmail: !row.email.endsWith('@phone.invalid') && !row.email.endsWith('@invalid.local'),
+    hasEmail: row.email !== null && !row.email.endsWith('@phone.invalid') &&
+      !row.email.endsWith('@invalid.local'),
   };
 }
 

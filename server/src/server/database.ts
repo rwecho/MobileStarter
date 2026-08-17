@@ -73,6 +73,12 @@ async function applyIdempotentMigrations() {
     ALTER TABLE orders ADD COLUMN IF NOT EXISTS store_transaction_id TEXT;
     ALTER TABLE orders ADD COLUMN IF NOT EXISTS receipt_hash TEXT;
     ALTER TABLE orders ADD COLUMN IF NOT EXISTS expires_at TEXT;
+    ALTER TABLE users ALTER COLUMN email DROP NOT NULL;
+  `);
+  // 存量伪邮箱清为未绑定（issue #14）：手机/华为登录曾生成 xxx@phone.invalid。
+  await database.exec(`
+    UPDATE users SET email = NULL
+    WHERE email IS NOT NULL AND (email LIKE '%@phone.invalid' OR email LIKE '%@invalid.local');
   `);
 }
 

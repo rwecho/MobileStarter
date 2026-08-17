@@ -75,17 +75,16 @@ async function findOrCreatePhoneUser(appId: string, phone: string) {
   if (identity) return identity.user_id;
   const userId = createId();
   const createdAt = nowIso();
-  const email = `phone-${hashToken(subject).slice(0, 24)}@phone.invalid`;
+  // 无真实邮箱 → NULL（不再生成 xxx@phone.invalid 伪邮箱，issue #14）。
   await database.prepare(`
     INSERT INTO users(
       id, app_id, email, password_hash, username, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?)
+    ) VALUES (?, ?, NULL, ?, ?, ?, ?)
   `).run(
     userId,
     appId,
-    email,
     `external$${createId()}`,
-    `手机用户 ${phone.slice(-4)}`,
+    `手机用户${phone.slice(-4)}`,
     createdAt,
     createdAt,
   );

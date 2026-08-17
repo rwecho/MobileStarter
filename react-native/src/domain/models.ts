@@ -4,7 +4,9 @@ export type UserSettings = Readonly<Record<string, string | boolean | number>>;
 
 export type AppUser = Readonly<{
   id: string;
-  email: string;
+  // 可空：手机号/华为登录未绑定邮箱；hasEmail=false 时 UI 不展示 email。
+  email: string | null;
+  hasEmail: boolean;
   username: string;
   displayName: string;
   bio: string;

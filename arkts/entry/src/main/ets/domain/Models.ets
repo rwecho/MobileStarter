@@ -184,7 +184,9 @@ export interface ProductFeedback {
 
 export interface AppUser {
   id: string
-  email: string
+  // 可空：手机号/华为登录账号未绑定邮箱；hasEmail=false 时 UI 不应展示 email。
+  email: string | null
+  hasEmail: boolean
   username: string
   displayName: string
   bio: string

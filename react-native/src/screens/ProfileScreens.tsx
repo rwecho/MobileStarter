@@ -35,7 +35,7 @@ export function ProfileScreen() {
         <ProfileIdentityCard
           displayName={user.displayName}
           username={user.username}
-          email={user.email}
+          email={user.hasEmail && user.email ? user.email : '未绑定邮箱'}
           bio={user.bio}
           avatarUrl={user.avatarUrl}
         />
@@ -154,7 +154,7 @@ export function EditProfileScreen() {
         <ProfileIdentityCard
           displayName={displayName || user?.username || 'M'}
           username={user?.username ?? ''}
-          email={user?.email ?? ''}
+          email={user?.hasEmail && user?.email ? user.email : '未绑定邮箱'}
           bio={bio}
           avatarUrl={avatarUrl}
           onAvatarPress={() => void chooseAvatar()}

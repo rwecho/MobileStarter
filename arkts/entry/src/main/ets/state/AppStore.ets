@@ -314,7 +314,7 @@ export class AppStore {
   }
 
   async verifyEmail(code: string): Promise<boolean> {
-    if (this.user === null) return false
+    if (this.user === null || this.user.email === null) return false
     try {
       const verified = await apiClient.verifyEmail(this.user.email, code)
       if (verified) this.user.emailVerified = true

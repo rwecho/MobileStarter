@@ -301,7 +301,8 @@ test('huawei quick login exchanges auth code for phone and merges with phone acc
       { appId: APP, provider: 'huawei', authorizationCode: 'authcode-1', deviceName: 'test' },
       config, platform,
     );
-    assert.equal(session.user.email.includes('@phone.invalid'), true);
+    // 华为登录（无真实邮箱）→ email 为 NULL（issue #14：不再伪邮箱）
+    assert.equal(session.user.email, null);
 
     // 再次华为登录 → 同一用户
     const again = await socialSignIn(

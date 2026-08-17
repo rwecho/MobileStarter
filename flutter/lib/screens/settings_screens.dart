@@ -40,7 +40,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
             AppCard(
               child: AppListTile(
                 label: controller.user?.username ?? '未登录用户',
-                value: controller.user?.email ?? '登录后同步跨设备设置',
+                value: controller.user == null
+                    ? '登录后同步跨设备设置'
+                    : controller.user!.hasEmail
+                    ? controller.user!.email!
+                    : '未绑定邮箱',
               ),
             ),
             const SizedBox(height: AppSpacing.x5),

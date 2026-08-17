@@ -36,7 +36,9 @@ class _AccountSecurityScreenState extends State<AccountSecurityScreen> {
                 children: [
                   AppListTile(
                     label: '登录邮箱',
-                    value: controller.user?.email ?? '未登录',
+                    value: controller.user?.hasEmail == true
+                        ? controller.user!.email!
+                        : '未绑定邮箱',
                   ),
                   const AppListTile(label: '身份绑定', value: '邮箱密码'),
                 ],

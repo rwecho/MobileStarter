@@ -120,11 +120,13 @@ final class AppUser {
     required this.settings,
     required this.emailVerified,
     required this.consentVersion,
+    required this.hasEmail,
   });
 
   factory AppUser.fromJson(JsonMap json) => AppUser(
     id: json['id']! as String,
-    email: json['email']! as String,
+    // 可空：手机号/华为登录未绑定邮箱；hasEmail=false 时 UI 不展示 email。
+    email: json['email'] as String?,
     username: json['username']! as String,
     displayName: json['displayName']! as String,
     bio: json['bio']! as String,
@@ -133,10 +135,11 @@ final class AppUser {
     settings: JsonMap.from(json['settings']! as Map),
     emailVerified: json['emailVerified'] == true,
     consentVersion: json['consentVersion'] as String?,
+    hasEmail: json['hasEmail'] == true,
   );
 
   final String id;
-  final String email;
+  final String? email;
   final String username;
   final String displayName;
   final String bio;
@@ -145,6 +148,7 @@ final class AppUser {
   final JsonMap settings;
   final bool emailVerified;
   final String? consentVersion;
+  final bool hasEmail;
 
   AppUser copyWith({
     String? displayName,
@@ -162,6 +166,7 @@ final class AppUser {
     settings: settings ?? this.settings,
     emailVerified: emailVerified,
     consentVersion: consentVersion,
+    hasEmail: hasEmail,
   );
 }
 

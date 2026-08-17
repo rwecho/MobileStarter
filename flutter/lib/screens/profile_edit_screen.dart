@@ -57,7 +57,9 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                 ProfileIdentityCard(
                   displayName: displayName.text,
                   username: controller.user?.username ?? '',
-                  email: controller.user?.email ?? '',
+                  email: controller.user?.hasEmail == true
+                      ? controller.user!.email!
+                      : '未绑定邮箱',
                   bio: bio.text,
                   avatarUrl: avatarUrl,
                   onAvatarTap: _pickAvatar,

@@ -301,17 +301,16 @@ async function findOrCreateHuaweiUser(appId: string, phone: string) {
     // 都没有：新建用户，同时挂 huawei + phone 两条身份，后续手机号验证码登录会合入同账号
     const userId = createId();
     const createdAt = nowIso();
-    const email = `huawei-${hashToken(huaweiSubject).slice(0, 24)}@phone.invalid`;
+    // 无真实邮箱 → NULL（不再生成 xxx@phone.invalid 伪邮箱，issue #14）。
     await database.prepare(`
       INSERT INTO users(
         id, app_id, email, password_hash, username, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, NULL, ?, ?, ?, ?)
     `).run(
       userId,
       appId,
-      email,
       `external$${createId()}`,
-      `手机用户 ${phone.slice(-4)}`,
+      `手机用户${phone.slice(-4)}`,
       createdAt,
       createdAt,
     );

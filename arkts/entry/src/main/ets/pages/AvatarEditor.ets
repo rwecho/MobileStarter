@@ -3,7 +3,7 @@ import { apiClient } from '../data/ApiClient'
 import { AppButton } from '../design_system/Components'
 import { AppIconName } from '../design_system/AppIcon'
 import { AppColors, AppRadii, AppSpacing } from '../theme/AppTokens'
-import { ImageSize, cropToJpegBytes, readImageSize } from '../media/AvatarPicker'
+import { CropRegion, ImageMeta, cropToJpegBytes, readImageMeta } from '../media/AvatarPicker'
 
 // 头像编辑 sheet 内容：方形预览 + 双指缩放 / 单指拖拽定位，确认后按手势
 // 计算原图方形区域 → 512×512 JPEG → POST /storage/uploads + PUT 直传 OSS。
@@ -22,18 +22,20 @@ export struct AvatarEditor {
   @State busy: boolean = false
   @State side: number = 320
   // 原图尺寸必须 @State：异步读回后驱动 UI 重算显示尺寸，否则图停留在
-  // 方形兜底（拉伸变形）。
+  // 方形兜底（拉伸变形）。存的是 EXIF 转正后的「显示空间」尺寸。
   @State origW: number = 0
   @State origH: number = 0
+  private imageMeta: ImageMeta | null = null
   private baseScale: number = 1
   private baseOffsetX: number = 0
   private baseOffsetY: number = 0
 
   aboutToAppear(): void {
-    // 媒体库 uri 需经 fs.open → fd（issue #21），统一走 readImageSize。
-    readImageSize(this.imageUri).then((size: ImageSize) => {
-      this.origW = size.width
-      this.origH = size.height
+    // 媒体库 uri 需经 fs.open → fd（issue #21）；meta 含 EXIF 方向（变形根因）。
+    readImageMeta(this.imageUri).then((meta: ImageMeta) => {
+      this.imageMeta = meta
+      this.origW = meta.width
+      this.origH = meta.height
     }).catch(() => {
       // 读不到尺寸时 confirm 会因 origW=0 拒绝，不至于崩溃。
     })
@@ -148,11 +150,12 @@ export struct AvatarEditor {
   }
 
   private async confirm(): Promise<void> {
-    if (this.busy || this.origW === 0) return
+    if (this.busy || this.origW === 0 || this.imageMeta === null) return
     this.busy = true
     try {
       // 手势 → 原图方形区域。图左上角显示坐标 = 中心 - 半尺寸 + 偏移；
-      // 反解到原图坐标除以总显示缩放（fitK × scale）。
+      // 反解到原图坐标除以总显示缩放（fitK × scale）。坐标在「显示空间」
+      // （EXIF 转正后），cropToJpegBytes 内部负责映射回原始像素空间。
       const k = this.fitK() * this.zoomScale
       const left = this.side / 2 - this.dispW() / 2 + this.offsetX
       const top = this.side / 2 - this.dispH() / 2 + this.offsetY
@@ -163,10 +166,11 @@ export struct AvatarEditor {
       rx = Math.max(0, Math.min(this.origW - sideOrig, rx))
       ry = Math.max(0, Math.min(this.origH - sideOrig, ry))
 
-      // 裁剪 → 512×512 JPEG bytes（fd 方式打开媒体库 uri，issue #21）。
-      const packed: ArrayBuffer = await cropToJpegBytes(this.imageUri, {
+      const cropRegion: CropRegion = {
         x: rx, y: ry, width: sideOrig, height: sideOrig
-      })
+      }
+      const packed: ArrayBuffer =
+        await cropToJpegBytes(this.imageUri, cropRegion, this.imageMeta)
 
       // 上传：avatars/<userId>-<时间戳>.jpg（时间戳避免 URL 缓存）。
       const userId = this.store.user?.id ?? 'anon'

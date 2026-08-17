@@ -333,9 +333,11 @@ export struct ProfileEditPage {
     AvatarEditor({
       store: this.store,
       imageUri: this.editorImageUri,
-      onDone: (url: string) => {
+      // 上传完成即自动保存资料（此前需要再手动点「保存资料」，容易被当成"没保存"）。
+      onDone: (objectKey: string) => {
         this.showAvatarEditor = false
-        this.avatarUrl = url
+        this.avatarUrl = objectKey
+        this.store.updateProfile(this.displayName, this.bio, objectKey)
       },
       onCancel: () => {
         this.showAvatarEditor = false

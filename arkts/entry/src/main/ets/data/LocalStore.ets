@@ -10,6 +10,8 @@ const INSTALLATION_KEY: string = 'installationId'
 const THEME_KEY: string = 'preference.theme'
 const LANGUAGE_KEY: string = 'preference.language'
 const TEXT_SCALE_KEY: string = 'preference.textScale'
+// 遥测磁盘快照（§3.1）：崩溃前的内存队列落盘，下次启动恢复补发。
+const TELEMETRY_QUEUE_KEY: string = 'telemetry.queue'
 
 export class LocalStore {
   private store?: preferences.Preferences
@@ -50,6 +52,17 @@ export class LocalStore {
 
   saveConfig(config: RuntimeConfig): void {
     this.store?.putSync(CONFIG_KEY, JSON.stringify(config))
+    this.store?.flush()
+  }
+
+  readTelemetryQueue(): string | null {
+    const value = String(this.store?.getSync(TELEMETRY_QUEUE_KEY, '') ?? '')
+    return value.length > 0 ? value : null
+  }
+
+  saveTelemetryQueue(json: string): void {
+    this.store?.putSync(TELEMETRY_QUEUE_KEY, json)
+    // 崩溃安全：putSync 只进内存缓存，flush() 落盘（异步，尽力而为）。
     this.store?.flush()
   }
 

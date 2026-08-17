@@ -40,6 +40,92 @@ class Telemetry {
   private flushing: boolean = false
   private flushScheduled: boolean = false
   private retryIndex: number = 0
+  // 磁盘快照（§3.1，对齐 RN 端）：enqueue 防抖落盘、启动恢复。进程被杀
+  // （崩溃/OOM）时内存队列丢失，快照保证下次启动补发（issue #22）。
+  private saveQueue: ((json: string) => void) | null = null
+  private persistScheduled: boolean = false
+
+  // 恢复快照必须在 configure() 之前调用（AppStore.initialize 里注入）。
+  setPersistence(load: () => string | null, save: (json: string) => void): void {
+    this.saveQueue = save
+    const saved = load()
+    if (saved !== null && saved.length > 0) {
+      this.restoreFromJson(saved)
+    }
+  }
+
+  // 崩溃 watcher 立即落盘（进程可能马上死，不等防抖）。
+  persistNow(): void {
+    this.persistScheduled = false
+    if (this.saveQueue !== null) {
+      this.saveQueue(this.serializeQueue())
+    }
+  }
+
+  private schedulePersist(): void {
+    if (this.saveQueue === null || this.persistScheduled) {
+      return
+    }
+    this.persistScheduled = true
+    setTimeout(() => {
+      this.persistScheduled = false
+      this.persistNow()
+    }, 300)
+  }
+
+  private serializeQueue(): string {
+    const items: object[] = []
+    for (const event of this.queue) {
+      const props: string[][] = []
+      event.properties.forEach((value: TelemetryValue, key: string) => {
+        props.push([key, `${value}`])
+      })
+      const item: Record<string, Object> = {
+        'eventId': event.eventId,
+        'name': event.name,
+        'screenId': event.screenId,
+        'occurredAt': event.occurredAt,
+        'configVersion': event.configVersion,
+        'properties': props
+      }
+      items.push(item)
+    }
+    return JSON.stringify({ 'anonymousId': this.anonymousId, 'events': items })
+  }
+
+  private restoreFromJson(saved: string): void {
+    try {
+      const parsed = JSON.parse(saved) as Record<string, Object>
+      const events = parsed['events'] as object[] | undefined
+      if (events === undefined) return
+      for (const raw of events) {
+        const item = raw as Record<string, Object>
+        const propsRaw = item['properties'] as string[][] | undefined
+        const properties = new Map<string, TelemetryValue>()
+        if (propsRaw !== undefined) {
+          for (const pair of propsRaw) {
+            if (pair.length >= 2) {
+              properties.set(pair[0], pair[1])
+            }
+          }
+        }
+        const event: TelemetryEvent = {
+          eventId: `${item['eventId']}`,
+          name: `${item['name']}`,
+          screenId: `${item['screenId']}`,
+          occurredAt: `${item['occurredAt']}`,
+          configVersion: Number(item['configVersion']),
+          properties: properties
+        }
+        this.queue.push(event)
+      }
+      while (this.queue.length > this.maxQueue) {
+        this.queue.shift()
+      }
+    } catch (_) {
+      // 损坏的快照直接丢弃，不影响启动。
+    }
+  }
 
   configure(config: TelemetryConfig, sink: TelemetrySink | null): void {
     this.config = config
@@ -83,6 +169,7 @@ class Telemetry {
       configVersion: this.config.configVersion,
       properties: properties
     })
+    this.schedulePersist()
     this.scheduleFlush(2000)
   }
 
@@ -121,6 +208,7 @@ class Telemetry {
       }
       this.queue = this.queue.slice(events.length)
       this.retryIndex = 0
+      this.schedulePersist()
     } catch (_) {
       this.retryIndex = Math.min(this.retryIndex + 1, 4)
     } finally {

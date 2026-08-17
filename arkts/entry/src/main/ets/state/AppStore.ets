@@ -116,6 +116,11 @@ export class AppStore {
     apiClient.setToken(token)
     apiClient.setRefreshToken(localStore.readRefreshToken())
     apiClient.setSessionExpiredCallback(() => { this.handleSessionExpired() })
+    // 磁盘快照注入 + 启动恢复（必须在 configureTelemetry 之前，issue #22）。
+    telemetry.setPersistence(
+      (): string | null => localStore.readTelemetryQueue(),
+      (json: string): void => localStore.saveTelemetryQueue(json)
+    )
     try {
       const payload = await apiClient.bootstrap()
       this.config = payload.config

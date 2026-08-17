@@ -28,9 +28,8 @@ async function runBootstrap() {
     await initializeProductSchema(database);
     await applyIdempotentMigrations();
     await seedDefaultConfig();
-    if (process.env.NODE_ENV !== 'production') {
-      await ensureDevelopmentTestAccount();
-    }
+    // 存量 app 补种标准测试账户（幂等；新 app 在 seedConfigScope 内即时种）。
+    await backfillAppTestAccounts();
     await ensureBootstrapAdmin();
   });
 }
@@ -89,49 +88,45 @@ async function seedDefaultConfig() {
   `).run(randomUUID(), DEFAULT_APP_ID, defaultConfig.version, document, timestamp);
 }
 
-async function ensureDevelopmentTestAccount() {
-  const email = 'test@zhongbei.local';
-  const passwordHash = await hashPassword('test123');
+// ── Per-app standard test account（test / Test1234）────────────────────────
+// 约定与三端集成测试一致（testServer: Test1234）。每个 app 创建即 seed；
+// 已存在则不覆盖（避免重置用户改过的密码）。不 seed 假手机号——无即 null。
+const TEST_ACCOUNT_EMAIL = 'test@test.local';
+const TEST_ACCOUNT_PASSWORD = 'Test1234';
+
+async function ensureAppTestAccount(appId: string) {
   const timestamp = nowIso();
   const exists = await database.prepare(
     'SELECT id FROM users WHERE app_id = ? AND email = ?',
-  ).get<{ id: string }>(DEFAULT_APP_ID, email);
-  if (exists) {
-    if (exists.id === 'development-test-account') {
-      await database.prepare(`
-        UPDATE users SET username = ?, password_hash = ?, updated_at = ?
-        WHERE id = ?
-      `).run('test', passwordHash, timestamp, exists.id);
-      await ensureDevelopmentTestPhone(exists.id, timestamp);
-    }
-    return;
-  }
+  ).get<{ id: string }>(appId, TEST_ACCOUNT_EMAIL);
+  if (exists) return;
+  const passwordHash = await hashPassword(TEST_ACCOUNT_PASSWORD);
   await database.prepare(`
     INSERT INTO users(
-      id, app_id, email, password_hash, username, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?)
+      id, app_id, email, password_hash, username, display_name,
+      email_verified, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)
+    ON CONFLICT (app_id, email) DO NOTHING
   `).run(
-    'development-test-account', DEFAULT_APP_ID, email, passwordHash, 'test',
-    timestamp, timestamp,
+    randomUUID(), appId, TEST_ACCOUNT_EMAIL, passwordHash,
+    'test', '测试账户', timestamp, timestamp,
   );
-  await ensureDevelopmentTestPhone('development-test-account', timestamp);
 }
 
-async function ensureDevelopmentTestPhone(userId: string, createdAt: string) {
-  const subject = `${DEFAULT_APP_ID}:+8613800000000`;
-  const identity = await database.prepare(`
-    SELECT user_id FROM external_identities
-    WHERE provider = 'phone' AND provider_subject = ?
-  `).get<{ user_id: string }>(subject);
-  if (identity && identity.user_id !== userId) {
-    throw new Error('Development test phone is assigned to another account');
+async function backfillAppTestAccounts() {
+  const rows = await database.prepare(
+    'SELECT DISTINCT app_id FROM runtime_configs',
+  ).all<{ app_id: string }>();
+  for (const row of rows) {
+    await ensureAppTestAccount(row.app_id);
   }
-  if (identity) return;
-  await database.prepare(`
-    INSERT INTO external_identities(
-      id, user_id, provider, provider_subject, email, created_at
-    ) VALUES (?, ?, 'phone', ?, ?, ?)
-  `).run('development-test-phone', userId, subject, 'test@zhongbei.local', createdAt);
+  // 旧 runtime_config（单数表）里可能还有未迁移的 app。
+  const legacy = await database.prepare(
+    'SELECT DISTINCT app_id FROM runtime_config',
+  ).all<{ app_id: string }>();
+  for (const row of legacy) {
+    await ensureAppTestAccount(row.app_id);
+  }
 }
 
 async function ensureBootstrapAdmin() {
@@ -200,6 +195,8 @@ async function seedConfigScope(appId: string, environment: string) {
     randomUUID(), appId, environment, defaultConfig.version,
     JSON.stringify(defaultConfig), nowIso(),
   );
+  // 每个 app 首次创建即 seed 标准测试账户（test / Test1234）。
+  await ensureAppTestAccount(appId);
 }
 
 async function upgradeConfig(

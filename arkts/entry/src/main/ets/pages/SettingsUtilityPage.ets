@@ -49,12 +49,14 @@ export struct SettingsUtilityPage {
               this.title = value
               this.formError = ''
             })
+            .border({ width: 1, color: AppColors.borderStrong })
           TextInput({ placeholder: '告诉我们哪里可以做得更好', text: this.body })
             .height(160).backgroundColor(AppColors.surface).borderRadius(AppRadii.control)
             .onChange(value => {
               this.body = value
               this.formError = ''
             })
+            .border({ width: 1, color: AppColors.borderStrong })
           if (this.formError.length > 0) {
             Text(this.formError)
               .fontSize(13).fontColor(AppColors.error).width('100%')

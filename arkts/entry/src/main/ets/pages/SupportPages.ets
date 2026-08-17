@@ -150,6 +150,7 @@ export struct SupportTicketPage {
             TextInput({ placeholder: '回复内容', text: this.reply })
               .layoutWeight(1).height(48).backgroundColor(AppColors.surface).borderRadius(AppRadii.control)
               .onChange(value => this.reply = value)
+              .border({ width: 1, color: AppColors.borderStrong })
             Button('发送')
               .height(48)
               .backgroundColor(AppColors.brand).fontColor(AppColors.onBrand)
@@ -198,9 +199,11 @@ export struct NewSupportTicketPage {
               this.subject = value
               this.formError = ''
             })
+            .border({ width: 1, color: AppColors.borderStrong })
           TextArea({ placeholder: '描述你遇到的问题（至少 4 字）', text: this.message })
             .height(140).backgroundColor(AppColors.surface).borderRadius(AppRadii.control)
             .onChange(value => this.message = value)
+            .border({ width: 1, color: AppColors.borderStrong })
           Text('类别').fontSize(13).fontColor(AppColors.textSecondary).width('100%')
           OptionRow({
             options: this.categories().map(c => c.id),
@@ -262,12 +265,14 @@ export struct ProductFeedbackPage {
               this.title = value
               this.formError = ''
             })
+            .border({ width: 1, color: AppColors.borderStrong })
           TextArea({ placeholder: '你的反馈（至少 4 字）', text: this.body })
             .height(160).backgroundColor(AppColors.surface).borderRadius(AppRadii.control)
             .onChange(value => {
               this.body = value
               this.formError = ''
             })
+            .border({ width: 1, color: AppColors.borderStrong })
           Text('类别').fontSize(13).fontColor(AppColors.textSecondary).width('100%')
           OptionRow({
             options: FEEDBACK_CATEGORIES.map(c => c.id),

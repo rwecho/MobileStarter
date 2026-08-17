@@ -78,6 +78,7 @@ export struct AuthPage {
             .backgroundColor(AppColors.surface)
             .borderRadius(AppRadii.control)
             .onChange(value => this.username = value)
+            .border({ width: 1, color: AppColors.borderStrong })
         }
         // 内联认证错误：紧贴表单显示，持久停留直到用户修改输入（替代底部 toast，
         // 避免被键盘遮挡/一闪而过）。见 issue #12。

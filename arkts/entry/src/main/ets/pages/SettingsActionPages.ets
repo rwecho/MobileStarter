@@ -83,6 +83,7 @@ struct PasswordInput {
     TextInput({ placeholder: this.label, text: this.value })
       .height(52).type(InputType.Password).backgroundColor(AppColors.surface)
       .borderRadius(AppRadii.control).onChange(this.changed)
+      .border({ width: 1, color: AppColors.borderStrong })
   }
 }
 
@@ -307,6 +308,7 @@ export struct ProfileEditPage {
           TextInput({ placeholder: appString(AppString.Bio, this.store.language), text: this.bio })
             .height(96).maxLength(160).backgroundColor(AppColors.surface)
             .borderRadius(AppRadii.control).onChange(value => this.bio = value)
+            .border({ width: 1, color: AppColors.borderStrong })
           AppButton({ label: this.store.busy
             ? appString(AppString.Saving, this.store.language)
             : appString(AppString.SaveProfile, this.store.language),

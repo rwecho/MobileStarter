@@ -5,6 +5,8 @@ export class AppColors {
   static readonly text: ResourceColor = $r('app.color.text')
   static readonly textSecondary: ResourceColor = $r('app.color.text_secondary')
   static readonly border: ResourceColor = $r('app.color.border')
+  // 输入框等可交互元素的描边（对比 ≥3:1，浅色 #98A2B3 / 深色 #667085）。
+  static readonly borderStrong: ResourceColor = $r('app.color.border_strong')
   static readonly brand: ResourceColor = $r('app.color.brand')
   static readonly brandSoft: ResourceColor = $r('app.color.brand_soft')
   static readonly onBrand: ResourceColor = $r('app.color.on_brand')

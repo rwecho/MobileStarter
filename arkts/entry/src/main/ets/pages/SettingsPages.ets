@@ -155,6 +155,7 @@ export struct SettingDetailPage {
             .backgroundColor(AppColors.surface)
             .borderRadius(AppRadii.control)
             .onChange(value => this.password = value)
+            .border({ width: 1, color: AppColors.borderStrong })
         } else {
           Row() {
             Text('启用此功能').layoutWeight(1)

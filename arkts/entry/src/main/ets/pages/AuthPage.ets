@@ -49,6 +49,7 @@ export struct AuthPage {
               this.email = value
               this.store.lastAuthError = ''
             })
+            .border({ width: 1, color: AppColors.borderStrong })
         } else {
           Text(this.store.recoveryEmail)
             .fontColor(AppColors.textSecondary)
@@ -71,6 +72,7 @@ export struct AuthPage {
               this.password = value
               this.store.lastAuthError = ''
             })
+            .border({ width: 1, color: AppColors.borderStrong })
         }
         if (this.mode === AuthMode.SignUp) {
           TextInput({ placeholder: '用户名', text: this.username })

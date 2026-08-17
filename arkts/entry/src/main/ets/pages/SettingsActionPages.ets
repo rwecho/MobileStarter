@@ -305,6 +305,7 @@ export struct ProfileEditPage {
             text: this.displayName })
             .height(52).maxLength(40).backgroundColor(AppColors.surface)
             .borderRadius(AppRadii.control).onChange(value => this.displayName = value)
+            .border({ width: 1, color: AppColors.borderStrong })
           TextInput({ placeholder: appString(AppString.Bio, this.store.language), text: this.bio })
             .height(96).maxLength(160).backgroundColor(AppColors.surface)
             .borderRadius(AppRadii.control).onChange(value => this.bio = value)

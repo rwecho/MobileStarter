@@ -1,9 +1,9 @@
-import image from '@ohos.multimedia.image'
 import { AppStore } from '../state/AppStore'
 import { apiClient } from '../data/ApiClient'
 import { AppButton } from '../design_system/Components'
 import { AppIconName } from '../design_system/AppIcon'
 import { AppColors, AppRadii, AppSpacing } from '../theme/AppTokens'
+import { ImageSize, cropToJpegBytes, readImageSize } from '../media/AvatarPicker'
 
 // 头像编辑 sheet 内容：方形预览 + 双指缩放 / 单指拖拽定位，确认后按手势
 // 计算原图方形区域 → 512×512 JPEG → POST /storage/uploads + PUT 直传 OSS。
@@ -28,13 +28,12 @@ export struct AvatarEditor {
   private baseOffsetY: number = 0
 
   aboutToAppear(): void {
-    const source = image.createImageSource(this.imageUri)
-    source.getImageInfo().then((info: image.ImageInfo) => {
-      this.origW = info.size.width
-      this.origH = info.size.height
-      source.release()
+    // 媒体库 uri 需经 fs.open → fd（issue #21），统一走 readImageSize。
+    readImageSize(this.imageUri).then((size: ImageSize) => {
+      this.origW = size.width
+      this.origH = size.height
     }).catch(() => {
-      source.release()
+      // 读不到尺寸时 confirm 会因 origW=0 拒绝，不至于崩溃。
     })
   }
 
@@ -147,23 +146,10 @@ export struct AvatarEditor {
       rx = Math.max(0, Math.min(this.origW - sideOrig, rx))
       ry = Math.max(0, Math.min(this.origH - sideOrig, ry))
 
-      const source = image.createImageSource(this.imageUri)
-      const cropSize: image.Size = { width: sideOrig, height: sideOrig }
-      const region: image.Region = {
-        x: rx, y: ry, size: cropSize
-      }
-      const pixelMap = await source.createPixelMap({
-        desiredRegion: region,
-        desiredSize: { width: 512, height: 512 }
+      // 裁剪 → 512×512 JPEG bytes（fd 方式打开媒体库 uri，issue #21）。
+      const packed: ArrayBuffer = await cropToJpegBytes(this.imageUri, {
+        x: rx, y: ry, width: sideOrig, height: sideOrig
       })
-      source.release()
-      const packer = image.createImagePacker()
-      const packed: ArrayBuffer = await packer.packToData(pixelMap, {
-        format: 'image/jpeg',
-        quality: 80
-      })
-      packer.release()
-      pixelMap.release()
 
       // 上传：avatars/<userId>-<时间戳>.jpg（时间戳避免 URL 缓存）。
       const userId = this.store.user?.id ?? 'anon'
@@ -171,7 +157,8 @@ export struct AvatarEditor {
       const sign = await apiClient.signUpload(path, 'image/jpeg')
       await apiClient.uploadToS3(sign.uploadUrl, packed, 'image/jpeg')
       this.busy = false
-      this.onDone(sign.url)
+      // 私有 bucket：存 objectKey，显示层经 /storage/urls 换 presigned URL。
+      this.onDone(sign.objectKey)
     } catch (error) {
       this.busy = false
       this.store.showToast(error instanceof Error ? error.message : '头像上传失败', true)

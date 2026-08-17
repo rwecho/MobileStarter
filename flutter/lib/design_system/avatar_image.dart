@@ -59,6 +59,15 @@ class _AvatarImageState extends State<AvatarImage> {
     _resolve();
   }
 
+  // 上传新头像后 avatarUrl 变化 → 重新 resolve（否则停留在旧图）。
+  @override
+  void didUpdateWidget(covariant AvatarImage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.avatarUrl != widget.avatarUrl) {
+      _resolve();
+    }
+  }
+
   Future<void> _resolve() async {
     final url = await AssetUrls.resolve(context, widget.avatarUrl);
     if (mounted) {

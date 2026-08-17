@@ -8,16 +8,25 @@ import { AppColors } from '../theme/AppTokens'
 //     （24h，见 AssetUrls 会话缓存），任何资产通用。
 //  2. http(s):// — 直接显示。
 //  3. data:image/... — 旧 base64 兼容。
+// avatarUrl 变化（上传新头像后）必须重新 resolve——@Watch 驱动，否则
+// 组件停留在旧图（"我的页不更新"的根因）。
 @Component
 export struct AvatarImage {
   @ObjectLink store: AppStore
-  avatarUrl: string = ''
+  @Prop @Watch('onAvatarUrlChange') avatarUrl: string = ''
   avatarSize: number = 88
 
   @State resolvedUrl: string = ''
   @State failed: boolean = false
 
   aboutToAppear(): void {
+    this.resolve()
+  }
+
+  // 上传/保存后 avatarUrl 更新 → 清旧解析结果重新换取。
+  onAvatarUrlChange(): void {
+    this.resolvedUrl = ''
+    this.failed = false
     this.resolve()
   }
 

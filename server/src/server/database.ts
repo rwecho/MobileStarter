@@ -8,6 +8,13 @@ import { DEFAULT_APP_ID } from './service-identity';
 
 export const database = new PostgresDatabase();
 
+// ── Per-app standard test account（test / Test1234）────────────────────────
+// 约定与三端集成测试一致（testServer: Test1234）。每个 app 创建即 seed；
+// 已存在则不覆盖（避免重置用户改过的密码）。不 seed 假手机号——无即 null。
+// 注意：必须声明在文件底部的顶层 await ensureBootstrap() 之前（TDZ）。
+const TEST_ACCOUNT_EMAIL = 'test@test.local';
+const TEST_ACCOUNT_PASSWORD = 'Test1234';
+
 // Node's test runner executes each test file in its own process, so multiple
 // workers import this module concurrently and would race on the idempotent
 // `CREATE TABLE IF NOT EXISTS` statements (Postgres still allocates the
@@ -87,12 +94,6 @@ async function seedDefaultConfig() {
     ON CONFLICT DO NOTHING
   `).run(randomUUID(), DEFAULT_APP_ID, defaultConfig.version, document, timestamp);
 }
-
-// ── Per-app standard test account（test / Test1234）────────────────────────
-// 约定与三端集成测试一致（testServer: Test1234）。每个 app 创建即 seed；
-// 已存在则不覆盖（避免重置用户改过的密码）。不 seed 假手机号——无即 null。
-const TEST_ACCOUNT_EMAIL = 'test@test.local';
-const TEST_ACCOUNT_PASSWORD = 'Test1234';
 
 async function ensureAppTestAccount(appId: string) {
   const timestamp = nowIso();

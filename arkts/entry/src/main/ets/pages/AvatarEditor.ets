@@ -44,10 +44,13 @@ export struct AvatarEditor {
   }
 
   private dispW(): number {
+    // 原图尺寸未读回前先铺满方形区（否则 0×0 → 一片黑）。
+    if (this.origW === 0) return this.side
     return this.origW * this.fitK() * this.zoomScale
   }
 
   private dispH(): number {
+    if (this.origH === 0) return this.side
     return this.origH * this.fitK() * this.zoomScale
   }
 
@@ -65,7 +68,8 @@ export struct AvatarEditor {
   build() {
     Column({ space: AppSpacing.x4 }) {
       Text('编辑头像').fontSize(18).fontWeight(FontWeight.Bold).fontColor(AppColors.text)
-      // 方形编辑区（叠半透明遮罩 + 居中透明方窗）
+      // 方形编辑区：黑底 + 图 + 中央方形描边（标记裁剪窗口）。
+      // 注意：不能叠全覆盖遮罩（会整体压黑，之前"黑屏"的根因）。
       Stack() {
         Image(this.imageUri)
           .width(this.dispW()).height(this.dispH())
@@ -94,11 +98,6 @@ export struct AvatarEditor {
                 this.offsetY = this.clampOffsetY(this.baseOffsetY + event.offsetY)
               })
           )
-        // 上下遮罩（图未铺满 side 的方向）
-        Column()
-          .backgroundColor('#99000000')
-          .width('100%').height('100%')
-          .hitTestBehavior(HitTestMode.Transparent)
       }
       .width(this.side).height(this.side)
       .backgroundColor('#000000')

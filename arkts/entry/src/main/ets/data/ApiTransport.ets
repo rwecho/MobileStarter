@@ -36,11 +36,19 @@ export interface RestorePurchasesBody {
   receipts: PurchaseReceipt[]
 }
 
+// 头像三形态（https/data:image/objectKey）或 null（未设置；空串由 client 规范化）。
+export interface ProfileUpdateBody {
+  displayName: string
+  bio: string
+  avatarUrl: string | null
+  username?: string
+}
+
 export type ApiRequestBody =
   Record<string, string | number | boolean> |
   SignInInput | SignUpInput | DeleteAccountInput |
   PhoneCodeInput | PhoneVerifyInput | FeedbackInput |
-  CreateTicketInput | SocialSignInInput |
+  CreateTicketInput | SocialSignInInput | ProfileUpdateBody |
   VerifyPurchaseBody | RestorePurchasesBody
 
 interface TelemetryEventEnvelope {

@@ -76,11 +76,15 @@ export const profileSchema = z.object({
   bio: z.string().trim().max(160).optional(),
   // 三种形态：https URL / 旧 base64 data:image / 对象存储 objectKey
   // （`<appId>/<env>/avatars/...`，私有 bucket presigned 显示）。
-  avatarUrl: z.union([
-    z.url(),
-    z.string().startsWith('data:image/'),
-    z.string().regex(/^[A-Za-z0-9._\-/]+$/, 'objectKey 只能含字母数字点横杠斜杠').max(512),
-  ]).nullable().optional(),
+  // 空串规范化为 null（客户端未设置头像时可能发 ''）。
+  avatarUrl: z.preprocess(
+    (value) => (value === '' ? null : value),
+    z.union([
+      z.url(),
+      z.string().startsWith('data:image/'),
+      z.string().regex(/^[A-Za-z0-9._\-/]+$/, 'objectKey 只能含字母数字点横杠斜杠').max(512),
+    ]).nullable().optional(),
+  ),
 }).strict();
 
 export const passwordSchema = z.object({

@@ -4,6 +4,7 @@ import {
   ApiFailure,
   ApiRequestBody,
   ApiTransport,
+  ProfileUpdateBody,
   RestorePurchasesBody,
   SocialSignInInput,
   VerifyPurchaseBody
@@ -193,11 +194,18 @@ export class ApiClient {
     ).then(result => result['changed'] === true)
   }
 
-  updateProfile(displayName: string, bio: string, avatarUrl: string): Promise<AppUser> {
+  updateProfile(displayName: string, bio: string, avatarUrl: string | null): Promise<AppUser> {
+    // 空串统一转 null（服务端 schema 拒绝 ''，未设置头像就是 null）。
+    const normalizedAvatar = avatarUrl !== null && avatarUrl.length === 0 ? null : avatarUrl
+    const body: ProfileUpdateBody = {
+      displayName,
+      bio,
+      avatarUrl: normalizedAvatar
+    }
     return this.request<AppUser>(
       '/api/v1/me/profile',
       http.RequestMethod.PUT,
-      { displayName, bio, avatarUrl }
+      body
     )
   }
 

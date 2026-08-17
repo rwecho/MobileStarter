@@ -495,7 +495,7 @@ export class AppStore {
     }
   }
 
-  async updateProfile(displayName: string, bio: string, avatarUrl: string): Promise<boolean> {
+  async updateProfile(displayName: string, bio: string, avatarUrl: string | null): Promise<boolean> {
     if (!this.signedIn || this.busy) return false
     this.busy = true
     try {

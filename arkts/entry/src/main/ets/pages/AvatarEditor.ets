@@ -23,6 +23,8 @@ export struct AvatarEditor {
   @State offsetX: number = 0
   @State offsetY: number = 0
   @State busy: boolean = false
+  // sheet 内联错误（全局 toast 会被 sheet 遮住，必须自己展示）。
+  @State error: string = ''
   @State side: number = 320
   // 归一化结果必须 @State：异步读回后驱动 UI 重算尺寸。
   @State pixelMap: image.PixelMap | null = null
@@ -119,6 +121,12 @@ export struct AvatarEditor {
                     this.offsetY = this.clampOffsetY(this.baseOffsetY + event.offsetY)
                   })
               )
+            // 圆形取景框：头像最终以圆形展示，圆内即最终效果（所见即所得）。
+            Column()
+              .width(this.side).height(this.side)
+              .borderRadius(this.side / 2)
+              .border({ width: 1.5, color: '#FFFFFFCC' })
+              .hitTestBehavior(HitTestMode.Transparent)
           }
           .width(this.side).height(this.side)
           .backgroundColor('#000000')
@@ -137,7 +145,19 @@ export struct AvatarEditor {
         }
       })
 
-      Text('双指缩放 · 单指拖拽调整构图').fontSize(12).fontColor(AppColors.textSecondary)
+      Text('圆形内为最终效果 · 双指缩放 · 单指拖拽').fontSize(12).fontColor(AppColors.textSecondary)
+
+      // sheet 内状态展示：全局 toast 会被 sheet 遮住（"点了没反应"的根因），
+      // 上传中/失败状态必须画在 sheet 里。
+      if (this.busy) {
+        Row({ space: AppSpacing.x2 }) {
+          LoadingProgress().width(18).height(18).color(AppColors.brand)
+          Text('正在裁剪并上传…').fontSize(13).fontColor(AppColors.brand)
+        }
+      }
+      if (this.error.length > 0) {
+        Text(this.error).fontSize(13).fontColor(AppColors.error)
+      }
 
       // AppButton 内部 width('100%')——必须各包 layoutWeight(1) 容器平分宽，
       // 否则取消按钮占满整行、确认按钮被挤出屏幕不可见。
@@ -161,6 +181,7 @@ export struct AvatarEditor {
   private async confirm(): Promise<void> {
     if (this.busy || this.origW === 0 || this.normalized === null) return
     this.busy = true
+    this.error = ''
     try {
       // 手势 → 转正空间方形区域。图左上角显示坐标 = 中心 - 半尺寸 + 偏移；
       // 反解除以总显示缩放（fitK × scale）。显示与裁剪同一空间，无映射。
@@ -190,7 +211,10 @@ export struct AvatarEditor {
       this.onDone(sign.objectKey)
     } catch (error) {
       this.busy = false
-      this.store.showToast(error instanceof Error ? error.message : '头像上传失败', true)
+      // sheet 内联展示错误（toast 会被 sheet 遮住）；两处都保留以便 sheet 外
+      // 也能看到失败。
+      this.error = error instanceof Error ? error.message : '头像上传失败，请重试'
+      this.store.showToast(this.error, true)
     }
   }
 }

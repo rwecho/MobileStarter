@@ -4,6 +4,7 @@ import { apiClient } from '../data/ApiClient'
 import { AppButton } from '../design_system/Components'
 import { AppIconName } from '../design_system/AppIcon'
 import { AppColors, AppRadii, AppSpacing } from '../theme/AppTokens'
+import { telemetry, TelemetryValue } from '../telemetry/Telemetry'
 import { CropRegion, NormalizedImage, cropToJpegBytes, loadNormalizedImage } from '../media/AvatarPicker'
 
 // 头像编辑 sheet 内容：方形预览 + 双指缩放 / 单指拖拽定位，确认后按手势
@@ -211,10 +212,17 @@ export struct AvatarEditor {
       this.onDone(sign.objectKey)
     } catch (error) {
       this.busy = false
-      // sheet 内联展示错误（toast 会被 sheet 遮住）；两处都保留以便 sheet 外
-      // 也能看到失败。
-      this.error = error instanceof Error ? error.message : '头像上传失败，请重试'
-      this.store.showToast(this.error, true)
+      // 非 Error 实例（部分原生错误）也要有可读信息，不再吞成统一文案。
+      const detail = error instanceof Error
+        ? error.message : `${error instanceof Object ? JSON.stringify(error) : String(error)}`
+      const message = detail.length > 0 ? detail : '头像上传失败，请重试'
+      // catch 分支错误必须进遥测（app_error），否则线上永远查不到。
+      const props = new Map<string, TelemetryValue>()
+      props.set('source', 'avatar_upload')
+      telemetry.report(new Error(message), props)
+      // sheet 内联展示（原生 toast 顶层弹，两处都保留）。
+      this.error = message
+      this.store.showToast(message, true)
     }
   }
 }

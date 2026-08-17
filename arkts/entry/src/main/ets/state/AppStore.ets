@@ -666,6 +666,9 @@ export class AppStore {
   }
 
   private showApiError(error: Error): void {
+    // 错误统一出口：用户可见的 API 错误必须进遥测（此前只 toast，
+    // catch 分支的错误永远查不到）。
+    telemetry.report(error)
     if (error instanceof ApiFailure) {
       this.showToast(error.message, true)
       return

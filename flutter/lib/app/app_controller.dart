@@ -1,5 +1,7 @@
 import 'dart:typed_data';
 
+import '../telemetry/telemetry.dart';
+
 import 'package:flutter/foundation.dart';
 
 import '../auth/social_auth.dart';
@@ -327,9 +329,12 @@ final class AppController extends ChangeNotifier {
       _actionState = const Success<void>(null);
       return result;
     } on ApiException catch (error) {
+      // 用户可见错误必须进遥测（app_error）——catch 分支不上报则线上查不到。
+      telemetry.report(error, StackTrace.current);
       _actionState = Failure(error.message);
       return null;
-    } catch (_) {
+    } catch (error) {
+      telemetry.report(error, StackTrace.current);
       _actionState = const Offline<void>();
       return null;
     } finally {

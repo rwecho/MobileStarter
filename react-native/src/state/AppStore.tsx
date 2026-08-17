@@ -147,6 +147,8 @@ export function AppProvider({ children }: Readonly<{ children: ReactNode }>) {
     } catch (error) {
       if (!(error instanceof ApiClientError)) setOnline(false);
       const message = error instanceof Error ? error.message : '操作失败';
+      // 用户可见错误必须进遥测（app_error）——catch 分支不上报则线上查不到。
+      telemetry.report(error instanceof Error ? error : new Error(message));
       setLastAuthError(message);
       throw error;
     } finally {

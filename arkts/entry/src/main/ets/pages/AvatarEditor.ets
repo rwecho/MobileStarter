@@ -21,8 +21,10 @@ export struct AvatarEditor {
   @State offsetY: number = 0
   @State busy: boolean = false
   @State side: number = 320
-  private origW: number = 0
-  private origH: number = 0
+  // 原图尺寸必须 @State：异步读回后驱动 UI 重算显示尺寸，否则图停留在
+  // 方形兜底（拉伸变形）。
+  @State origW: number = 0
+  @State origH: number = 0
   private baseScale: number = 1
   private baseOffsetX: number = 0
   private baseOffsetY: number = 0
@@ -44,13 +46,10 @@ export struct AvatarEditor {
   }
 
   private dispW(): number {
-    // 原图尺寸未读回前先铺满方形区（否则 0×0 → 一片黑）。
-    if (this.origW === 0) return this.side
     return this.origW * this.fitK() * this.zoomScale
   }
 
   private dispH(): number {
-    if (this.origH === 0) return this.side
     return this.origH * this.fitK() * this.zoomScale
   }
 
@@ -68,43 +67,56 @@ export struct AvatarEditor {
   build() {
     Column({ space: AppSpacing.x4 }) {
       Text('编辑头像').fontSize(18).fontWeight(FontWeight.Bold).fontColor(AppColors.text)
-      // 方形编辑区：黑底 + 图 + 中央方形描边（标记裁剪窗口）。
-      // 注意：不能叠全覆盖遮罩（会整体压黑，之前"黑屏"的根因）。
-      Stack() {
-        Image(this.imageUri)
-          .width(this.dispW()).height(this.dispH())
-          .objectFit(ImageFit.Fill)
-          .translate({ x: this.offsetX, y: this.offsetY })
-          .gesture(
-            PinchGesture({ fingers: 2 })
-              .onActionStart(() => {
-                this.baseScale = this.zoomScale
-              })
-              .onActionUpdate((event: GestureEvent) => {
-                const next = this.baseScale * event.scale
-                this.zoomScale = Math.max(1, Math.min(4, next))
-                this.offsetX = this.clampOffsetX(this.offsetX)
-                this.offsetY = this.clampOffsetY(this.offsetY)
-              })
-          )
-          .gesture(
-            PanGesture({ fingers: 1 })
-              .onActionStart(() => {
-                this.baseOffsetX = this.offsetX
-                this.baseOffsetY = this.offsetY
-              })
-              .onActionUpdate((event: GestureEvent) => {
-                this.offsetX = this.clampOffsetX(this.baseOffsetX + event.offsetX)
-                this.offsetY = this.clampOffsetY(this.baseOffsetY + event.offsetY)
-              })
-          )
+      // 方形编辑区。尺寸读回前显示 loading（避免 0×0/拉伸），读回后
+      // dispW/dispH 保持原图宽高比（@State origW/H 驱动刷新）。
+      Column() {
+        if (this.origW === 0 || this.origH === 0) {
+          Column({ space: AppSpacing.x2 }) {
+            LoadingProgress().width(36).height(36).color(AppColors.brand)
+            Text('读取图片…').fontSize(12).fontColor(AppColors.textSecondary)
+          }
+          .width(this.side).height(this.side)
+          .backgroundColor(AppColors.surfaceMuted)
+          .borderRadius(AppRadii.card)
+          .justifyContent(FlexAlign.Center)
+        } else {
+          Stack() {
+            Image(this.imageUri)
+              .width(this.dispW()).height(this.dispH())
+              .objectFit(ImageFit.Fill)
+              .translate({ x: this.offsetX, y: this.offsetY })
+              .gesture(
+                PinchGesture({ fingers: 2 })
+                  .onActionStart(() => {
+                    this.baseScale = this.zoomScale
+                  })
+                  .onActionUpdate((event: GestureEvent) => {
+                    const next = this.baseScale * event.scale
+                    this.zoomScale = Math.max(1, Math.min(4, next))
+                    this.offsetX = this.clampOffsetX(this.offsetX)
+                    this.offsetY = this.clampOffsetY(this.offsetY)
+                  })
+              )
+              .gesture(
+                PanGesture({ fingers: 1 })
+                  .onActionStart(() => {
+                    this.baseOffsetX = this.offsetX
+                    this.baseOffsetY = this.offsetY
+                  })
+                  .onActionUpdate((event: GestureEvent) => {
+                    this.offsetX = this.clampOffsetX(this.baseOffsetX + event.offsetX)
+                    this.offsetY = this.clampOffsetY(this.baseOffsetY + event.offsetY)
+                  })
+              )
+          }
+          .width(this.side).height(this.side)
+          .backgroundColor('#000000')
+          .borderRadius(AppRadii.card)
+          .clip(true)
+        }
       }
-      .width(this.side).height(this.side)
-      .backgroundColor('#000000')
-      .borderRadius(AppRadii.card)
-      .clip(true)
+      // 首次布局拿实际方形边长（两个分支同尺寸，onAreaChange 放共用容器）。
       .onAreaChange((_old: Area, newArea: Area) => {
-        // 首次布局拿到实际方形边长，重置手势基准。
         const w = Number(newArea.width)
         if (w > 0 && Math.abs(w - this.side) > 0.5) {
           this.side = w
@@ -116,13 +128,19 @@ export struct AvatarEditor {
 
       Text('双指缩放 · 单指拖拽调整构图').fontSize(12).fontColor(AppColors.textSecondary)
 
+      // AppButton 内部 width('100%')——必须各包 layoutWeight(1) 容器平分宽，
+      // 否则取消按钮占满整行、确认按钮被挤出屏幕不可见。
       Row({ space: AppSpacing.x3 }) {
-        AppButton({ label: '取消', onTap: () => this.onCancel() })
-        AppButton({
-          label: this.busy ? '上传中…' : '确认并上传',
-          icon: AppIconName.Check,
-          onTap: () => this.confirm()
-        })
+        Column() {
+          AppButton({ label: '取消', onTap: () => this.onCancel() })
+        }.layoutWeight(1)
+        Column() {
+          AppButton({
+            label: this.busy ? '上传中…' : '确认上传',
+            icon: AppIconName.Check,
+            onTap: () => this.confirm()
+          })
+        }.layoutWeight(1)
       }.width('100%')
     }
     .width('100%')

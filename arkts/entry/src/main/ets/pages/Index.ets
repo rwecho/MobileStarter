@@ -29,6 +29,9 @@ struct Index {
   @State store: AppStore = new AppStore()
 
   aboutToAppear(): void {
+    // 原生 toast 需要 UIContext（顶部展示 + 主色文字）；必须在 initialize
+    // 之前注入——initialize 里的离线提示就会触发 showToast。
+    this.store.attachUIContext(this.getUIContext())
     this.store.initialize(this.getUIContext().getHostContext() as common.UIAbilityContext)
     entryIntentInbox.subscribe(this)
   }
@@ -136,34 +139,11 @@ struct Index {
   }
 
   build() {
-    Stack({ alignContent: Alignment.Bottom }) {
-      Navigation(this.store.navStack) {
-      }
-      .navDestination(this.pageMap)
-      .hideTitleBar(true)
-      .mode(NavigationMode.Stack)
-      if (this.store.toastMessage.length > 0) {
-        ToastHost({ store: this.store })
-      }
+    Navigation(this.store.navStack) {
     }
+    .navDestination(this.pageMap)
+    .hideTitleBar(true)
+    .mode(NavigationMode.Stack)
     .width('100%').height('100%').backgroundColor(AppColors.background)
-  }
-}
-
-@Component
-struct ToastHost {
-  @ObjectLink store: AppStore
-  build() {
-    Row({ space: AppSpacing.x3 }) {
-      AppIcon({
-        name: this.store.toastError ? AppIconName.Alert : AppIconName.Check,
-        color: this.store.toastError ? AppColors.error : AppColors.success,
-        iconSize: 20
-      })
-      Text(this.store.toastMessage).fontColor(AppColors.text)
-    }
-    .margin(AppSpacing.x4).padding(AppSpacing.x4).width('90%')
-    .backgroundColor(AppColors.surface).borderRadius(AppRadii.control)
-    .shadow({ radius: 16, color: '#26000000', offsetY: 4 })
   }
 }

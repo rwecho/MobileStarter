@@ -1,4 +1,6 @@
 import common from '@ohos.app.ability.common'
+import { UIContext } from '@ohos.arkui.UIContext'
+import { AppColors } from '../theme/AppTokens'
 import { ConfigurationConstant } from '@kit.AbilityKit'
 import { apiClient, ApiFailure } from '../data/ApiClient'
 import { localStore } from '../data/LocalStore'
@@ -71,8 +73,6 @@ export class AppStore {
   textScale: number = 1
   config: RuntimeConfig | null = null
   user: AppUser | null = null
-  toastMessage: string = ''
-  toastError: boolean = false
   // 最近一次认证失败的错误信息（内联显示在表单字段下方，见 AuthPage）。
   // 认证成功后清空；输入变化时由页面清空。
   lastAuthError: string = ''
@@ -612,14 +612,23 @@ export class AppStore {
     this.pendingPlanId = planId
   }
 
+  // 原生 toast（系统级）：顶部展示、文字用主色（错误用语义红）。
+  // UIContext 由 Index 挂载时注入（attachUIContext）；极早期未注入时静默跳过。
+  private uiContext: UIContext | null = null
+
+  attachUIContext(ui: UIContext): void {
+    this.uiContext = ui
+  }
+
   showToast(message: string, error: boolean = false): void {
-    this.toastMessage = message
-    this.toastError = error
-    setTimeout(() => {
-      if (this.toastMessage === message) {
-        this.toastMessage = ''
-      }
-    }, 2400)
+    if (this.uiContext === null) return
+    this.uiContext.getPromptAction().showToast({
+      message: message,
+      duration: 2000,
+      alignment: Alignment.Top,
+      textColor: error ? AppColors.error : AppColors.brand,
+      backgroundColor: AppColors.surface
+    })
   }
 
   private async authenticate(

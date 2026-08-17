@@ -161,7 +161,9 @@ export async function resolveObjectUrl(params: {
     return { url: `${PUBLIC_BASE}/${bucket}/${params.objectKey}` };
   }
   const command = new GetObjectCommand({ Bucket: bucket, Key: params.objectKey });
-  const url = await getSignedUrl(client(), command, { expiresIn: 3600 });
+  // 24h：一次登录会话（含跨天）内无需刷新；业界 presigned 常见 1h–7d，
+  // 24h 是安全与体验的平衡。过期后客户端重新调 /urls 换取。
+  const url = await getSignedUrl(client(), command, { expiresIn: 86_400 });
   return { url };
 }
 

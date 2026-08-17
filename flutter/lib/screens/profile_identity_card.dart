@@ -1,8 +1,6 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
 
-import '../design_system/app_icon.dart';
+import '../design_system/avatar_image.dart';
 import '../design_system/components.dart';
 import '../theme/app_tokens.dart';
 
@@ -38,17 +36,9 @@ class ProfileIdentityCard extends StatelessWidget {
               child: InkWell(
                 onTap: onAvatarTap,
                 customBorder: const CircleBorder(),
-                child: CircleAvatar(
-                  radius: 48,
-                  backgroundColor: scheme.primaryContainer,
-                  backgroundImage: _avatarImage(avatarUrl),
-                  child: avatarUrl == null || avatarUrl!.isEmpty
-                      ? AppIcon(
-                          AppIconName.user,
-                          size: 38,
-                          color: scheme.primary,
-                        )
-                      : null,
+                child: AvatarImage(
+                  avatarUrl: avatarUrl ?? '',
+                  size: 96,
                 ),
               ),
             ),
@@ -81,17 +71,5 @@ class ProfileIdentityCard extends StatelessWidget {
         ),
       ),
     );
-  }
-}
-
-ImageProvider? _avatarImage(String? value) {
-  if (value == null || value.isEmpty) return null;
-  if (!value.startsWith('data:')) return NetworkImage(value);
-  final comma = value.indexOf(',');
-  if (comma <= 0) return null;
-  try {
-    return MemoryImage(base64Decode(value.substring(comma + 1)));
-  } catch (_) {
-    return null;
   }
 }

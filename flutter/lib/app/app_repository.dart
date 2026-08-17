@@ -114,6 +114,19 @@ final class AppRepository {
     );
   }
 
+  /// objectKey → 短时效 presigned GET URL（私有 bucket；24h 有效）。
+  /// 通用资产（avatar/视频/音频…）显示前换取。
+  Future<String?> resolveObjectUrl(String objectKey) async {
+    try {
+      final data = await _request(
+        '/api/v1/storage/urls?key=${Uri.encodeComponent(objectKey)}',
+      );
+      return data['url'] as String?;
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// 二进制直传到 presigned URL（不经 API base；PUT 一次成功即返回）。
   Future<void> uploadToS3(
     String uploadUrl,

@@ -71,8 +71,40 @@ async function uploadAvatarToStorage(jpegBase64: string, userId: string): Promis
   return sign.url;
 }
 
+// objectKey → presigned GET URL（私有 bucket，24h）。通用资产显示前换取。
+async function resolveObjectUrl(objectKey: string): Promise<string | null> {
+  try {
+    const result = await request<{ url: string }>(
+      `/api/v1/storage/urls?key=${encodeURIComponent(objectKey)}`,
+    );
+    return result.url ?? null;
+  } catch {
+    return null;
+  }
+}
+
+// 会话级缓存 + 并发合并（同一 objectKey 只请求一次；失败/过期 invalidate）。
+const assetUrlCache = new Map<string, string>();
+
+export async function resolveAssetUrl(objectKey: string): Promise<string | null> {
+  if (objectKey.startsWith('http://') || objectKey.startsWith('https://') ||
+      objectKey.startsWith('data:')) {
+    return objectKey;
+  }
+  const cached = assetUrlCache.get(objectKey);
+  if (cached) return cached;
+  const url = await resolveObjectUrl(objectKey);
+  if (url) assetUrlCache.set(objectKey, url);
+  return url;
+}
+
+export function invalidateAssetUrl(objectKey: string): void {
+  assetUrlCache.delete(objectKey);
+}
+
 export const apiClient = {
   uploadAvatarToStorage,
+  resolveObjectUrl,
   bootstrap: () => request<BootstrapPayload>('/api/v1/bootstrap'),
   signIn: (identifier: string, password: string) => requestAuth('/api/v1/auth/sign-in', {
     identifier,

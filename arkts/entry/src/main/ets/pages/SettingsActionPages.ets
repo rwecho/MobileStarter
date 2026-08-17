@@ -5,7 +5,8 @@ import { AppButton, AppListRow, PageHeader } from '../design_system/Components'
 import { AppIcon, AppIconName } from '../design_system/AppIcon'
 import { AppColors, AppRadii, AppSpacing } from '../theme/AppTokens'
 import { LegalDocument } from '../domain/Models'
-import { pickAvatarDataUrl, pickAvatarUri } from '../media/AvatarPicker'
+import { pickAvatarUri } from '../media/AvatarPicker'
+import { AvatarImage } from '../design_system/AvatarImage'
 import { AvatarEditor } from './AvatarEditor'
 import { appString, AppString } from '../localization/AppStrings'
 import { lvMarkdownIn } from '@luvi/lv-markdown-in'
@@ -292,18 +293,7 @@ export struct ProfileEditPage {
         title: appString(AppString.ProfileEdit, this.store.language) })
       Scroll() {
         Column({ space: AppSpacing.x4 }) {
-          if (this.avatarUrl.length > 0) {
-            Image(this.avatarUrl)
-              .width(88).height(88).borderRadius(44).objectFit(ImageFit.Cover)
-              .backgroundColor(AppColors.surfaceMuted)
-          } else {
-            Column() {
-              AppIcon({ name: AppIconName.User, iconSize: 36, color: AppColors.brand })
-            }
-            .width(88).height(88).borderRadius(44)
-            .backgroundColor(AppColors.brandSoft)
-            .justifyContent(FlexAlign.Center)
-          }
+          AvatarImage({ store: this.store, avatarUrl: this.avatarUrl, avatarSize: 88 })
           AppButton({ label: appString(AppString.ChooseAvatar, this.store.language),
             icon: AppIconName.User, onTap: () => this.pickAvatar() })
           AppListRow({ store: this.store,

@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Image, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { invalidateAssetUrl, resolveAssetUrl } from '../data/apiClient';
 import * as ImagePicker from 'expo-image-picker';
 import {
   AppButton,
@@ -88,10 +89,30 @@ function SignedOutProfile() {
   );
 }
 
+// 头像显示：兼容 objectKey（→ presigned 24h）/ http(s) / data: 三种形态。
 function Avatar({ avatarUrl, label }: Readonly<{ avatarUrl?: string | null; label: string }>) {
   const { palette } = usePreferences();
-  if (avatarUrl) {
-    return <Image accessibilityLabel="用户头像" source={{ uri: avatarUrl }} style={profileStyles.avatar} />;
+  const [resolved, setResolved] = useState<string | null>(null);
+  useEffect(() => {
+    let alive = true;
+    if (!avatarUrl) return;
+    void resolveAssetUrl(avatarUrl).then(url => {
+      if (alive) setResolved(url);
+    });
+    return () => { alive = false; };
+  }, [avatarUrl]);
+  if (resolved) {
+    return (
+      <Image
+        accessibilityLabel="用户头像"
+        source={{ uri: resolved }}
+        style={profileStyles.avatar}
+        onError={() => {
+          if (avatarUrl) invalidateAssetUrl(avatarUrl);
+          setResolved(null);
+        }}
+      />
+    );
   }
   return (
     <View style={[profileStyles.avatar, { backgroundColor: palette.brandSoft }]}>

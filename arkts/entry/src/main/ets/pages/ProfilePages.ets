@@ -1,5 +1,6 @@
 ﻿import { AppRoute } from '../navigation/AppRoute'
 import { AppStore } from '../state/AppStore'
+import { AvatarImage } from '../design_system/AvatarImage'
 import { AppIcon, AppIconName } from '../design_system/AppIcon'
 import { AppButton, AppListRow, PageHeader } from '../design_system/Components'
 import { AppColors, AppRadii, AppSpacing } from '../theme/AppTokens'
@@ -140,18 +141,11 @@ export struct ProfileIdentityCard {
 
   build() {
     Row({ space: AppSpacing.x4 }) {
-      if ((this.store.user?.avatarUrl ?? '').length > 0) {
-        Image(this.store.user?.avatarUrl ?? '')
-          .width(64).height(64).borderRadius(32)
-          .objectFit(ImageFit.Cover)
-      } else {
-        Column() {
-          AppIcon({ name: AppIconName.User, color: AppColors.brand, iconSize: 28 })
-        }
-        .width(64).height(64).borderRadius(32)
-        .justifyContent(FlexAlign.Center)
-        .backgroundColor(AppColors.brandSoft)
-      }
+      AvatarImage({
+        store: this.store,
+        avatarUrl: this.store.user?.avatarUrl ?? '',
+        avatarSize: 64
+      })
       Column({ space: AppSpacing.x1 }) {
         Text(this.store.user?.displayName ?? '')
           .fontSize(18).fontWeight(FontWeight.Bold).fontColor(AppColors.text)

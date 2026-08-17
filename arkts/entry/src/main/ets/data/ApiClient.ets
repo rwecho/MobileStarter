@@ -258,6 +258,20 @@ export class ApiClient {
     )
   }
 
+  // objectKey → 短时效 presigned GET URL（私有 bucket；每次显示前换取）。
+  // 返回 null 表示对象不存在/无权（调用方回退占位头像）。
+  async resolveObjectUrl(objectKey: string): Promise<string | null> {
+    try {
+      const result = await this.request<Record<string, string>>(
+        `/api/v1/storage/urls?key=${encodeURIComponent(objectKey)}`,
+        http.RequestMethod.GET
+      )
+      return result['url'] ?? null
+    } catch {
+      return null
+    }
+  }
+
   // 直传到 OSS presigned URL（不经 API base；二进制 PUT）。
   uploadToS3(uploadUrl: string, data: ArrayBuffer, contentType: string): Promise<void> {
     const client = http.createHttp()

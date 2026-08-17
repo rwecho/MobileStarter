@@ -172,6 +172,10 @@ final class AppController extends ChangeNotifier {
     }
   }
 
+  /// objectKey → presigned URL（私有 bucket 24h；显示层 AssetUrls 缓存调用）。
+  Future<String?> resolveObjectUrl(String objectKey) =>
+      _repository.resolveObjectUrl(objectKey);
+
   Future<bool> saveSettings(JsonMap patch) async {
     final result = await _capture(() => _repository.saveSettings(patch));
     if (result == null || _user == null) return false;

@@ -2,11 +2,12 @@ import type { NextRequest } from 'next/server';
 import type { PublicUser } from '@/domain/user';
 import { database, getRuntimeConfig, nowIso } from './database';
 import { ApiError } from './http';
-import { createId, hashToken } from './ids';
+import { createId } from './ids';
 import { hashPassword, validatePasswordAgainstPolicy, verifyPassword } from './passwords';
 import { issueSessionPair, revokeAllRefreshForUser, revokeRefreshForSession } from './session-tokens';
 import { assertSignInNotLocked, recordSignInFailure, recordSignInSuccess } from './sign-in-attempts';
 import { createEmailVerification } from './email-verification';
+import { verifyAccessToken } from './jwt';
 import { DEFAULT_APP_ID, SERVICE_NAME } from './service-identity';
 
 type UserRow = {
@@ -121,10 +122,11 @@ export async function requireAuth(request: NextRequest): Promise<AuthContext> {
   const header = request.headers.get('authorization');
   const token = header?.startsWith('Bearer ') ? header.slice(7) : '';
   if (!token) throw new ApiError(401, 'UNAUTHORIZED', '请先登录');
-  const session = await database.prepare(`
-    SELECT * FROM sessions
-    WHERE token_hash = ? AND revoked_at IS NULL AND expires_at > ?
-  `).get(hashToken(token), nowIso()) as SessionRow | undefined;
+  const verified = await verifyAccessToken(token);
+  if (!verified) throw new ApiError(401, 'SESSION_EXPIRED', '登录状态已过期');
+  const session = await database.prepare(
+    'SELECT * FROM sessions WHERE id = ? AND revoked_at IS NULL',
+  ).get(verified.sessionId) as SessionRow | undefined;
   if (!session) throw new ApiError(401, 'SESSION_EXPIRED', '登录状态已过期');
   const user = await getUserRow(session.user_id);
   const appId = request.headers.get('x-app-id')?.trim() || DEFAULT_APP_ID;

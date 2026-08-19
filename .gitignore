@@ -70,3 +70,4 @@ Thumbs.db
 # superpowers git worktrees
 .worktrees/
 server/*.p8
+server/.dev-jwt-key.pem

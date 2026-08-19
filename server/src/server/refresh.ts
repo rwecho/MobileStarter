@@ -1,6 +1,7 @@
 import { database, nowIso, runTransaction } from './database';
 import { ApiError } from './http';
 import { createId, createSessionToken, hashToken } from './ids';
+import { signAccessToken } from './jwt';
 import { ACCESS_TOKEN_TTL_MS, REFRESH_TOKEN_TTL_MS, revokeRefreshFamily } from './session-tokens';
 import { getUserRow, toPublicUser } from './auth';
 
@@ -29,7 +30,12 @@ export async function rotateRefreshToken(appId: string, rawRefreshToken: string)
   if (user.app_id !== appId) {
     throw new ApiError(401, 'TENANT_MISMATCH', '登录状态不属于当前应用');
   }
-  const newAccess = createSessionToken();
+  const newAccess = await signAccessToken({
+    userId: row.user_id,
+    appId,
+    sessionId: row.session_id,
+    ttlMs: ACCESS_TOKEN_TTL_MS,
+  });
   const newRefresh = createSessionToken();
   const newRefreshId = createId();
   const now = nowIso();

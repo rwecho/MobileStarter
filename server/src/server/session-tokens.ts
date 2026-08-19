@@ -1,5 +1,6 @@
 import { database, nowIso, runTransaction } from './database';
 import { createId, createSessionToken, hashToken } from './ids';
+import { signAccessToken } from './jwt';
 
 export const ACCESS_TOKEN_TTL_MS = 30 * 60_000;
 export const REFRESH_TOKEN_TTL_MS = 30 * 86400_000;
@@ -16,9 +17,9 @@ export async function issueSessionPair(
   deviceName: string,
   familyId: string,
 ): Promise<IssuedTokens> {
-  const token = createSessionToken();
-  const refreshToken = createSessionToken();
   const sessionId = createId();
+  const token = await signAccessToken({ userId, appId, sessionId, ttlMs: ACCESS_TOKEN_TTL_MS });
+  const refreshToken = createSessionToken();
   const refreshId = createId();
   const createdAt = nowIso();
   const sessionExpires = new Date(Date.now() + ACCESS_TOKEN_TTL_MS).toISOString();

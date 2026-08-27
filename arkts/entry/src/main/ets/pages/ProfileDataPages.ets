@@ -40,6 +40,7 @@ export struct StatisticsPage {
             })
           }.padding(AppSpacing.x4)
         }.layoutWeight(1)
+        .edgeEffect(EdgeEffect.Spring)
       } else {
         RetryState({ message: this.remote.usageState.message ?? '加载失败',
           retry: () => this.remote.loadUsage() })
@@ -81,6 +82,7 @@ export struct CouponsPage {
             }
           })
         }.padding(AppSpacing.x4).layoutWeight(1)
+          .edgeEffect(EdgeEffect.Spring, { alwaysEnabled: true })
       } else {
         RetryState({ message: this.remote.couponState.message ?? '加载失败',
           retry: () => this.remote.loadCoupons() })

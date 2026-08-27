@@ -52,6 +52,7 @@ export struct SettingsPage {
         .padding(AppSpacing.x4)
       }
       .layoutWeight(1)
+      .edgeEffect(EdgeEffect.Spring)
     }
     .width('100%')
     .height('100%')

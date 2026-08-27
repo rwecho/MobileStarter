@@ -113,6 +113,7 @@ export struct ProfilePage {
           .justifyContent(FlexAlign.Start)
         }
         .layoutWeight(1)
+        .edgeEffect(EdgeEffect.Spring)
       }
     }
     .width('100%')
@@ -261,6 +262,7 @@ export struct MembershipPage {
         .padding(AppSpacing.x4)
       }
       .layoutWeight(1)
+      .edgeEffect(EdgeEffect.Spring)
     }
     .width('100%')
     .height('100%')

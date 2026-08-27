@@ -18,11 +18,13 @@ import '../theme/app_tokens.dart';
 //
 // 阶段：
 //  1. loading：logo + appName + tagline + 加载指示 + "加载中…"
-//     等待「最短展示 1s AND 初始 bootstrap 完成」（8s 兜底防 fetch 挂死）
-//  2. bootstrap 完成后判断：splash==null 或 离线 → 直进首页；
-//     在线且有 splash → 预加载媒体 → 品牌闪屏（倒计时用 durationSeconds）→ home
+//     只等磁盘（controller.localReady），不等网络（8s 兜底防 fetch 挂死）。
+//     AGC 冷启动时延 ≤1100ms：原生启动页渐隐已覆盖品牌停顿，App 内不再
+//     强制 1s logo 展示（issue #24）。
+//  2. localReady 后判断：无缓存闪屏配置 → 不等网络直接进首页（bootstrap 后台
+//     继续完成）；有缓存闪屏 → 等 bootstrap 拉最新后：splash==null 或 离线 →
+//     直进首页；在线且有 splash → 预加载媒体 → 品牌闪屏 → home
 
-const Duration _kMinLogoDelay = Duration(seconds: 1);
 const Duration _kMaxSplashWait = Duration(seconds: 8);
 
 class SplashScreen extends StatefulWidget {
@@ -34,11 +36,9 @@ class SplashScreen extends StatefulWidget {
 
 class _SplashScreenState extends State<SplashScreen> {
   late AppController _controller;
-  Timer? _minTimer;
   Timer? _maxTimer;
   Timer? _countdownTimer;
   bool _listening = false;
-  bool _minElapsed = false;
   bool _advancing = false;
   bool _done = false;
   int? _countdown; // null = loading 阶段；非空 = 品牌闪屏阶段
@@ -46,11 +46,6 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
-    _minTimer = Timer(_kMinLogoDelay, () {
-      if (!mounted) return;
-      setState(() => _minElapsed = true);
-      _maybeAdvance();
-    });
     // fetch 无显式超时，最长等待兜底，避免一直卡在 loading
     _maxTimer = Timer(_kMaxSplashWait, _goHome);
   }
@@ -62,6 +57,8 @@ class _SplashScreenState extends State<SplashScreen> {
     if (!_listening) {
       _controller.addListener(_onChanged);
       _listening = true;
+      // 挂载时 localReady 可能已就绪（磁盘读取早于页面挂载）：首帧后再推进
+      WidgetsBinding.instance.addPostFrameCallback((_) => _maybeAdvance());
     }
   }
 
@@ -72,8 +69,13 @@ class _SplashScreenState extends State<SplashScreen> {
 
   void _maybeAdvance() {
     if (_advancing || _countdown != null) return; // 已进入闪屏或正在推进
-    if (!_minElapsed || !_controller.bootstrapped) return;
+    if (!_controller.localReady) return; // 磁盘缓存配置未读完：等 listener 触发
     final splash = _controller.config?.splash;
+    if (splash == null && !_controller.bootstrapped) {
+      _goHome(); // 无缓存闪屏配置：不等网络直接进首页，bootstrap 后台继续
+      return;
+    }
+    if (!_controller.bootstrapped) return; // 有缓存闪屏 → 等 bootstrap 拉最新
     if (splash == null || !_controller.online) {
       _goHome(); // 未配置闪屏或离线 → 直接进首页
       return;
@@ -112,7 +114,6 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   void dispose() {
     if (_listening) _controller.removeListener(_onChanged);
-    _minTimer?.cancel();
     _maxTimer?.cancel();
     _countdownTimer?.cancel();
     super.dispose();

@@ -162,6 +162,14 @@ final class AppRepository {
     }
   }
 
+  /// 磁盘缓存的 bootstrap 快照（config，无用户）：冷启动先读它进首页、
+  /// 不等网络（issue #24）；无缓存返回 null。
+  Future<BootstrapResult?> readCachedBootstrap() async {
+    final cached = await SharedPreferencesAsync().getString(_bootstrapKey);
+    if (cached == null) return null;
+    return _parseBootstrap(JsonMap.from(jsonDecode(cached) as Map));
+  }
+
   BootstrapResult _parseBootstrap(JsonMap data) {
     return BootstrapResult(
       config: RuntimeConfig.fromJson(JsonMap.from(data['config']! as Map)),

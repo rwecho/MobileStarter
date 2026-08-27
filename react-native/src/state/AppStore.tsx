@@ -48,6 +48,7 @@ type AppContextValue = Readonly<{
   authProviderPolicy: AuthProviderPolicy;
   online: boolean;
   bootstrapped: boolean;
+  localReady: boolean;
   busy: boolean;
   purchaseState: PurchaseState;
   setPurchaseState: (state: PurchaseState) => void;
@@ -100,6 +101,8 @@ export function AppProvider({ children }: Readonly<{ children: ReactNode }>) {
   const [authProviderPolicy, setAuthProviderPolicy] = useState(defaultProviderPolicy);
   const [online, setOnline] = useState(true);
   const [bootstrapped, setBootstrapped] = useState(false);
+  // localReady：磁盘缓存配置读取完成（issue #24：启动只等磁盘、不等网络）。
+  const [localReady, setLocalReady] = useState(false);
   const [busy, setBusy] = useState(false);
   const [purchaseState, setPurchaseState] = useState<PurchaseState>({ kind: 'idle' });
   const [pendingPlanId, setPendingPlanId] = useState<string | null>(null);
@@ -114,6 +117,8 @@ export function AppProvider({ children }: Readonly<{ children: ReactNode }>) {
       setConfig(cached);
       void telemetry.configure(cached);
     }
+    // 磁盘读取完成即置位（有无缓存均可）：splash 门控只等这里、不等网络。
+    setLocalReady(true);
     try {
       const payload = await apiClient.bootstrap();
       setConfig(payload.config);
@@ -241,6 +246,7 @@ export function AppProvider({ children }: Readonly<{ children: ReactNode }>) {
     authProviderPolicy,
     online,
     bootstrapped,
+    localReady,
     busy,
     lastAuthError,
     clearAuthError,
@@ -256,6 +262,7 @@ export function AppProvider({ children }: Readonly<{ children: ReactNode }>) {
     authProviderConfig,
     authProviderPolicy,
     bootstrapped,
+    localReady,
     busy,
     pendingPlanId,
     purchaseState,

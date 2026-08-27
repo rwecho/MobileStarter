@@ -67,6 +67,9 @@ export class AppStore {
   online: boolean = true
   // bootstrapped：初始 bootstrap 是否完成（成功或失败）；品牌闪屏据此判断"配置拉取完成"。
   bootstrapped: boolean = false
+  // localReady：本地启动数据（preferences + 磁盘缓存 config）已就绪。SplashPage 进首页
+  // 只等它、不等网络（issue #24：冷启动时延 = 磁盘读取，通常 <20ms）。
+  localReady: boolean = false
   busy: boolean = false
   theme: string = 'system'
   language: string = 'zh-CN'
@@ -112,6 +115,8 @@ export class AppStore {
     if (cached !== null) {
       this.config = cached
     }
+    // 网络 bootstrap 之前置位：进首页不等网络，只等磁盘（issue #24）。
+    this.localReady = true
     const token = localStore.readToken()
     apiClient.setToken(token)
     apiClient.setRefreshToken(localStore.readRefreshToken())

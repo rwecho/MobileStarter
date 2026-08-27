@@ -13,7 +13,6 @@ import { styles } from '../theme/styles';
 const LogoImage = require('../../assets/splash-icon.png');
 
 // 品牌闪屏阶段常量
-const MIN_LOGO_MS = 1000; // logo+loading 最短展示时间，避免 bootstrap 极快时闪跳
 const MAX_SPLASH_WAIT_MS = 8000; // fetch 无显式超时，最长等待兜底防挂死
 
 // ── Splash screen ────────────────────────────────────────────────────
@@ -21,14 +20,14 @@ const MAX_SPLASH_WAIT_MS = 8000; // fetch 无显式超时，最长等待兜底�
 // 时展示（全屏媒体 + 右上角胶囊跳过 + 倒计时）；离线或未配置 → 直接进首页。
 // 合规：非按钮区域不可点击跳转，仅跳过按钮可点。
 export function SplashScreen() {
-  const { replace, config, bootstrapped, online } = useApp();
+  const { replace, config, bootstrapped, localReady, online } = useApp();
   const { palette } = usePreferences();
-  const [minElapsed, setMinElapsed] = useState(false);
   const [countdown, setCountdown] = useState<number | null>(null);
   const doneRef = useRef(false);
 
   // 首帧渲染完成后隐藏原生启动屏：与 App.tsx 的 preventAutoHideAsync 配合，
   // 无缝过渡到 JS 品牌闪屏，避免闪跳并遮住 dev-client 的 bundle 下载。
+  // 冷启动只等磁盘（localReady），不做人为最短展示（issue #24）。
   useEffect(() => {
     void ExpoSplashScreen.hideAsync();
   }, []);
@@ -39,20 +38,20 @@ export function SplashScreen() {
     replace('home');
   }, [replace]);
 
-  useEffect(() => {
-    const t = setTimeout(() => setMinElapsed(true), MIN_LOGO_MS);
-    return () => clearTimeout(t);
-  }, []);
-
   // fetch 无显式超时，最长等待兜底，避免一直卡在 loading
   useEffect(() => {
     const t = setTimeout(goHome, MAX_SPLASH_WAIT_MS);
     return () => clearTimeout(t);
   }, [goHome]);
 
-  const ready = minElapsed && bootstrapped;
+  const ready = localReady;
   useEffect(() => {
     if (!ready || countdown !== null) return;
+    if (!config.splash && !bootstrapped) {
+      goHome(); // 无闪屏配置（含缓存）：不等网络直接进首页，bootstrap 后台继续
+      return;
+    }
+    if (!bootstrapped) return; // 有闪屏配置 → 等 bootstrap 拉最新（8s 兜底）
     if (!config.splash || !online) {
       goHome(); // 未配置闪屏或离线 → 直接进首页
       return;
@@ -63,7 +62,7 @@ export function SplashScreen() {
     const enter = () => setCountdown(config.splash!.durationSeconds);
     if (url) Image.prefetch(url).finally(enter);
     else enter();
-  }, [ready, config.splash, online, countdown, goHome]);
+  }, [ready, bootstrapped, config.splash, online, countdown, goHome]);
 
   useEffect(() => {
     if (countdown === null) return;

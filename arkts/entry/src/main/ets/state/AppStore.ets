@@ -115,6 +115,13 @@ export class AppStore {
     const token = localStore.readToken()
     apiClient.setToken(token)
     apiClient.setRefreshToken(localStore.readRefreshToken())
+    // 静默刷新轮换出的新 token 对必须落盘：transport 只更新内存，不落盘则
+    // 重启后读到已轮换的旧 refresh token，服务端复用检测（REFRESH_TOKEN_REUSED）
+    // 会吊销整个会话 → 使用中被踢回登录页。
+    apiClient.setTokenPersistHandler((token: string, refreshToken: string): void => {
+      localStore.saveToken(token)
+      localStore.saveRefreshToken(refreshToken)
+    })
     apiClient.setSessionExpiredCallback(() => { this.handleSessionExpired() })
     // 磁盘快照注入 + 启动恢复（必须在 configureTelemetry 之前，issue #22）。
     telemetry.setPersistence(

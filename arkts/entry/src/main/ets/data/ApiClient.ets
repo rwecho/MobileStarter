@@ -65,6 +65,12 @@ export class ApiClient {
     this.transport.setSessionExpiredCallback(callback)
   }
 
+  // Set by AppStore so a successful refresh persists the rotated token pair
+  // to localStore（否则重启后读到已轮换的旧 refresh token，复用检测会吊销会话）。
+  setTokenPersistHandler(handler: ((token: string, refreshToken: string) => void) | null): void {
+    this.transport.setTokenPersistHandler(handler)
+  }
+
   bootstrap(): Promise<BootstrapPayload> {
     return this.request<BootstrapPayload>('/api/v1/bootstrap', http.RequestMethod.GET)
   }

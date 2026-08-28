@@ -88,6 +88,10 @@ export class ApiTransport {
   private language: string = 'zh-CN'
   private refreshInFlight: Promise<boolean> | null = null
   private sessionExpiredCallback: (() => void) | null = null
+  // 刷新成功后把轮换出的新 token 对落盘（AppStore.initialize 注入到 localStore）。
+  // 不落盘则重启后读到已轮换的旧 refresh token，服务端复用检测
+  // （REFRESH_TOKEN_REUSED）会吊销整个会话 → 使用中被踢回登录页。
+  private tokenPersistHandler: ((token: string, refreshToken: string) => void) | null = null
 
   constructor() {
     if (APP_ID.length === 0) throw new Error('APP_ID is required')
@@ -112,6 +116,10 @@ export class ApiTransport {
 
   setSessionExpiredCallback(callback: (() => void) | null): void {
     this.sessionExpiredCallback = callback
+  }
+
+  setTokenPersistHandler(handler: ((token: string, refreshToken: string) => void) | null): void {
+    this.tokenPersistHandler = handler
   }
 
   async request<T>(
@@ -237,6 +245,8 @@ export class ApiTransport {
       if (!payload.data.token || !payload.data.refreshToken) return false
       this.token = payload.data.token
       this.refreshToken = payload.data.refreshToken
+      // 与登录路径（AppStore.authenticate）对称：内存 + 磁盘成对更新。
+      this.tokenPersistHandler?.(this.token, this.refreshToken)
       return true
     } catch (error) {
       return false

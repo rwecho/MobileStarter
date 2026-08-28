@@ -51,7 +51,13 @@ extension AppRepositoryHttp on AppRepository {
     }
     final decoded = jsonDecode(response.body) as Map<String, Object?>;
     if (response.statusCode < 200 || response.statusCode >= 300) {
-      if (response.statusCode == 401 && !retried) onSessionExpired?.call();
+      // 401 仅在「已登录会话失效」时触发过期回调；auth 端点（登录/注册/
+      // 验证码等）的 401 是凭证错误，走表单内联错误展示，不能切页。
+      if (response.statusCode == 401 &&
+          !retried &&
+          !path.startsWith('/api/v1/auth/')) {
+        onSessionExpired?.call();
+      }
       final error = JsonMap.from(decoded['error']! as Map);
       final fieldErrors = _parseFieldErrors(error['fieldErrors']);
       throw ApiException(

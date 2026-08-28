@@ -325,7 +325,11 @@ async function sendRequest<T>(
       retryable: response.status >= 500,
       traceId: 'local',
     };
-    if (response.status === 401 && !retried) sessionExpiredHandler?.();
+    // 401 仅在「已登录会话失效」时触发过期回调；auth 端点（登录/注册/验证码
+    // 等）的 401 是凭证错误，走表单内联错误展示，不能切页/清输入。
+    if (response.status === 401 && !retried && !path.startsWith('/api/v1/auth/')) {
+      sessionExpiredHandler?.();
+    }
     throw new ApiClientError(
       error.code,
       specificErrorMessage(error.message, error.fieldErrors),

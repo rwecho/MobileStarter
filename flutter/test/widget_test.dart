@@ -31,7 +31,14 @@ void main() {
       const TelemetryConfig(enabled: false, backendEnabled: false),
     );
 
-    final controller = AppController(AppRepository(client: _splashClient()));
+    final controller = AppController(
+      // appId/environment 走测试注入 seam，裸跑 flutter test 不依赖 --dart-define。
+      AppRepository(
+        client: _splashClient(),
+        appId: 'test-app',
+        environment: 'test',
+      ),
+    );
     addTearDown(controller.dispose);
     // Run initialize() in real async so the platform-channel futures resolve;
     // the widget-tree pump below runs in the test's fake-async clock.

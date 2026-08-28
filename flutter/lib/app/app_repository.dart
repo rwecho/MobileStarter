@@ -51,7 +51,19 @@ final class AuthResult {
 }
 
 final class AppRepository {
-  AppRepository({http.Client? client}) : _client = client ?? http.Client();
+  AppRepository({
+    http.Client? client,
+    String? appId,
+    String? environment,
+  }) : _client = client ?? http.Client(),
+       _appIdOverride = appId,
+       _environmentOverride = environment;
+
+  final http.Client _client;
+  // 测试注入 seam：widget 测试不带 --dart-define，构造时显式注入；运行时仍以
+  // --dart-define 为准（未配置即报错，启动期统一校验见 main()）。
+  final String? _appIdOverride;
+  final String? _environmentOverride;
 
   static const _apiBase = String.fromEnvironment(
     'MOBILEUI_API_URL',
@@ -60,7 +72,9 @@ final class AppRepository {
   // app_id（租户）必须通过 --dart-define=MOBILEUI_APP_ID 显式配置，未配置即报错，
   // 避免混入不可预测的 app_id；启动期统一校验见 main()。
   static const _appIdValue = String.fromEnvironment('MOBILEUI_APP_ID');
-  static String get _appId {
+  String get _appId {
+    final override = _appIdOverride;
+    if (override != null && override.isNotEmpty) return override;
     if (_appIdValue.isEmpty) {
       throw StateError(
         'MOBILEUI_APP_ID 未配置：请使用 --dart-define=MOBILEUI_APP_ID=<app-id> 启动，不能为空。',
@@ -73,7 +87,9 @@ final class AppRepository {
   static const _appEnvironmentValue = String.fromEnvironment(
     'MOBILEUI_APP_ENVIRONMENT',
   );
-  static String get _appEnvironment {
+  String get _appEnvironment {
+    final override = _environmentOverride;
+    if (override != null && override.isNotEmpty) return override;
     if (_appEnvironmentValue.isEmpty) {
       throw StateError(
         'MOBILEUI_APP_ENVIRONMENT 未配置：请使用 --dart-define=MOBILEUI_APP_ENVIRONMENT=<env> 启动，不能为空。',
@@ -86,7 +102,6 @@ final class AppRepository {
   static const _refreshTokenKey = 'mobileui.sessionRefreshToken';
   static const _bootstrapKey = 'mobileui.bootstrap.public';
 
-  final http.Client _client;
   final FlutterSecureStorage _secure = const FlutterSecureStorage();
   String _token = '';
   String _acceptLanguage = 'zh-CN';

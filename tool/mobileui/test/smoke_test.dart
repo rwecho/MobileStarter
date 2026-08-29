@@ -68,9 +68,9 @@ void _verifyBehavioralBaseline(Directory project, Iterable<String> profiles) {
   if (profiles.contains('flutter')) {
     _expectFileContains(
       project,
-      'flutter/lib/app/app_controller_navigation.dart',
-      '_pendingRoute ?? AppRoute.home',
-      'Flutter ordinary login must land on home',
+      'flutter/lib/navigation/app_router_config.dart',
+      'pathFor(AppRoute.home)',
+      'Flutter route guard fallback must land on home',
     );
   }
   if (profiles.contains('react-native')) {

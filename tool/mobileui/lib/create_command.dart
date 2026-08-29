@@ -129,7 +129,7 @@ final class CreateCommand {
     );
     File(_join(target.path, '.gitignore')).writeAsStringSync(
       '.dart_tool/\nbuild/\nnode_modules/\n.expo/\n.hvigor/\n.idea/\n.vscode/\n'
-      '**/local.properties\n**/signing-config.json\n',
+      '**/local.properties\n**/signing-config.json\n.next/\n*.tsbuildinfo\n',
     );
   }
 }

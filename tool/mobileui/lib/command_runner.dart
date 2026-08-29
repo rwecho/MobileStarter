@@ -57,7 +57,7 @@ MobileUI product repository CLI
 
 Usage:
   mobileui create <repo-name> --output <directory>
-      --profile <flutter|react-native|arkts|all>
+      --profile <flutter|react-native|arkts|server|all>
       --display-name <name> --organization <reverse-domain> --app-id <id>
       [--source <local|github>] [--source-url <git-url>] [--ref <tag|branch|sha>]
   mobileui doctor --project <directory>
@@ -67,7 +67,7 @@ Usage:
   mobileui version
 
 Supported profiles:
-  flutter, react-native, arkts, all
+  flutter, react-native, arkts, server, all (mobile clients only)
 ''');
   }
 }

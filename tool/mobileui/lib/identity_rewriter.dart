@@ -57,6 +57,7 @@ final class IdentityRewriter {
       '${manifest.organization}.${manifest.packageName}';
 
   void _replaceText(Directory root, Map<String, String> replacements) {
+    if (replacements.isEmpty) return;
     for (final entity in root.listSync(recursive: true)) {
       if (entity is! File || !_isTextFile(entity.path)) continue;
       var content = entity.readAsStringSync();

@@ -91,8 +91,8 @@ final class IdentityRewriter {
     final content = profile.readAsStringSync();
     final sanitized = content
         .replaceFirst(
-          RegExp(r'\s*"signingConfigs"\s*:\s*\[.*?\]\s*,', dotAll: true),
-          '',
+          RegExp(r'"signingConfigs"\s*:\s*\[.*?\]', dotAll: true),
+          '"signingConfigs": []',
         )
         .replaceAll(RegExp(r'\s*"signingConfig"\s*:\s*"[^"]+"\s*,'), '');
     profile.writeAsStringSync(sanitized);

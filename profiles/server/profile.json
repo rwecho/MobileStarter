@@ -1,0 +1,15 @@
+{
+  "id": "server",
+  "version": "0.2.0",
+  "source": "server",
+  "platforms": ["web"],
+  "features": ["config", "console", "logs", "tenant"],
+  "workflows": ["server-ci.yml", "server-publish.yml"],
+  "excludedDirectories": [
+    "node_modules",
+    ".next",
+    ".env",
+    ".env.local",
+    "tsconfig.tsbuildinfo"
+  ]
+}

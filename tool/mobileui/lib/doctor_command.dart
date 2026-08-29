@@ -73,6 +73,11 @@ final class DoctorCommand {
         'arkts/AppScope/app.json5',
         '.github/workflows/arkts-ci.yml',
       ],
+      'server' => [
+        'server/package.json',
+        'server/next.config.ts',
+        '.github/workflows/server-ci.yml',
+      ],
       _ => <String>[],
     };
     if (required.isEmpty) {

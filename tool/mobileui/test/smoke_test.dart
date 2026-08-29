@@ -12,9 +12,16 @@ Future<void> main() async {
   final sandbox = Directory.systemTemp.createTempSync('mobileui-cli-test-');
   try {
     _expect(TemplateCommand(templateRoot).run(['list']) == 0, 'list templates');
-    for (final profile in const ['flutter', 'react-native', 'arkts', 'all']) {
+    for (final profile in const [
+      'flutter',
+      'react-native',
+      'arkts',
+      'server',
+      'all',
+    ]) {
       await _verifyProfile(templateRoot, sandbox, profile);
     }
+    await _verifyCombinedProfiles(templateRoot, sandbox);
     await _verifyGitHubSource(templateRoot, sandbox);
     await _verifyNonEmptyProtection(templateRoot, sandbox);
     stdout.writeln('MobileUI CLI smoke test passed.');
@@ -62,6 +69,74 @@ Future<void> _verifyProfile(
   final expectedCount = profile == 'all' ? 3 : 1;
   _expect(profiles.length == expectedCount, '$profile manifest profile count');
   _verifyBehavioralBaseline(project, profiles);
+}
+
+Future<void> _verifyCombinedProfiles(
+  Directory templateRoot,
+  Directory sandbox,
+) async {
+  const name = 'app-combined';
+  final exit = await CreateCommand(templateRoot).run([
+    name,
+    '--output',
+    sandbox.path,
+    '--profile',
+    'react-native,server',
+    '--display-name',
+    'Example Combined',
+    '--organization',
+    'tech.zhongbei',
+    '--app-id',
+    'example-combined',
+  ]);
+  _expect(exit == 0, 'combined create must succeed');
+  final project = Directory(_join(sandbox.path, name));
+  _expect(
+    Directory(_join(project.path, 'server', 'src', 'app')).existsSync(),
+    'combined create must copy server source tree',
+  );
+  _expect(
+    File(
+      _join(project.path, '.github', 'workflows', 'server-ci.yml'),
+    ).existsSync(),
+    'combined create must copy server CI workflow',
+  );
+  _expect(
+    !Directory(_join(project.path, 'server', 'node_modules')).existsSync(),
+    'server node_modules must not be copied',
+  );
+  _expect(
+    DoctorCommand().run(['--project', project.path]) == 0,
+    'combined doctor must succeed',
+  );
+  _expect(
+    FeatureCommand().run([
+      'add',
+      'achievements',
+      '--project',
+      project.path,
+    ]) == 0,
+    'combined feature add must cover every profile',
+  );
+  _expect(
+    Directory(
+      _join(project.path, 'react-native', 'src', 'features', 'achievements'),
+    ).listSync().isNotEmpty,
+    'combined feature must land in react-native',
+  );
+  _expect(
+    Directory(
+      _join(project.path, 'server', 'src', 'features', 'achievements'),
+    ).listSync().isNotEmpty,
+    'combined feature must land in server',
+  );
+  final manifest = _manifest(project);
+  final profiles = (manifest['profiles'] as List<Object?>).whereType<String>();
+  _expect(profiles.length == 2, 'combined manifest profile count');
+  _expect(
+    (manifest['templateSource'] as Map<String, Object?>)['commit'] != null,
+    'combined manifest must record template commit',
+  );
 }
 
 void _verifyBehavioralBaseline(Directory project, Iterable<String> profiles) {
@@ -230,11 +305,19 @@ void _git(Directory directory, List<String> arguments) {
   if (result.exitCode != 0) throw StateError(result.stderr.toString());
 }
 
-String _join(String first, String second, [String? third]) {
+String _join(
+  String first,
+  String second, [
+  String? third,
+  String? fourth,
+  String? fifth,
+]) {
   return [
     first,
     second,
     third,
+    fourth,
+    fifth,
   ].whereType<String>().join(Platform.pathSeparator);
 }
 

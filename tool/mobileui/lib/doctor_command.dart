@@ -111,7 +111,17 @@ final class DoctorCommand {
     };
     for (final entity in root.listSync(recursive: true)) {
       if (entity is! File || !_isTextFile(entity.path)) continue;
-      final content = entity.readAsStringSync();
+      if (entity.path.split(Platform.pathSeparator).contains('node_modules')) {
+        continue;
+      }
+      final String content;
+      try {
+        content = entity.readAsStringSync();
+      } on FormatException {
+        continue;
+      } on FileSystemException {
+        continue;
+      }
       for (final marker in markers[profile] ?? const <String>[]) {
         if (content.contains(marker)) {
           issues.add('stale or sensitive marker "$marker" in ${entity.path}');

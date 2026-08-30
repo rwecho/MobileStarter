@@ -108,6 +108,7 @@ final class DoctorCommand {
         'com.mobileui.mobilestarter',
       ],
       'arkts': ['com.mobilestarter.template', 'storePassword', 'keyPassword'],
+      'server': ['com.mobileui.mobilestarter', 'zhongbei-auth'],
     };
     for (final entity in root.listSync(recursive: true)) {
       if (entity is! File || !_isTextFile(entity.path)) continue;

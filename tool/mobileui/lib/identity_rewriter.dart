@@ -15,11 +15,19 @@ final class IdentityRewriter {
         'flutter' => _flutterReplacements(),
         'react-native' => _reactNativeReplacements(),
         'arkts' => _arkTsReplacements(),
+        'server' => _serverReplacements(),
         _ => const <String, String>{},
       };
       _replaceText(root, replacements);
       if (profile.id == 'flutter') _moveMainActivity(root);
       if (profile.id == 'arkts') _removeArkTsSigning(root);
+      if (profile.id == 'server') {
+        // Workflows land outside the profile source tree, so the deep-link
+        // image identity in server-publish.yml needs a targeted rewrite.
+        _replaceWorkflowText(project, 'server-publish.yml', {
+          'zhongbei-auth': manifest.packageName,
+        });
+      }
     }
   }
 
@@ -53,6 +61,16 @@ final class IdentityRewriter {
     'MobileStarter': manifest.displayName,
   };
 
+  Map<String, String> _serverReplacements() => {
+    // Deep-link verification files: the associated Android package and iOS
+    // bundle id both follow the product appId identity.
+    'com.mobileui.mobilestarter': manifest.appId,
+    'com.mobileui.mobileui_flutter': manifest.appId,
+    // Server package identity (package.json name, compose image/container and
+    // publish workflow image) follows the generated repository package name.
+    'zhongbei-auth': manifest.packageName,
+  };
+
   String get _nativePackage =>
       '${manifest.organization}.${manifest.packageName}';
 
@@ -66,6 +84,22 @@ final class IdentityRewriter {
       }
       entity.writeAsStringSync(content);
     }
+  }
+
+  /// Rewrites a single workflow file under `<project>/.github/workflows/`,
+  /// which lives outside every profile source tree.
+  void _replaceWorkflowText(
+    Directory project,
+    String name,
+    Map<String, String> replacements,
+  ) {
+    final file = File(_join(project.path, '.github', 'workflows', name));
+    if (!file.existsSync()) return;
+    var content = file.readAsStringSync();
+    for (final replacement in replacements.entries) {
+      content = content.replaceAll(replacement.key, replacement.value);
+    }
+    file.writeAsStringSync(content);
   }
 
   void _moveMainActivity(Directory root) {

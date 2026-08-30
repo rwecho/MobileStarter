@@ -101,6 +101,41 @@ Future<void> _verifyCombinedProfiles(
     ).existsSync(),
     'combined create must copy server CI workflow',
   );
+  final publishWorkflow = File(
+    _join(project.path, '.github', 'workflows', 'server-publish.yml'),
+  );
+  _expect(publishWorkflow.existsSync(), 'combined create must copy publish workflow');
+  _expect(
+    !publishWorkflow.readAsStringSync().contains('zhongbei-auth'),
+    'server publish image must not keep the template image name',
+  );
+  _expect(
+    publishWorkflow.readAsStringSync().contains('/app_combined'),
+    'server publish image must follow the generated package name',
+  );
+  for (final route in const [
+    'server/src/app/.well-known/apple-app-site-association/route.ts',
+    'server/src/app/.well-known/assetlinks.json/route.ts',
+  ]) {
+    _expectFileNotContains(
+      project,
+      route,
+      'com.mobileui.mobilestarter',
+      'deep-link route must not keep the template app id ($route)',
+    );
+    _expectFileNotContains(
+      project,
+      route,
+      'com.mobileui.mobileui_flutter',
+      'deep-link route must not keep the template package ($route)',
+    );
+    _expectFileContains(
+      project,
+      route,
+      'example-combined',
+      'deep-link route must follow the product app id ($route)',
+    );
+  }
   _expect(
     !Directory(_join(project.path, 'server', 'node_modules')).existsSync(),
     'server node_modules must not be copied',
@@ -175,6 +210,17 @@ void _expectFileContains(
   final path = relativePath.split('/');
   final file = File([project.path, ...path].join(Platform.pathSeparator));
   _expect(file.readAsStringSync().contains(expected), message);
+}
+
+void _expectFileNotContains(
+  Directory project,
+  String relativePath,
+  String forbidden,
+  String message,
+) {
+  final path = relativePath.split('/');
+  final file = File([project.path, ...path].join(Platform.pathSeparator));
+  _expect(!file.readAsStringSync().contains(forbidden), message);
 }
 
 Future<void> _verifyGitHubSource(

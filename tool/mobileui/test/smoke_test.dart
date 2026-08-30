@@ -190,6 +190,12 @@ void _verifyBehavioralBaseline(Directory project, Iterable<String> profiles) {
       "pendingRoute ?? 'home'",
       'React Native ordinary login must land on home',
     );
+    _expectFileNotContains(
+      project,
+      '.github/workflows/react-native-publish.yml',
+      'com.mobileui.mobilestarter',
+      'React Native publish workflow must carry product identity',
+    );
   }
   if (profiles.contains('arkts')) {
     _expectFileContains(

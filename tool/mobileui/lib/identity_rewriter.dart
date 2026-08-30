@@ -21,6 +21,13 @@ final class IdentityRewriter {
       _replaceText(root, replacements);
       if (profile.id == 'flutter') _moveMainActivity(root);
       if (profile.id == 'arkts') _removeArkTsSigning(root);
+      if (profile.id == 'react-native') {
+        // RN 发布 workflow 的 google-services 占位同样携带模板包名（文件在
+        // profile source tree 之外），按产品 native 包名改写。
+        _replaceWorkflowText(project, 'react-native-publish.yml', {
+          'com.mobileui.mobilestarter': _nativePackage,
+        });
+      }
       if (profile.id == 'server') {
         // Workflows land outside the profile source tree, so the deep-link
         // image identity in server-publish.yml needs a targeted rewrite.

@@ -13,7 +13,10 @@ Future<void> main() async {
   final templateRoot = Directory.current.parent.parent;
   final sandbox = Directory.systemTemp.createTempSync('mobileui-cli-test-');
   try {
-    expectTrue(TemplateCommand(templateRoot).run(['list']) == 0, 'list templates');
+    expectTrue(
+      TemplateCommand(templateRoot).run(['list']) == 0,
+      'list templates',
+    );
     for (final profile in const [
       'flutter',
       'react-native',
@@ -69,7 +72,10 @@ Future<void> _verifyProfile(
   final manifest = _manifest(project);
   final profiles = (manifest['profiles'] as List<Object?>).whereType<String>();
   final expectedCount = profile == 'all' ? 3 : 1;
-  expectTrue(profiles.length == expectedCount, '$profile manifest profile count');
+  expectTrue(
+    profiles.length == expectedCount,
+    '$profile manifest profile count',
+  );
   _verifyBehavioralBaseline(project, profiles);
 }
 
@@ -282,4 +288,3 @@ Map<String, Object?> _manifest(Directory project) {
   final file = File(joinPath(project.path, '.mobileui', 'template.json'));
   return jsonDecode(file.readAsStringSync()) as Map<String, Object?>;
 }
-

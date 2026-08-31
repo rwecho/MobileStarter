@@ -126,8 +126,8 @@ extension AppRepositoryHttp on AppRepository {
     final headers = <String, String>{
       'content-type': 'application/json',
       'accept-language': _acceptLanguage,
-      'x-app-id': AppRepository._appId,
-      'x-app-environment': AppRepository._appEnvironment,
+      'x-app-id': _appId,
+      'x-app-environment': _appEnvironment,
       'x-platform': kIsWeb ? 'web' : defaultTargetPlatform.name,
       'x-app-version': '1.0.0',
     };

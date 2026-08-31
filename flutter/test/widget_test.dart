@@ -31,7 +31,14 @@ void main() {
       const TelemetryConfig(enabled: false, backendEnabled: false),
     );
 
-    final controller = AppController(AppRepository(client: _splashClient()));
+    final controller = AppController(
+      // appId/environment 走测试注入 seam，裸跑 flutter test 不依赖 --dart-define。
+      AppRepository(
+        client: _splashClient(),
+        appId: 'test-app',
+        environment: 'test',
+      ),
+    );
     addTearDown(controller.dispose);
     // Run initialize() in real async so the platform-channel futures resolve;
     // the widget-tree pump below runs in the test's fake-async clock.
@@ -60,9 +67,9 @@ void main() {
     expect(find.text('MobileStarter'), findsOneWidget);
     expect(find.text('加载中…'), findsOneWidget);
 
-    // Advance past the 1s minimum-logo delay; bootstrap already completed
-    // during initialize(), so _maybeAdvance enters the countdown.
-    await tester.pump(const Duration(milliseconds: 1100));
+    // issue #24 已去掉 1s 最短展示：bootstrap 在 initialize()（runAsync）中已
+    // 先行完成，localReady 后 _maybeAdvance 于首帧 post-frame 回调进入倒计时；
+    // pump 一帧渲染倒计时胶囊。
     await tester.pump();
 
     // The skip capsule renders countdown + label as one text: "3 s 跳过".

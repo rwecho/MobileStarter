@@ -1,20 +1,19 @@
-name: Server Publish
+name: Caddy MultiDNS Publish
 
 on:
-  push:
-    branches: ["**"]
-    tags: ["v*"]
-    paths:
-      - "server/**"
-      - ".github/workflows/server-publish.yml"
   workflow_dispatch:
+  push:
+    branches: ["main"]
+    paths:
+      - "infra/caddy-multidns/**"
+      - ".github/workflows/caddy-multidns-publish.yml"
 
 permissions:
   contents: read
   packages: write
 
 concurrency:
-  group: server-publish-${{ github.ref }}
+  group: caddy-multidns-publish
   cancel-in-progress: true
 
 jobs:
@@ -40,12 +39,12 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       - uses: docker/build-push-action@v6
         with:
-          context: server
-          file: server/Dockerfile
+          context: infra/caddy-multidns
+          file: infra/caddy-multidns/Dockerfile
           platforms: ${{ matrix.platform }}
           push: true
           tags: |
-            ghcr.io/${{ github.repository_owner }}/zhongbei-auth:${{ github.sha }}-${{ matrix.arch }}
+            ghcr.io/${{ github.repository_owner }}/caddy-multidns:${{ github.sha }}-${{ matrix.arch }}
           labels: |
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
           cache-from: type=gha
@@ -54,8 +53,8 @@ jobs:
         if: github.ref == 'refs/heads/main'
         run: |
           docker buildx imagetools create \
-            -t ghcr.io/${{ github.repository_owner }}/zhongbei-auth:latest-${{ matrix.arch }} \
-            ghcr.io/${{ github.repository_owner }}/zhongbei-auth:${{ github.sha }}-${{ matrix.arch }}
+            -t ghcr.io/${{ github.repository_owner }}/caddy-multidns:latest-${{ matrix.arch }} \
+            ghcr.io/${{ github.repository_owner }}/caddy-multidns:${{ github.sha }}-${{ matrix.arch }}
 
   manifest:
     needs: build
@@ -70,6 +69,6 @@ jobs:
       - name: Merge multi-arch manifest
         run: |
           docker buildx imagetools create \
-            -t ghcr.io/${{ github.repository_owner }}/zhongbei-auth:latest \
-            ghcr.io/${{ github.repository_owner }}/zhongbei-auth:latest-amd64 \
-            ghcr.io/${{ github.repository_owner }}/zhongbei-auth:latest-arm64
+            -t ghcr.io/${{ github.repository_owner }}/caddy-multidns:latest \
+            ghcr.io/${{ github.repository_owner }}/caddy-multidns:latest-amd64 \
+            ghcr.io/${{ github.repository_owner }}/caddy-multidns:latest-arm64

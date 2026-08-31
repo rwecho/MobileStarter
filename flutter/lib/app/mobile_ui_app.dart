@@ -144,6 +144,12 @@ class _RouterHostState extends State<_RouterHost> {
       title: 'MobileStarter',
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
+      // 统一滚动边界反馈动效：Android 默认 Clamping 滚到边界无任何反馈
+      // （AGC 上架检测项），iOS 默认即是 Bouncing。统一为 Bouncing 后
+      // 短列表也可拖动回弹（issue #23）。
+      scrollBehavior: const MaterialScrollBehavior().copyWith(
+        physics: const BouncingScrollPhysics(parent: RangeMaintainingScrollPhysics()),
+      ),
       themeMode: _MobileUiAppState._themeModeOf(widget.controller),
       locale: _MobileUiAppState._localeOf(widget.controller),
       supportedLocales: const [Locale('zh', 'CN'), Locale('en', 'US')],

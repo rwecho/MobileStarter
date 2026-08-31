@@ -1,0 +1,6 @@
+# 集成测试（@Tags(['integration'])）依赖真实 dev server（localhost:3210，
+# 见 test/payment/test_server.dart），默认跳过保持 `flutter test` 离线可跑。
+# 显式运行：flutter test --tags integration --run-skipped
+tags:
+  integration:
+    skip: "integration test：需要本地 dev server（localhost:3210）"

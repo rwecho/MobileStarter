@@ -206,6 +206,7 @@ export struct LegalPage {
           }
         })
       }.padding(AppSpacing.x4).layoutWeight(1)
+        .edgeEffect(EdgeEffect.Spring, { alwaysEnabled: true })
     }.width('100%').height('100%')
   }
 
@@ -238,6 +239,7 @@ export struct LegalDocumentPage {
           }
         }.alignItems(HorizontalAlign.Start).padding(AppSpacing.x4)
       }.layoutWeight(1)
+      .edgeEffect(EdgeEffect.Spring)
     }.width('100%').height('100%')
   }
 
@@ -321,6 +323,7 @@ export struct ProfileEditPage {
         .constraintSize({ minHeight: '100%' })
         .justifyContent(FlexAlign.Start)
       }.layoutWeight(1)
+      .edgeEffect(EdgeEffect.Spring)
     }
     .width('100%').height('100%')
     .bindSheet($$this.showAvatarEditor, this.avatarEditorBuilder(), {

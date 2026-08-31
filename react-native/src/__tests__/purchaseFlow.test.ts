@@ -3,7 +3,10 @@ import { apiClient, setAnonymousIdReader, setPlatformHeader, setRefreshTokenRead
 import { MockPaymentProvider } from '../payment/mockPaymentProvider';
 import { signUpAndGetToken } from './testServer';
 
-describe('purchase flow (real server)', () => {
+// 集成测试：依赖真实 server（.env 的 EXPO_PUBLIC_API_URL + 租户已配置好
+// pro-monthly 的商店商品）。默认跳过保持 `npm test` 密封可离线；
+// 显式运行：RUN_INTEGRATION=1 npm test
+describe.skipIf(!process.env.RUN_INTEGRATION)('purchase flow (real server)', () => {
   let token: string;
   beforeAll(async () => {
     setPlatformHeader('ios');

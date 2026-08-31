@@ -39,10 +39,13 @@ final class AppController extends ChangeNotifier {
   AppUser? get user => _user;
   // online：最近一次 bootstrap 是否成功拉到配置（失败即视为离线）。
   // bootstrapped：初始 bootstrap 是否完成（成功或失败）；闪屏据此判断"配置拉取完成"。
+  // localReady：磁盘缓存 config 已就绪；闪屏进首页只等它、不等网络（issue #24）。
   bool _online = true;
   bool _bootstrapped = false;
+  bool _localReady = false;
   bool get online => _online;
   bool get bootstrapped => _bootstrapped;
+  bool get localReady => _localReady;
 
   /// Called by the router redirect when a signed-out user hits a protected
   /// route; remembers the target so auth screens can resume it after login.
@@ -58,7 +61,18 @@ final class AppController extends ChangeNotifier {
 
   Future<void> initialize() async {
     _actionState = const Loading<void>();
-    notifyListeners();
+    // 冷启动只等磁盘：先读缓存 config 置 localReady（splash 据此放行），
+    // 网络 bootstrap 在其后继续（issue #24：进首页不等网络）。
+    if (_config == null) {
+      try {
+        final cached = await _repository.readCachedBootstrap();
+        if (cached != null) _config = cached.config;
+      } catch (_) {
+        // 缓存读取失败不阻塞启动，走网络 bootstrap 兜底
+      }
+      _localReady = true;
+      notifyListeners();
+    }
     try {
       final result = await _repository.bootstrap();
       _config = result.config;

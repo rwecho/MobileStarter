@@ -83,6 +83,16 @@ export function objectKey(appId: string, environment: string, path: string): str
     : `${environment}/${cleanPath}`;
 }
 
+// Ownership check for GET /urls: the key must belong to the caller's app.
+// Single-bucket mode isolates via the `${appId}/` key prefix, so verify it;
+// per-app mode isolates via the bucket itself, where any key is owned.
+export function ownsObjectKey(appId: string, objectKey: string): boolean {
+  if (singleBucketMode()) {
+    return objectKey.toLowerCase().startsWith(`${appId.toLowerCase()}/`);
+  }
+  return true;
+}
+
 const ensuredBuckets = new Set<string>();
 
 // Lazily create the app's bucket on first use. MinIO/COS/OSS support

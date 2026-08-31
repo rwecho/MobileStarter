@@ -114,6 +114,13 @@ specification rather than generated placeholder behavior.
         featureId,
       ),
       'server' => _join(project, 'server', 'src', 'features', featureId),
+      'biz-server' => _join(
+        project,
+        'biz-server',
+        'src',
+        'features',
+        featureId,
+      ),
       _ => throw MobileUiUsageException('unsupported profile "$profile"'),
     };
   }

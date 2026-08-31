@@ -1,0 +1,19 @@
+{
+  "id": "biz-server",
+  "version": "0.1.0",
+  "source": "biz-server",
+  "platforms": ["web"],
+  "features": [],
+  "workflows": [
+    "biz-server-ci.yml",
+    "biz-server-publish.yml"
+  ],
+  "excludedDirectories": [
+    "node_modules",
+    ".next",
+    ".env",
+    ".env.local",
+    "tsconfig.tsbuildinfo",
+    "AGENTS.md"
+  ]
+}

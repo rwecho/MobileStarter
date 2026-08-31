@@ -22,6 +22,7 @@ Future<void> main() async {
       'react-native',
       'arkts',
       'server',
+      'biz-server',
       'all',
     ]) {
       await _verifyProfile(templateRoot, sandbox, profile);
@@ -89,7 +90,7 @@ Future<void> _verifyCombinedProfiles(
     '--output',
     sandbox.path,
     '--profile',
-    'react-native,server',
+    'react-native,server,biz-server',
     '--display-name',
     'Example Combined',
     '--organization',
@@ -152,6 +153,43 @@ Future<void> _verifyCombinedProfiles(
     'server node_modules must not be copied',
   );
   expectTrue(
+    Directory(joinPath(project.path, 'biz-server', 'src', 'app')).existsSync(),
+    'combined create must copy biz-server source tree',
+  );
+  expectTrue(
+    File(
+      joinPath(project.path, '.github', 'workflows', 'biz-server-ci.yml'),
+    ).existsSync(),
+    'combined create must copy biz-server CI workflow',
+  );
+  final bizPublishWorkflow = File(
+    joinPath(project.path, '.github', 'workflows', 'biz-server-publish.yml'),
+  );
+  expectTrue(
+    bizPublishWorkflow.existsSync(),
+    'combined create must copy biz-server publish workflow',
+  );
+  expectTrue(
+    !bizPublishWorkflow.readAsStringSync().contains('zhongbei-biz'),
+    'biz-server publish image must not keep the template image name',
+  );
+  expectTrue(
+    bizPublishWorkflow.readAsStringSync().contains('/app_combined'),
+    'biz-server publish image must follow the generated package name',
+  );
+  expectTrue(
+    !File(
+      joinPath(project.path, 'biz-server', '.env.example'),
+    ).readAsStringSync().contains('APP_ID=mobilestarter'),
+    'biz-server env must not keep the template app id',
+  );
+  expectTrue(
+    !Directory(
+      joinPath(project.path, 'biz-server', 'node_modules'),
+    ).existsSync(),
+    'biz-server node_modules must not be copied',
+  );
+  expectTrue(
     DoctorCommand().run(['--project', project.path]) == 0,
     'combined doctor must succeed',
   );
@@ -172,9 +210,15 @@ Future<void> _verifyCombinedProfiles(
     ).listSync().isNotEmpty,
     'combined feature must land in server',
   );
+  expectTrue(
+    Directory(
+      joinPath(project.path, 'biz-server', 'src', 'features', 'achievements'),
+    ).listSync().isNotEmpty,
+    'combined feature must land in biz-server',
+  );
   final manifest = _manifest(project);
   final profiles = (manifest['profiles'] as List<Object?>).whereType<String>();
-  expectTrue(profiles.length == 2, 'combined manifest profile count');
+  expectTrue(profiles.length == 3, 'combined manifest profile count');
   expectTrue(
     (manifest['templateSource'] as Map<String, Object?>)['commit'] != null,
     'combined manifest must record template commit',
@@ -210,6 +254,14 @@ void _verifyBehavioralBaseline(Directory project, Iterable<String> profiles) {
       'arkts/entry/src/main/ets/state/AppStore.ets',
       'pendingRoute ?? AppRoute.Home',
       'ArkTS ordinary login must land on home',
+    );
+  }
+  if (profiles.contains('biz-server')) {
+    expectFileContains(
+      project,
+      'biz-server/src/auth/jwt.ts',
+      '/api/v1/auth/jwks',
+      'biz-server must verify tokens against the shared auth JWKS',
     );
   }
 }

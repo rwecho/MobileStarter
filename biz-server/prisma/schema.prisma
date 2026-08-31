@@ -1,0 +1,23 @@
+// 业务数据库 schema。只放这个 app 的业务模型；
+// 用户身份来自 auth.zhongbei.tech 签发的 JWT（sub = user_id），
+// 这里不建 users 表——userId 是对基础设施用户的外键式引用（逻辑外键）。
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// 垂直切片样板模型：演示 userId 引用 + 常用字段约定。
+// 业务落地时按需求替换或删除。
+model Note {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  content   String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@map("notes")
+}

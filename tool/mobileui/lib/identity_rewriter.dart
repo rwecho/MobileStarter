@@ -16,6 +16,7 @@ final class IdentityRewriter {
         'react-native' => _reactNativeReplacements(),
         'arkts' => _arkTsReplacements(),
         'server' => _serverReplacements(),
+        'biz-server' => _bizServerReplacements(),
         _ => const <String, String>{},
       };
       _replaceText(root, replacements);
@@ -33,6 +34,13 @@ final class IdentityRewriter {
         // image identity in server-publish.yml needs a targeted rewrite.
         _replaceWorkflowText(project, 'server-publish.yml', {
           'zhongbei-auth': manifest.packageName,
+        });
+      }
+      if (profile.id == 'biz-server') {
+        // 同 server：biz-server-publish.yml 在 profile source tree 之外，
+        // 镜像名占位按产品包名改写。
+        _replaceWorkflowText(project, 'biz-server-publish.yml', {
+          'zhongbei-biz': manifest.packageName,
         });
       }
     }
@@ -76,6 +84,13 @@ final class IdentityRewriter {
     // Server package identity (package.json name, compose image/container and
     // publish workflow image) follows the generated repository package name.
     'zhongbei-auth': manifest.packageName,
+  };
+
+  Map<String, String> _bizServerReplacements() => {
+    // 业务后端租户身份：.env.example 的 APP_ID 跟随产品 appId，
+    // 服务包名/镜像占位跟随生成的仓库包名。
+    'APP_ID=mobilestarter': 'APP_ID=${manifest.appId}',
+    'zhongbei-biz': manifest.packageName,
   };
 
   String get _nativePackage =>
@@ -148,6 +163,7 @@ bool _isTextFile(String path) {
     '.yml',
     '.json',
     '.json5',
+    '.example',
     '.html',
     '.xml',
     '.plist',

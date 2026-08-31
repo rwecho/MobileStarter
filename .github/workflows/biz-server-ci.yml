@@ -1,0 +1,57 @@
+name: Biz Server CI
+
+# 双重角色：在本仓库验证 biz-server/ 模板自身；被 create 复制到生成项目后，
+# 跑的路径/文件不变，验证的是该项目的业务后端。
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "biz-server/**"
+      - ".github/workflows/biz-server-ci.yml"
+  pull_request:
+    paths:
+      - "biz-server/**"
+      - ".github/workflows/biz-server-ci.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: zhongbei_biz_test
+          POSTGRES_USER: zhongbei_biz
+          POSTGRES_PASSWORD: zhongbei_biz_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U zhongbei_biz -d zhongbei_biz_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://zhongbei_biz:zhongbei_biz_test@localhost:5432/zhongbei_biz_test
+      APP_ID: ci
+      AUTH_BASE_URL: https://auth.example.test
+    defaults:
+      run:
+        working-directory: biz-server
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: biz-server/package-lock.json
+      - run: npm ci
+      # 迁移先行：schema 漂移在 CI 即暴露（业务落地后这里验证每个迁移）
+      - run: npx prisma migrate deploy
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build

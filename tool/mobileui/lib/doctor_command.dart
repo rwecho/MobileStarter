@@ -78,6 +78,11 @@ final class DoctorCommand {
         'server/next.config.ts',
         '.github/workflows/server-ci.yml',
       ],
+      'biz-server' => [
+        'biz-server/package.json',
+        'biz-server/prisma/schema.prisma',
+        '.github/workflows/biz-server-ci.yml',
+      ],
       _ => <String>[],
     };
     if (required.isEmpty) {
@@ -109,6 +114,7 @@ final class DoctorCommand {
       ],
       'arkts': ['com.mobilestarter.template', 'storePassword', 'keyPassword'],
       'server': ['com.mobileui.mobilestarter', 'zhongbei-auth'],
+      'biz-server': ['zhongbei-biz'],
     };
     for (final entity in root.listSync(recursive: true)) {
       if (entity is! File || !_isTextFile(entity.path)) continue;

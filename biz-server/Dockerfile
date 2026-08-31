@@ -3,6 +3,8 @@ ARG NODE_IMAGE=node:22-alpine
 FROM ${NODE_IMAGE} AS dependencies
 WORKDIR /app
 COPY package.json package-lock.json ./
+# schema 先于 npm ci：postinstall 的 prisma generate 需要 schema 在场
+COPY prisma ./prisma
 RUN npm ci
 
 FROM ${NODE_IMAGE} AS builder

@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import '../app/app_scope.dart';
 import '../design_system/components.dart';
 import '../design_system/feedback.dart';
+import '../l10n/generated/app_localizations.dart';
 import '../navigation/app_route.dart';
 import '../navigation/app_route_paths.dart';
 import '../theme/app_tokens.dart';
@@ -97,6 +98,7 @@ class _AuthScreenState extends State<AuthScreen> {
   }
 
   bool _validateSubmission() {
+    final l10n = AppLocalizations.of(context)!;
     final isSignUp = widget.mode == AuthMode.signUp;
     final isSignIn = widget.mode == AuthMode.signIn;
     if (!isSignUp && !isSignIn) return true;
@@ -105,15 +107,15 @@ class _AuthScreenState extends State<AuthScreen> {
     final password = passwordController.text;
     setState(() {
       accountError = account.isEmpty
-          ? (isSignIn ? '请输入用户名、邮箱或手机号' : '请输入邮箱')
+          ? (isSignIn ? l10n.authAccountRequired : l10n.authEmailRequired)
           : isSignUp && !_isEmail(account)
-          ? '邮箱格式不正确'
+          ? l10n.authEmailInvalid
           : null;
-      usernameError = isSignUp && username.length < 2 ? '用户名至少 2 个字符' : null;
+      usernameError = isSignUp && username.length < 2 ? l10n.authUsernameMinLength : null;
       passwordError = password.isEmpty
-          ? '请输入密码'
+          ? l10n.authPasswordRequired
           : isSignUp && password.length < 8
-          ? '密码至少 8 位'
+          ? l10n.authPasswordMinLength
           : null;
     });
     final valid =
@@ -124,7 +126,7 @@ class _AuthScreenState extends State<AuthScreen> {
 
   bool _ensureConsent() {
     if (consentAgreed) return true;
-    showAppToast(context, '请先阅读并同意用户协议与隐私政策');
+    showAppToast(context, AppLocalizations.of(context)!.authConsentRequired);
     return false;
   }
 
@@ -133,7 +135,8 @@ class _AuthScreenState extends State<AuthScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final copy = _copyFor(widget.mode);
+    final l10n = AppLocalizations.of(context)!;
+    final copy = _copyFor(l10n, widget.mode);
     final controller = AppScope.of(context);
     return ListenableBuilder(
       listenable: controller,
@@ -146,7 +149,7 @@ class _AuthScreenState extends State<AuthScreen> {
             Text(copy.$1, style: Theme.of(context).textTheme.headlineMedium),
             const SizedBox(height: AppSpacing.x2),
             Text(
-              '安全同步你的会员、订单与偏好设置。',
+              l10n.authTagline,
               style: Theme.of(context).textTheme.bodyMedium,
             ),
             const SizedBox(height: AppSpacing.x6),
@@ -156,7 +159,7 @@ class _AuthScreenState extends State<AuthScreen> {
                   ? TextInputType.phone
                   : TextInputType.emailAddress,
               decoration: InputDecoration(
-                labelText: _accountLabel(),
+                labelText: _accountLabel(l10n),
                 errorText: accountError,
               ),
               onChanged: (_) => setState(() => authError = null),
@@ -166,7 +169,7 @@ class _AuthScreenState extends State<AuthScreen> {
               TextField(
                 controller: usernameController,
                 decoration: InputDecoration(
-                  labelText: '用户名',
+                  labelText: l10n.authUsername,
                   errorText: usernameError,
                 ),
                 onChanged: (_) => setState(() => authError = null),
@@ -182,8 +185,8 @@ class _AuthScreenState extends State<AuthScreen> {
                   labelText:
                       widget.mode == AuthMode.verify ||
                           widget.mode == AuthMode.phone
-                      ? '验证码'
-                      : '密码',
+                      ? l10n.authCode
+                      : l10n.authPassword,
                   errorText: passwordError,
                 ),
                 onChanged: (_) => setState(() => authError = null),
@@ -198,7 +201,7 @@ class _AuthScreenState extends State<AuthScreen> {
               const SizedBox(height: AppSpacing.x2),
             ],
             AppButton(
-              label: controller.busy ? '正在处理…' : copy.$2,
+              label: controller.busy ? l10n.authProcessing : copy.$2,
               onPressed: () => submit(),
             ),
             if (widget.mode == AuthMode.signIn) ...[
@@ -208,11 +211,11 @@ class _AuthScreenState extends State<AuthScreen> {
               AuthProviderRow(onPressed: _socialSignIn),
               TextButton(
                 onPressed: () => context.push(pathFor(AppRoute.forgotPassword)),
-                child: const Text('忘记密码'),
+                child: Text(l10n.authForgotPassword),
               ),
               TextButton(
                 onPressed: () => context.push(pathFor(AppRoute.signUp)),
-                child: const Text('创建账号'),
+                child: Text(l10n.authCreateAccount),
               ),
             ],
             if (_requiresConsent) ...[
@@ -231,10 +234,10 @@ class _AuthScreenState extends State<AuthScreen> {
   bool get _requiresConsent =>
       widget.mode == AuthMode.signIn || widget.mode == AuthMode.signUp;
 
-  String _accountLabel() => switch (widget.mode) {
-    AuthMode.phone => '手机号',
-    AuthMode.signIn => '用户名、邮箱或手机号',
-    _ => '邮箱',
+  String _accountLabel(AppLocalizations l10n) => switch (widget.mode) {
+    AuthMode.phone => l10n.authPhone,
+    AuthMode.signIn => l10n.authAccountPlaceholder,
+    _ => l10n.authEmail,
   };
 
   Future<void> _socialSignIn(String provider) async {
@@ -258,14 +261,17 @@ class _AuthScreenState extends State<AuthScreen> {
     return legal.first.revision;
   }
 
-  (String, String) _copyFor(AuthMode mode) {
+  (String, String) _copyFor(AppLocalizations l10n, AuthMode mode) {
     return switch (mode) {
-      AuthMode.signIn => ('欢迎回来', '登录'),
-      AuthMode.signUp => ('创建账号', '注册'),
-      AuthMode.phone => ('手机号登录', phoneCodeSent ? '验证并登录' : '发送验证码'),
-      AuthMode.forgot => ('找回密码', '发送验证码'),
-      AuthMode.verify => ('验证邮箱', '确认验证码'),
-      AuthMode.reset => ('设置新密码', '确认修改'),
+      AuthMode.signIn => (l10n.authSignInTitle, l10n.authSignInAction),
+      AuthMode.signUp => (l10n.authSignUpTitle, l10n.authSignUpAction),
+      AuthMode.phone => (
+        l10n.authPhoneTitle,
+        phoneCodeSent ? l10n.authVerifyAndSignIn : l10n.authPhoneAction,
+      ),
+      AuthMode.forgot => (l10n.authForgotTitle, l10n.authForgotAction),
+      AuthMode.verify => (l10n.authVerifyTitle, l10n.authVerifyAction),
+      AuthMode.reset => (l10n.authResetTitle, l10n.authResetAction),
     };
   }
 }

@@ -4,19 +4,11 @@ import { AppButton, PageHeader } from '../design-system/components';
 import { useApp } from '../state/AppStore';
 import { colors, spacing } from '../theme/tokens';
 import { styles } from '../theme/styles';
+import { useTranslation } from 'react-i18next';
 import { useAuthRecovery } from '../auth/AuthRecoveryStore';
 import { SocialAuthButtons } from '../auth/SocialAuthButtons';
 
 export type AuthMode = 'signIn' | 'signUp' | 'phone' | 'forgot' | 'verify' | 'reset';
-
-const authCopy: Record<AuthMode, Readonly<{ title: string; action: string }>> = {
-  signIn: { title: '欢迎回来', action: '登录' },
-  signUp: { title: '创建账号', action: '注册' },
-  phone: { title: '手机号登录', action: '发送验证码' },
-  forgot: { title: '找回密码', action: '发送验证码' },
-  verify: { title: '验证邮箱', action: '确认验证码' },
-  reset: { title: '设置新密码', action: '确认修改' },
-};
 
 export function AuthScreen({ mode }: Readonly<{ mode: AuthMode }>) {
   const {
@@ -31,6 +23,7 @@ export function AuthScreen({ mode }: Readonly<{ mode: AuthMode }>) {
     lastAuthError,
     clearAuthError,
   } = useApp();
+  const { t } = useTranslation();
   const recovery = useAuthRecovery();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -39,7 +32,7 @@ export function AuthScreen({ mode }: Readonly<{ mode: AuthMode }>) {
   const [phone, setPhone] = useState('+86');
   const [phoneCodeSent, setPhoneCodeSent] = useState(false);
   const [agreed, setAgreed] = useState(false);
-  const copy = authCopy[mode];
+  const copy = { title: t(`auth.${mode}_title`), action: t(`auth.${mode}_action`) };
   const busy = accountBusy || recovery.busy;
   const termsRevision = config.legal.find((document) => document.type === 'terms')?.revision
     ?? 'unknown';
@@ -61,7 +54,7 @@ export function AuthScreen({ mode }: Readonly<{ mode: AuthMode }>) {
       if (!phoneCodeSent) {
         if (await requestPhoneCode(phone)) {
           setPhoneCodeSent(true);
-          showToast('验证码已发送', 'success');
+          showToast(t('auth.codeSentToast'), 'success');
         }
         return;
       }
@@ -78,7 +71,7 @@ export function AuthScreen({ mode }: Readonly<{ mode: AuthMode }>) {
 
   const ensureConsent = () => {
     if (agreed) return true;
-    showToast('请先阅读并同意用户协议与隐私政策', 'info');
+    showToast(t('auth.consentRequired'), 'info');
     return false;
   };
 
@@ -88,13 +81,13 @@ export function AuthScreen({ mode }: Readonly<{ mode: AuthMode }>) {
       <ScrollView contentContainerStyle={authStyles.content}>
         <View style={authStyles.copy}>
           <Text style={styles.title}>{copy.title}</Text>
-          <Text style={styles.secondary}>安全同步你的会员、订单与偏好设置。</Text>
+          <Text style={styles.secondary}>{t('auth.tagline')}</Text>
         </View>
         {mode === 'signUp' ? (
           <TextInput
-            accessibilityLabel="用户名"
+            accessibilityLabel={t('auth.username')}
             onChangeText={setUsername}
-            placeholder="用户名"
+            placeholder={t('auth.username')}
             style={styles.input}
             value={username}
           />
@@ -102,20 +95,20 @@ export function AuthScreen({ mode }: Readonly<{ mode: AuthMode }>) {
         {mode === 'phone' ? (
           <>
             <TextInput
-              accessibilityLabel="手机号"
+              accessibilityLabel={t('auth.phone')}
               keyboardType="phone-pad"
               onChangeText={setPhone}
-              placeholder="+86 13800000000"
+              placeholder={t('auth.phonePlaceholder')}
               style={styles.input}
               value={phone}
             />
             {phoneCodeSent ? (
               <TextInput
-                accessibilityLabel="短信验证码"
+                accessibilityLabel={t('auth.smsCode')}
                 keyboardType="number-pad"
                 maxLength={6}
                 onChangeText={setCode}
-                placeholder="6 位短信验证码"
+                placeholder={t('auth.smsCodePlaceholder')}
                 style={styles.input}
                 value={code}
               />
@@ -124,22 +117,22 @@ export function AuthScreen({ mode }: Readonly<{ mode: AuthMode }>) {
         ) : null}
         {mode === 'signIn' || mode === 'signUp' || mode === 'forgot' ? (
           <TextInput
-            accessibilityLabel={mode === 'signIn' ? '账号' : '邮箱'}
+            accessibilityLabel={mode === 'signIn' ? t('auth.account') : t('auth.email')}
             autoCapitalize="none"
             onChangeText={(value) => { setEmail(value); clearAuthError(); }}
-            placeholder={mode === 'signIn' ? '用户名 / 邮箱 / 手机号' : '邮箱'}
+            placeholder={mode === 'signIn' ? t('auth.accountPlaceholder') : t('auth.email')}
             style={styles.input}
             value={email}
           />
         ) : null}
         {mode === 'verify' ? (
-          <Text style={styles.secondary}>验证码已发送至 {recovery.email}</Text>
+          <Text style={styles.secondary}>{t('auth.codeSentTo', { email: recovery.email })}</Text>
         ) : null}
         {mode !== 'forgot' && mode !== 'verify' && mode !== 'phone' ? (
           <TextInput
-            accessibilityLabel="密码"
+            accessibilityLabel={t('auth.password')}
             onChangeText={(value) => { setPassword(value); clearAuthError(); }}
-            placeholder={mode === 'reset' ? '新密码' : '密码'}
+            placeholder={mode === 'reset' ? t('auth.newPassword') : t('auth.password')}
             secureTextEntry
             style={styles.input}
             value={password}
@@ -147,11 +140,11 @@ export function AuthScreen({ mode }: Readonly<{ mode: AuthMode }>) {
         ) : null}
         {mode === 'verify' ? (
           <TextInput
-            accessibilityLabel="验证码"
+            accessibilityLabel={t('auth.code')}
             keyboardType="number-pad"
             maxLength={6}
             onChangeText={setCode}
-            placeholder="6 位验证码"
+            placeholder={t('auth.codePlaceholder')}
             style={styles.input}
             value={code}
           />
@@ -161,19 +154,19 @@ export function AuthScreen({ mode }: Readonly<{ mode: AuthMode }>) {
         ) : null}
         <AppButton
           disabled={busy || !isValid({ mode, email, password, username, code, phone, phoneCodeSent })}
-          label={busy ? '正在处理…' : mode === 'phone' && phoneCodeSent ? '验证并登录' : copy.action}
+          label={busy ? t('auth.processing') : mode === 'phone' && phoneCodeSent ? t('auth.verifyAndSignIn') : copy.action}
           onPress={() => void submit()}
         />
         {mode === 'signIn' ? (
           <>
             <SocialAuthButtons onBeforeAuthenticate={ensureConsent} />
             <AppButton
-              label="忘记密码"
+              label={t('auth.forgotPassword')}
               variant="secondary"
               onPress={() => navigate('auth.forgotPassword')}
             />
             <AppButton
-              label="创建账号"
+              label={t('auth.createAccount')}
               variant="secondary"
               onPress={() => navigate('auth.signUp')}
             />
@@ -184,7 +177,7 @@ export function AuthScreen({ mode }: Readonly<{ mode: AuthMode }>) {
             <Pressable
               accessibilityRole="checkbox"
               accessibilityState={{ checked: agreed }}
-              accessibilityLabel="同意用户协议与隐私政策"
+              accessibilityLabel={t('auth.consentCheckbox')}
               hitSlop={8}
               onPress={() => setAgreed((value) => !value)}
               style={authStyles.checkboxTarget}
@@ -196,21 +189,21 @@ export function AuthScreen({ mode }: Readonly<{ mode: AuthMode }>) {
             <Text
               style={[styles.caption, authStyles.consentText]}
               accessibilityRole="button"
-              accessibilityLabel="同意用户协议与隐私政策"
+              accessibilityLabel={t('auth.consentCheckbox')}
               onPress={() => setAgreed((value) => !value)}
             >
-              我已阅读并同意{' '}
+              {t('auth.consentPrefix')}{' '}
               <Text
                 accessibilityRole="link"
                 onPress={() => navigate('settings.termsOfService')}
                 style={authStyles.legalLinkInline}
-              >用户协议</Text>
-              {' '}与{' '}
+              >{t('auth.terms')}</Text>
+              {' '}{t('auth.consentMiddle')}{' '}
               <Text
                 accessibilityRole="link"
                 onPress={() => navigate('settings.privacyPolicy')}
                 style={authStyles.legalLinkInline}
-              >隐私政策</Text>
+              >{t('auth.privacy')}</Text>
             </Text>
           </View>
         ) : null}

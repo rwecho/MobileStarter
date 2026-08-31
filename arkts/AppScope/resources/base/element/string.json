@@ -1,52 +1,328 @@
 {
   "string": [
-    { "name": "app_name", "value": "MobileStarter" },
-    { "name": "back", "value": "返回" },
-    { "name": "profile_title", "value": "我的" },
-    { "name": "sign_in_prompt", "value": "登录后同步你的数据" },
-    { "name": "sign_in_description", "value": "会员、订单、优惠券与设置会安全同步。" },
-    { "name": "sign_in_action", "value": "登录或注册" },
-    { "name": "profile_edit", "value": "个人资料" },
-    { "name": "membership", "value": "会员中心" },
-    { "name": "statistics", "value": "使用统计" },
-    { "name": "orders", "value": "订单管理" },
-    { "name": "settings", "value": "设置" },
-    { "name": "sign_out", "value": "退出登录" },
-    { "name": "account_services", "value": "账户与服务" },
-    { "name": "preferences", "value": "应用偏好" },
-    { "name": "privacy_storage_support", "value": "隐私、存储与支持" },
-    { "name": "account_security", "value": "账户与安全" },
-    { "name": "devices", "value": "登录设备管理" },
-    { "name": "notification_settings", "value": "通知设置" },
-    { "name": "general", "value": "通用设置" },
-    { "name": "appearance", "value": "外观主题" },
-    { "name": "language", "value": "语言" },
-    { "name": "text_size", "value": "字体大小" },
-    { "name": "privacy", "value": "隐私设置" },
-    { "name": "permissions", "value": "权限管理" },
-    { "name": "storage", "value": "存储与缓存" },
-    { "name": "help_feedback", "value": "帮助与反馈" },
-    { "name": "legal", "value": "协议与政策" },
-    { "name": "terms_of_service", "value": "用户协议" },
-    { "name": "privacy_policy", "value": "隐私政策" },
-    { "name": "about", "value": "关于与版本" },
-    { "name": "delete_account", "value": "注销账号" },
-    { "name": "theme_system", "value": "跟随系统" },
-    { "name": "theme_light", "value": "浅色" },
-    { "name": "theme_dark", "value": "深色" },
-    { "name": "language_chinese", "value": "简体中文" },
-    { "name": "language_english", "value": "English" },
-    { "name": "text_small", "value": "较小" },
-    { "name": "text_standard", "value": "标准" },
-    { "name": "text_large", "value": "较大" },
-    { "name": "text_extra_large", "value": "特大" },
-    { "name": "save_settings", "value": "保存设置" },
-    { "name": "saving", "value": "保存中…" },
-    { "name": "username_readonly", "value": "用户名（不可修改）" },
-    { "name": "display_name", "value": "显示名称" },
-    { "name": "bio", "value": "个人简介" },
-    { "name": "choose_avatar", "value": "选择头像" },
-    { "name": "avatar_url", "value": "或粘贴头像 URL" },
-    { "name": "save_profile", "value": "保存资料" }
+    {
+      "name": "app_name",
+      "value": "MobileStarter"
+    },
+    {
+      "name": "back",
+      "value": "返回"
+    },
+    {
+      "name": "profile_title",
+      "value": "我的"
+    },
+    {
+      "name": "sign_in_prompt",
+      "value": "登录后同步你的数据"
+    },
+    {
+      "name": "sign_in_description",
+      "value": "会员、订单、优惠券与设置会安全同步。"
+    },
+    {
+      "name": "sign_in_action",
+      "value": "登录或注册"
+    },
+    {
+      "name": "profile_edit",
+      "value": "个人资料"
+    },
+    {
+      "name": "membership",
+      "value": "会员中心"
+    },
+    {
+      "name": "statistics",
+      "value": "使用统计"
+    },
+    {
+      "name": "orders",
+      "value": "订单管理"
+    },
+    {
+      "name": "settings",
+      "value": "设置"
+    },
+    {
+      "name": "sign_out",
+      "value": "退出登录"
+    },
+    {
+      "name": "account_services",
+      "value": "账户与服务"
+    },
+    {
+      "name": "preferences",
+      "value": "应用偏好"
+    },
+    {
+      "name": "privacy_storage_support",
+      "value": "隐私、存储与支持"
+    },
+    {
+      "name": "account_security",
+      "value": "账户与安全"
+    },
+    {
+      "name": "devices",
+      "value": "登录设备管理"
+    },
+    {
+      "name": "notification_settings",
+      "value": "通知设置"
+    },
+    {
+      "name": "general",
+      "value": "通用设置"
+    },
+    {
+      "name": "appearance",
+      "value": "外观主题"
+    },
+    {
+      "name": "language",
+      "value": "语言"
+    },
+    {
+      "name": "text_size",
+      "value": "字体大小"
+    },
+    {
+      "name": "privacy",
+      "value": "隐私设置"
+    },
+    {
+      "name": "permissions",
+      "value": "权限管理"
+    },
+    {
+      "name": "storage",
+      "value": "存储与缓存"
+    },
+    {
+      "name": "help_feedback",
+      "value": "帮助与反馈"
+    },
+    {
+      "name": "legal",
+      "value": "协议与政策"
+    },
+    {
+      "name": "terms_of_service",
+      "value": "用户协议"
+    },
+    {
+      "name": "privacy_policy",
+      "value": "隐私政策"
+    },
+    {
+      "name": "about",
+      "value": "关于与版本"
+    },
+    {
+      "name": "delete_account",
+      "value": "注销账号"
+    },
+    {
+      "name": "theme_system",
+      "value": "跟随系统"
+    },
+    {
+      "name": "theme_light",
+      "value": "浅色"
+    },
+    {
+      "name": "theme_dark",
+      "value": "深色"
+    },
+    {
+      "name": "language_chinese",
+      "value": "简体中文"
+    },
+    {
+      "name": "language_english",
+      "value": "English"
+    },
+    {
+      "name": "text_small",
+      "value": "较小"
+    },
+    {
+      "name": "text_standard",
+      "value": "标准"
+    },
+    {
+      "name": "text_large",
+      "value": "较大"
+    },
+    {
+      "name": "text_extra_large",
+      "value": "特大"
+    },
+    {
+      "name": "save_settings",
+      "value": "保存设置"
+    },
+    {
+      "name": "saving",
+      "value": "保存中…"
+    },
+    {
+      "name": "username_readonly",
+      "value": "用户名（不可修改）"
+    },
+    {
+      "name": "display_name",
+      "value": "显示名称"
+    },
+    {
+      "name": "bio",
+      "value": "个人简介"
+    },
+    {
+      "name": "choose_avatar",
+      "value": "选择头像"
+    },
+    {
+      "name": "avatar_url",
+      "value": "或粘贴头像 URL"
+    },
+    {
+      "name": "save_profile",
+      "value": "保存资料"
+    },
+    {
+      "name": "auth_tagline",
+      "value": "安全同步你的会员、订单与偏好设置。"
+    },
+    {
+      "name": "auth_sign_in_title",
+      "value": "欢迎回来"
+    },
+    {
+      "name": "auth_sign_in_action",
+      "value": "登录"
+    },
+    {
+      "name": "auth_sign_up_title",
+      "value": "创建账号"
+    },
+    {
+      "name": "auth_sign_up_action",
+      "value": "注册"
+    },
+    {
+      "name": "auth_phone_title",
+      "value": "手机号登录"
+    },
+    {
+      "name": "auth_phone_action",
+      "value": "发送验证码"
+    },
+    {
+      "name": "auth_forgot_title",
+      "value": "找回密码"
+    },
+    {
+      "name": "auth_forgot_action",
+      "value": "发送验证码"
+    },
+    {
+      "name": "auth_verify_title",
+      "value": "验证邮箱"
+    },
+    {
+      "name": "auth_verify_action",
+      "value": "确认验证码"
+    },
+    {
+      "name": "auth_reset_title",
+      "value": "设置新密码"
+    },
+    {
+      "name": "auth_reset_action",
+      "value": "确认修改"
+    },
+    {
+      "name": "auth_processing",
+      "value": "正在处理…"
+    },
+    {
+      "name": "auth_verify_and_sign_in",
+      "value": "验证并登录"
+    },
+    {
+      "name": "auth_forgot_password",
+      "value": "忘记密码"
+    },
+    {
+      "name": "auth_create_account",
+      "value": "创建账号"
+    },
+    {
+      "name": "auth_other_methods",
+      "value": "其他登录方式"
+    },
+    {
+      "name": "auth_username",
+      "value": "用户名"
+    },
+    {
+      "name": "auth_phone",
+      "value": "手机号"
+    },
+    {
+      "name": "auth_email",
+      "value": "邮箱"
+    },
+    {
+      "name": "auth_account_placeholder",
+      "value": "用户名、邮箱或手机号"
+    },
+    {
+      "name": "auth_password",
+      "value": "密码"
+    },
+    {
+      "name": "auth_new_password",
+      "value": "新密码"
+    },
+    {
+      "name": "auth_code",
+      "value": "验证码"
+    },
+    {
+      "name": "auth_code_sent",
+      "value": "验证码已发送"
+    },
+    {
+      "name": "auth_reset_success",
+      "value": "密码修改成功"
+    },
+    {
+      "name": "auth_apple_unavailable",
+      "value": "HarmonyOS 暂不支持 Apple 登录"
+    },
+    {
+      "name": "auth_consent_prefix",
+      "value": "我已阅读并同意"
+    },
+    {
+      "name": "auth_consent_middle",
+      "value": "与"
+    },
+    {
+      "name": "auth_consent_terms",
+      "value": "用户协议"
+    },
+    {
+      "name": "auth_consent_privacy",
+      "value": "隐私政策"
+    },
+    {
+      "name": "auth_consent_required",
+      "value": "请先阅读并同意用户协议与隐私政策"
+    }
   ]
 }

@@ -15,6 +15,8 @@ import {
 } from '../domain/models';
 import { AppRoute } from '../navigation/routes';
 import { EntrySource } from '../navigation/useEntryIntents';
+import { startPush, stopPush } from '../push/PushService';
+import { setAppLanguage } from '../i18n';
 import { guardRoute } from '../navigation/routeGuards';
 import { telemetry } from '../telemetry/Telemetry';
 import { defaultProviderPolicy, defaultProviders } from '../auth/authDefaults';
@@ -23,7 +25,12 @@ import {
   Credentials, SocialCredentials, useAccountActions,
 } from './useAccountActions';
 import { ConfirmState, useFeedbackState } from './useAppShellState';
-import { navigationRef, navigateRoute } from '../navigation/navigationRef';
+import {
+  navigationRef,
+  navigateRoute,
+  resetToHomeThenPush,
+  resetToRoute,
+} from '../navigation/navigationRef';
 type ToastTone = 'success' | 'info' | 'error';
 
 // 购买流程的当前状态。success/failed 携带服务器确认后的订单（真实 order.status）。
@@ -168,7 +175,7 @@ export function AppProvider({ children }: Readonly<{ children: ReactNode }>) {
   const replace = useCallback((route: AppRoute) => {
     const decision = guardRoute(route, { signedIn: user !== null, features: config.features });
     if (decision.pending) setPendingRoute(decision.pending);
-    if (navigationRef.isReady()) navigationRef.reset({ routes: [{ name: decision.route }] });
+    resetToRoute(decision.route);
   }, [config.features, user]);
   const back = useCallback(() => {
     if (navigationRef.isReady() && navigationRef.canGoBack()) navigationRef.goBack();
@@ -183,15 +190,15 @@ export function AppProvider({ children }: Readonly<{ children: ReactNode }>) {
     if (!navigationRef.isReady()) return;
     if (decision.unavailable) {
       feedback.showToast('目标内容不可用，已返回首页', 'info');
-      navigationRef.reset({ routes: [{ name: 'home' }] });
+      resetToRoute('home');
       return;
     }
     if (cold) {
-      navigationRef.reset({
-        routes: decision.route === 'home'
-          ? [{ name: 'home' }]
-          : [{ name: 'home' }, { name: decision.route }],
-      });
+      if (decision.route === 'home') {
+        resetToRoute('home');
+      } else {
+        resetToHomeThenPush(decision.route);
+      }
     } else {
       navigateRoute(decision.route);
     }
@@ -208,7 +215,7 @@ export function AppProvider({ children }: Readonly<{ children: ReactNode }>) {
       setPurchaseState({ kind: 'idle' });
       const target = pendingRoute ?? 'home';
       setPendingRoute(null);
-      if (navigationRef.isReady()) navigationRef.reset({ routes: [{ name: target }] });
+      resetToRoute(target);
     },
     onSignedOut: () => {
       setPurchaseState({ kind: 'idle' });
@@ -227,6 +234,18 @@ export function AppProvider({ children }: Readonly<{ children: ReactNode }>) {
     return () => registerSessionExpiredHandler(null);
   }, []);
   const dataActions = useDataActions(run, setUser, user, setPurchaseState);
+  const language = typeof user?.settings.language === 'string' ? user.settings.language : 'zh-CN';
+  useEffect(() => {
+    setAppLanguage(language);
+  }, [language]);
+  useEffect(() => {
+    // 推送基线：登录后注册 FCM/APNs 令牌，登出解绑；失败静默降级（PushService 内上报）。
+    if (!user) {
+      void stopPush();
+      return;
+    }
+    void startPush((message) => feedback.showToast(message, 'info'));
+  }, [feedback, user]);
   const value = useMemo<AppContextValue>(() => ({
     route: (navigationRef.getCurrentRoute()?.name ?? 'launch.splash') as AppRoute,
     canGoBack: navigationRef.isReady() && navigationRef.canGoBack(),

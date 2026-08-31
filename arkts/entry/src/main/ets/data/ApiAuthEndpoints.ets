@@ -66,6 +66,24 @@ export function signOutAll(transport: ApiTransport): Promise<boolean> {
   ).then(result => result['signedOut'] === true)
 }
 
+export function registerPushToken(
+  transport: ApiTransport, token: string
+): Promise<boolean> {
+  return transport.request<Record<string, boolean>>(
+    '/api/v1/push/register', http.RequestMethod.POST,
+    { token }
+  ).then(result => result['registered'] === true)
+}
+
+export function unregisterPushToken(
+  transport: ApiTransport, token: string
+): Promise<boolean> {
+  return transport.request<Record<string, boolean>>(
+    '/api/v1/push/unregister', http.RequestMethod.POST,
+    { token }
+  ).then(result => result['unregistered'] === true)
+}
+
 export function requestPhoneCode(transport: ApiTransport, phone: string): Promise<boolean> {
   const input: PhoneCodeInput = { phone }
   return transport.request<Record<string, boolean>>(

@@ -4,6 +4,7 @@
 import { apiClient, ApiFailure } from '../data/ApiClient'
 import { localStore } from '../data/LocalStore'
 import { AuthPayload } from '../domain/Models'
+import { registerPushTokenAction, unregisterPushTokenAction } from '../push/PushManager'
 import { AppRoute } from '../navigation/AppRoute'
 import { AppStore } from './AppStore'
 
@@ -24,6 +25,8 @@ async function authenticate(
     store.signedIn = true
     store.online = true
     store.lastAuthError = ''
+    // 推送基线：登录成功后注册 Push Kit 令牌（AGC 未开通推送时静默降级）。
+    registerPushTokenAction()
     return true
   } catch (error) {
     store.lastAuthError = authErrorMessage(store, error)
@@ -133,6 +136,7 @@ export async function signOutAction(store: AppStore): Promise<void> {
   } catch (error) {
     store.online = false
   }
+  unregisterPushTokenAction()
   clearLocalSession(store)
   store.signedIn = false
   store.user = null
@@ -144,6 +148,7 @@ export async function signOutAllAction(store: AppStore): Promise<void> {
   } catch (error) {
     store.online = false
   }
+  unregisterPushTokenAction()
   clearLocalSession(store)
   store.signedIn = false
   store.user = null

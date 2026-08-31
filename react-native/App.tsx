@@ -1,5 +1,7 @@
 import React, { useCallback } from 'react';
 import { Platform, SafeAreaView } from 'react-native';
+// i18next 初始化（副作用 import）：必须在任何消费 useTranslation 的组件之前。
+import './src/i18n';
 import * as ExpoSplashScreen from 'expo-splash-screen';
 import { NavigationContainer } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';

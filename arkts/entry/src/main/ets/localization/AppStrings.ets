@@ -49,7 +49,40 @@ export enum AppString {
   Bio,
   ChooseAvatar,
   AvatarUrl,
-  SaveProfile
+  SaveProfile,
+  AuthTagline,
+  AuthSignInTitle,
+  AuthSignInAction,
+  AuthSignUpTitle,
+  AuthSignUpAction,
+  AuthPhoneTitle,
+  AuthPhoneAction,
+  AuthForgotTitle,
+  AuthForgotAction,
+  AuthVerifyTitle,
+  AuthVerifyAction,
+  AuthResetTitle,
+  AuthResetAction,
+  AuthProcessing,
+  AuthVerifyAndSignIn,
+  AuthForgotPassword,
+  AuthCreateAccount,
+  AuthOtherMethods,
+  AuthUsername,
+  AuthPhone,
+  AuthEmail,
+  AuthAccountPlaceholder,
+  AuthPassword,
+  AuthNewPassword,
+  AuthCode,
+  AuthCodeSent,
+  AuthResetSuccess,
+  AuthAppleUnavailable,
+  AuthConsentPrefix,
+  AuthConsentMiddle,
+  AuthConsentTerms,
+  AuthConsentPrivacy,
+  AuthConsentRequired
 }
 
 let context: common.UIAbilityContext | null = null
@@ -108,6 +141,39 @@ function resName(key: AppString): string {
     case AppString.ChooseAvatar: return 'choose_avatar'
     case AppString.AvatarUrl: return 'avatar_url'
     case AppString.SaveProfile: return 'save_profile'
+    case AppString.AuthTagline: return 'auth_tagline'
+    case AppString.AuthSignInTitle: return 'auth_sign_in_title'
+    case AppString.AuthSignInAction: return 'auth_sign_in_action'
+    case AppString.AuthSignUpTitle: return 'auth_sign_up_title'
+    case AppString.AuthSignUpAction: return 'auth_sign_up_action'
+    case AppString.AuthPhoneTitle: return 'auth_phone_title'
+    case AppString.AuthPhoneAction: return 'auth_phone_action'
+    case AppString.AuthForgotTitle: return 'auth_forgot_title'
+    case AppString.AuthForgotAction: return 'auth_forgot_action'
+    case AppString.AuthVerifyTitle: return 'auth_verify_title'
+    case AppString.AuthVerifyAction: return 'auth_verify_action'
+    case AppString.AuthResetTitle: return 'auth_reset_title'
+    case AppString.AuthResetAction: return 'auth_reset_action'
+    case AppString.AuthProcessing: return 'auth_processing'
+    case AppString.AuthVerifyAndSignIn: return 'auth_verify_and_sign_in'
+    case AppString.AuthForgotPassword: return 'auth_forgot_password'
+    case AppString.AuthCreateAccount: return 'auth_create_account'
+    case AppString.AuthOtherMethods: return 'auth_other_methods'
+    case AppString.AuthUsername: return 'auth_username'
+    case AppString.AuthPhone: return 'auth_phone'
+    case AppString.AuthEmail: return 'auth_email'
+    case AppString.AuthAccountPlaceholder: return 'auth_account_placeholder'
+    case AppString.AuthPassword: return 'auth_password'
+    case AppString.AuthNewPassword: return 'auth_new_password'
+    case AppString.AuthCode: return 'auth_code'
+    case AppString.AuthCodeSent: return 'auth_code_sent'
+    case AppString.AuthResetSuccess: return 'auth_reset_success'
+    case AppString.AuthAppleUnavailable: return 'auth_apple_unavailable'
+    case AppString.AuthConsentPrefix: return 'auth_consent_prefix'
+    case AppString.AuthConsentMiddle: return 'auth_consent_middle'
+    case AppString.AuthConsentTerms: return 'auth_consent_terms'
+    case AppString.AuthConsentPrivacy: return 'auth_consent_privacy'
+    case AppString.AuthConsentRequired: return 'auth_consent_required'
     default: return ''
   }
 }

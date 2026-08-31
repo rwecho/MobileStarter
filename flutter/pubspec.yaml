@@ -24,6 +24,10 @@ dependencies:
   shared_preferences: ^2.5.5
   sign_in_with_apple: ^6.1.4
   video_player: ^2.9.5
+  firebase_messaging: ^16.6.0
+  # 通用外链（官网/评分/网页版协议）：对齐 RN expo-web-browser、ArkTS openLink 的端能力预置。
+  # 当前无调用点，首个外链业务接入时直接 launchUrl 使用，勿因"暂无调用"清理。
+  url_launcher: ^6.3.2
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -31,6 +35,7 @@ dev_dependencies:
   # test/widget_test.dart mocks the async shared_preferences platform.
   shared_preferences_platform_interface: ^2.4.0
 flutter:
+  generate: true
   uses-material-design: true
   assets:
     - assets/icons/

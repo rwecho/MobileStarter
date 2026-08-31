@@ -49,6 +49,7 @@ import { uploadToS3 } from './ApiTransport'
 import { CreateTicketInput } from '../domain/SupportModels'
 import {
   changePassword,
+  registerPushToken,
   requestPasswordReset,
   requestPhoneCode,
   resendEmailVerification,
@@ -59,6 +60,7 @@ import {
   signOutAll,
   signUp,
   socialSignIn,
+  unregisterPushToken,
   updateProfile,
   verifyEmail,
   verifyPasswordReset,
@@ -125,6 +127,14 @@ export class ApiClient {
 
   signOutAll(): Promise<boolean> {
     return signOutAll(this.transport)
+  }
+
+  registerPushToken(token: string): Promise<boolean> {
+    return registerPushToken(this.transport, token)
+  }
+
+  unregisterPushToken(token: string): Promise<boolean> {
+    return unregisterPushToken(this.transport, token)
   }
 
   requestPhoneCode(phone: string): Promise<boolean> {

@@ -11,7 +11,8 @@ $sourcePatterns = @('*.dart', '*.ts', '*.tsx', '*.ets')
 $sourceFiles = foreach ($pattern in $sourcePatterns) {
   Get-ChildItem -LiteralPath $Root -Recurse -File -Filter $pattern |
     Where-Object {
-      $_.FullName -notmatch '[\\/](node_modules(?:\.[^\\/]+)?|build|dist|oh_modules|\.next|\.dart_tool|\.preview|\.hvigor|\.git)[\\/]' -and
+      # generated 除外：l10n 等代码生成物不受手写源码的行数/样式硬限约束。
+      $_.FullName -notmatch '[\\/](node_modules(?:\.[^\\/]+)?|build|dist|oh_modules|\.next|\.dart_tool|\.preview|\.hvigor|\.git|generated)[\\/]' -and
       $_.FullName -notmatch '[\\/]\.claude[\\/]worktrees[\\/]'
     }
 }

@@ -1,52 +1,328 @@
 {
   "string": [
-    { "name": "app_name", "value": "MobileStarter" },
-    { "name": "back", "value": "Back" },
-    { "name": "profile_title", "value": "Profile" },
-    { "name": "sign_in_prompt", "value": "Sign in to sync your data" },
-    { "name": "sign_in_description", "value": "Membership, orders, coupons, and settings sync securely." },
-    { "name": "sign_in_action", "value": "Sign in or create account" },
-    { "name": "profile_edit", "value": "Edit profile" },
-    { "name": "membership", "value": "Membership" },
-    { "name": "statistics", "value": "Usage statistics" },
-    { "name": "orders", "value": "Orders" },
-    { "name": "settings", "value": "Settings" },
-    { "name": "sign_out", "value": "Sign out" },
-    { "name": "account_services", "value": "Account & services" },
-    { "name": "preferences", "value": "App preferences" },
-    { "name": "privacy_storage_support", "value": "Privacy, storage & support" },
-    { "name": "account_security", "value": "Account & security" },
-    { "name": "devices", "value": "Signed-in devices" },
-    { "name": "notification_settings", "value": "Notifications" },
-    { "name": "general", "value": "General" },
-    { "name": "appearance", "value": "Appearance" },
-    { "name": "language", "value": "Language" },
-    { "name": "text_size", "value": "Text size" },
-    { "name": "privacy", "value": "Privacy" },
-    { "name": "permissions", "value": "Permissions" },
-    { "name": "storage", "value": "Storage & cache" },
-    { "name": "help_feedback", "value": "Help & feedback" },
-    { "name": "legal", "value": "Terms & policies" },
-    { "name": "terms_of_service", "value": "Terms of Service" },
-    { "name": "privacy_policy", "value": "Privacy Policy" },
-    { "name": "about", "value": "About" },
-    { "name": "delete_account", "value": "Delete account" },
-    { "name": "theme_system", "value": "Follow system" },
-    { "name": "theme_light", "value": "Light" },
-    { "name": "theme_dark", "value": "Dark" },
-    { "name": "language_chinese", "value": "简体中文" },
-    { "name": "language_english", "value": "English" },
-    { "name": "text_small", "value": "Small" },
-    { "name": "text_standard", "value": "Standard" },
-    { "name": "text_large", "value": "Large" },
-    { "name": "text_extra_large", "value": "Extra large" },
-    { "name": "save_settings", "value": "Save settings" },
-    { "name": "saving", "value": "Saving…" },
-    { "name": "username_readonly", "value": "Username (cannot be changed)" },
-    { "name": "display_name", "value": "Display name" },
-    { "name": "bio", "value": "Bio" },
-    { "name": "choose_avatar", "value": "Choose avatar" },
-    { "name": "avatar_url", "value": "Or paste an avatar URL" },
-    { "name": "save_profile", "value": "Save profile" }
+    {
+      "name": "app_name",
+      "value": "MobileStarter"
+    },
+    {
+      "name": "back",
+      "value": "Back"
+    },
+    {
+      "name": "profile_title",
+      "value": "Profile"
+    },
+    {
+      "name": "sign_in_prompt",
+      "value": "Sign in to sync your data"
+    },
+    {
+      "name": "sign_in_description",
+      "value": "Membership, orders, coupons, and settings sync securely."
+    },
+    {
+      "name": "sign_in_action",
+      "value": "Sign in or create account"
+    },
+    {
+      "name": "profile_edit",
+      "value": "Edit profile"
+    },
+    {
+      "name": "membership",
+      "value": "Membership"
+    },
+    {
+      "name": "statistics",
+      "value": "Usage statistics"
+    },
+    {
+      "name": "orders",
+      "value": "Orders"
+    },
+    {
+      "name": "settings",
+      "value": "Settings"
+    },
+    {
+      "name": "sign_out",
+      "value": "Sign out"
+    },
+    {
+      "name": "account_services",
+      "value": "Account & services"
+    },
+    {
+      "name": "preferences",
+      "value": "App preferences"
+    },
+    {
+      "name": "privacy_storage_support",
+      "value": "Privacy, storage & support"
+    },
+    {
+      "name": "account_security",
+      "value": "Account & security"
+    },
+    {
+      "name": "devices",
+      "value": "Signed-in devices"
+    },
+    {
+      "name": "notification_settings",
+      "value": "Notifications"
+    },
+    {
+      "name": "general",
+      "value": "General"
+    },
+    {
+      "name": "appearance",
+      "value": "Appearance"
+    },
+    {
+      "name": "language",
+      "value": "Language"
+    },
+    {
+      "name": "text_size",
+      "value": "Text size"
+    },
+    {
+      "name": "privacy",
+      "value": "Privacy"
+    },
+    {
+      "name": "permissions",
+      "value": "Permissions"
+    },
+    {
+      "name": "storage",
+      "value": "Storage & cache"
+    },
+    {
+      "name": "help_feedback",
+      "value": "Help & feedback"
+    },
+    {
+      "name": "legal",
+      "value": "Terms & policies"
+    },
+    {
+      "name": "terms_of_service",
+      "value": "Terms of Service"
+    },
+    {
+      "name": "privacy_policy",
+      "value": "Privacy Policy"
+    },
+    {
+      "name": "about",
+      "value": "About"
+    },
+    {
+      "name": "delete_account",
+      "value": "Delete account"
+    },
+    {
+      "name": "theme_system",
+      "value": "Follow system"
+    },
+    {
+      "name": "theme_light",
+      "value": "Light"
+    },
+    {
+      "name": "theme_dark",
+      "value": "Dark"
+    },
+    {
+      "name": "language_chinese",
+      "value": "简体中文"
+    },
+    {
+      "name": "language_english",
+      "value": "English"
+    },
+    {
+      "name": "text_small",
+      "value": "Small"
+    },
+    {
+      "name": "text_standard",
+      "value": "Standard"
+    },
+    {
+      "name": "text_large",
+      "value": "Large"
+    },
+    {
+      "name": "text_extra_large",
+      "value": "Extra large"
+    },
+    {
+      "name": "save_settings",
+      "value": "Save settings"
+    },
+    {
+      "name": "saving",
+      "value": "Saving…"
+    },
+    {
+      "name": "username_readonly",
+      "value": "Username (cannot be changed)"
+    },
+    {
+      "name": "display_name",
+      "value": "Display name"
+    },
+    {
+      "name": "bio",
+      "value": "Bio"
+    },
+    {
+      "name": "choose_avatar",
+      "value": "Choose avatar"
+    },
+    {
+      "name": "avatar_url",
+      "value": "Or paste an avatar URL"
+    },
+    {
+      "name": "save_profile",
+      "value": "Save profile"
+    },
+    {
+      "name": "auth_tagline",
+      "value": "Sync your membership, orders and preferences securely."
+    },
+    {
+      "name": "auth_sign_in_title",
+      "value": "Welcome back"
+    },
+    {
+      "name": "auth_sign_in_action",
+      "value": "Sign in"
+    },
+    {
+      "name": "auth_sign_up_title",
+      "value": "Create account"
+    },
+    {
+      "name": "auth_sign_up_action",
+      "value": "Sign up"
+    },
+    {
+      "name": "auth_phone_title",
+      "value": "Phone sign-in"
+    },
+    {
+      "name": "auth_phone_action",
+      "value": "Send code"
+    },
+    {
+      "name": "auth_forgot_title",
+      "value": "Reset password"
+    },
+    {
+      "name": "auth_forgot_action",
+      "value": "Send code"
+    },
+    {
+      "name": "auth_verify_title",
+      "value": "Verify email"
+    },
+    {
+      "name": "auth_verify_action",
+      "value": "Confirm code"
+    },
+    {
+      "name": "auth_reset_title",
+      "value": "Set new password"
+    },
+    {
+      "name": "auth_reset_action",
+      "value": "Confirm change"
+    },
+    {
+      "name": "auth_processing",
+      "value": "Working…"
+    },
+    {
+      "name": "auth_verify_and_sign_in",
+      "value": "Verify & sign in"
+    },
+    {
+      "name": "auth_forgot_password",
+      "value": "Forgot password"
+    },
+    {
+      "name": "auth_create_account",
+      "value": "Create account"
+    },
+    {
+      "name": "auth_other_methods",
+      "value": "Other sign-in methods"
+    },
+    {
+      "name": "auth_username",
+      "value": "Username"
+    },
+    {
+      "name": "auth_phone",
+      "value": "Phone number"
+    },
+    {
+      "name": "auth_email",
+      "value": "Email"
+    },
+    {
+      "name": "auth_account_placeholder",
+      "value": "Username, email or phone"
+    },
+    {
+      "name": "auth_password",
+      "value": "Password"
+    },
+    {
+      "name": "auth_new_password",
+      "value": "New password"
+    },
+    {
+      "name": "auth_code",
+      "value": "Verification code"
+    },
+    {
+      "name": "auth_code_sent",
+      "value": "Code sent"
+    },
+    {
+      "name": "auth_reset_success",
+      "value": "Password changed"
+    },
+    {
+      "name": "auth_apple_unavailable",
+      "value": "Apple sign-in is not supported on HarmonyOS yet"
+    },
+    {
+      "name": "auth_consent_prefix",
+      "value": "I have read and agree to the"
+    },
+    {
+      "name": "auth_consent_middle",
+      "value": "and"
+    },
+    {
+      "name": "auth_consent_terms",
+      "value": "Terms of Service"
+    },
+    {
+      "name": "auth_consent_privacy",
+      "value": "Privacy Policy"
+    },
+    {
+      "name": "auth_consent_required",
+      "value": "Please read and agree to the Terms and Privacy Policy first"
+    }
   ]
 }

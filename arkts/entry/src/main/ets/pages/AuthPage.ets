@@ -1,6 +1,7 @@
 import { AppRoute } from '../navigation/AppRoute'
 import { AppStore } from '../state/AppStore'
 import { AppButton, PageHeader } from '../design_system/Components'
+import { AppString, appString } from '../localization/AppStrings'
 import { AppColors, AppRadii, AppSpacing } from '../theme/AppTokens'
 import { SocialAuthSheet } from './SocialAuthSheet'
 
@@ -34,7 +35,7 @@ export struct AuthPage {
           .fontWeight(FontWeight.Bold)
           .fontColor(AppColors.text)
           .width('100%')
-        Text('安全同步你的会员、订单与偏好设置。')
+        Text(appString(AppString.AuthTagline, this.store.language))
           .fontColor(AppColors.textSecondary)
           .width('100%')
         if (this.mode !== AuthMode.Verify && this.mode !== AuthMode.Reset) {
@@ -59,8 +60,8 @@ export struct AuthPage {
           (this.mode !== AuthMode.Phone || this.phoneCodeSent)) {
           TextInput({
             placeholder: this.mode === AuthMode.Verify ||
-              this.mode === AuthMode.Phone ? '验证码' :
-              this.mode === AuthMode.Reset ? '新密码' : '密码',
+              this.mode === AuthMode.Phone ? appString(AppString.AuthCode, this.store.language) :
+              this.mode === AuthMode.Reset ? appString(AppString.AuthNewPassword, this.store.language) : appString(AppString.AuthPassword, this.store.language),
             text: this.password
           })
             .height(52)
@@ -75,7 +76,7 @@ export struct AuthPage {
             .border({ width: 1, color: AppColors.borderStrong })
         }
         if (this.mode === AuthMode.SignUp) {
-          TextInput({ placeholder: '用户名', text: this.username })
+          TextInput({ placeholder: appString(AppString.AuthUsername, this.store.language), text: this.username })
             .height(52)
             .backgroundColor(AppColors.surface)
             .borderRadius(AppRadii.control)
@@ -91,18 +92,18 @@ export struct AuthPage {
             .width('100%')
         }
         AppButton({
-          label: this.store.busy ? '正在处理…' : this.action(),
+          label: this.store.busy ? appString(AppString.AuthProcessing, this.store.language) : this.action(),
           onTap: () => this.submit()
         })
         if (this.mode === AuthMode.SignIn) {
-          Text('其他登录方式')
+          Text(appString(AppString.AuthOtherMethods, this.store.language))
             .fontSize(12)
             .fontColor(AppColors.textSecondary)
           AuthProviderRow({ store: this.store, onSocial: (provider) => this.beginSocial(provider) })
-          Text('忘记密码')
+          Text(appString(AppString.AuthForgotPassword, this.store.language))
             .fontColor(AppColors.brand)
             .onClick(() => this.store.navigate(AppRoute.ForgotPassword))
-          Text('创建账号')
+          Text(appString(AppString.AuthCreateAccount, this.store.language))
             .fontColor(AppColors.brand)
             .onClick(() => this.store.navigate(AppRoute.SignUp))
         }
@@ -111,14 +112,14 @@ export struct AuthPage {
             Checkbox()
               .select(this.consentAgreed)
               .onChange((value: boolean) => { this.consentAgreed = value })
-            Text('我已阅读并同意').fontSize(12).fontColor(AppColors.textSecondary)
+            Text(appString(AppString.AuthConsentPrefix, this.store.language)).fontSize(12).fontColor(AppColors.textSecondary)
               .onClick(() => { this.consentAgreed = !this.consentAgreed })
-            Text('用户协议')
+            Text(appString(AppString.AuthConsentTerms, this.store.language))
               .fontSize(12).fontColor(AppColors.brand)
               .onClick(() => this.store.navigate(AppRoute.TermsOfService))
-            Text('与').fontSize(12).fontColor(AppColors.textSecondary)
+            Text(appString(AppString.AuthConsentMiddle, this.store.language)).fontSize(12).fontColor(AppColors.textSecondary)
               .onClick(() => { this.consentAgreed = !this.consentAgreed })
-            Text('隐私政策')
+            Text(appString(AppString.AuthConsentPrivacy, this.store.language))
               .fontSize(12).fontColor(AppColors.brand)
               .onClick(() => this.store.navigate(AppRoute.PrivacyPolicy))
           }
@@ -149,7 +150,7 @@ export struct AuthPage {
       return
     }
     if (provider === 'apple') {
-      this.store.showToast('HarmonyOS 暂不支持 Apple 登录', true)
+      this.store.showToast(appString(AppString.AuthAppleUnavailable, this.store.language), true)
       return
     }
     this.socialProvider = provider
@@ -172,7 +173,7 @@ export struct AuthPage {
         return
       case AuthMode.Reset:
         if (await this.store.resetPassword(this.password)) {
-          this.store.showToast('密码修改成功')
+          this.store.showToast(appString(AppString.AuthResetSuccess, this.store.language))
           this.store.replaceAll(AppRoute.SignIn)
         }
         return
@@ -180,7 +181,7 @@ export struct AuthPage {
         if (!this.phoneCodeSent) {
           if (await this.store.requestPhoneCode(this.email)) {
             this.phoneCodeSent = true
-            this.store.showToast('验证码已发送')
+            this.store.showToast(appString(AppString.AuthCodeSent, this.store.language))
           }
           return
         }
@@ -206,7 +207,7 @@ export struct AuthPage {
 
   private ensureConsent(): boolean {
     if (this.consentAgreed) return true
-    this.store.showToast('请先阅读并同意用户协议与隐私政策', true)
+    this.store.showToast(appString(AppString.AuthConsentRequired, this.store.language), true)
     return false
   }
 
@@ -216,8 +217,8 @@ export struct AuthPage {
 
   private accountPlaceholder(): string {
     if (this.mode === AuthMode.Phone) return '+86 13800000000'
-    if (this.mode === AuthMode.SignIn) return '用户名、邮箱或手机号'
-    return '邮箱'
+    if (this.mode === AuthMode.SignIn) return appString(AppString.AuthAccountPlaceholder, this.store.language)
+    return appString(AppString.AuthEmail, this.store.language)
   }
 
   private termsRevision(): string {
@@ -230,23 +231,23 @@ export struct AuthPage {
 
   private title(): string {
     switch (this.mode) {
-      case AuthMode.SignIn: return '欢迎回来'
-      case AuthMode.SignUp: return '创建账号'
-      case AuthMode.Phone: return '手机号登录'
-      case AuthMode.Forgot: return '找回密码'
-      case AuthMode.Verify: return '验证邮箱'
-      case AuthMode.Reset: return '设置新密码'
+      case AuthMode.SignIn: return appString(AppString.AuthSignInTitle, this.store.language)
+      case AuthMode.SignUp: return appString(AppString.AuthSignUpTitle, this.store.language)
+      case AuthMode.Phone: return appString(AppString.AuthPhoneTitle, this.store.language)
+      case AuthMode.Forgot: return appString(AppString.AuthForgotTitle, this.store.language)
+      case AuthMode.Verify: return appString(AppString.AuthVerifyTitle, this.store.language)
+      case AuthMode.Reset: return appString(AppString.AuthResetTitle, this.store.language)
     }
   }
 
   private action(): string {
     switch (this.mode) {
-      case AuthMode.SignIn: return '登录'
-      case AuthMode.SignUp: return '注册'
-      case AuthMode.Phone: return this.phoneCodeSent ? '验证并登录' : '发送验证码'
-      case AuthMode.Forgot: return '发送验证码'
-      case AuthMode.Verify: return '确认验证码'
-      case AuthMode.Reset: return '确认修改'
+      case AuthMode.SignIn: return appString(AppString.AuthSignInAction, this.store.language)
+      case AuthMode.SignUp: return appString(AppString.AuthSignUpAction, this.store.language)
+      case AuthMode.Phone: return this.phoneCodeSent ? appString(AppString.AuthVerifyAndSignIn, this.store.language) : appString(AppString.AuthPhoneAction, this.store.language)
+      case AuthMode.Forgot: return appString(AppString.AuthForgotAction, this.store.language)
+      case AuthMode.Verify: return appString(AppString.AuthVerifyAction, this.store.language)
+      case AuthMode.Reset: return appString(AppString.AuthResetAction, this.store.language)
     }
   }
 }
@@ -280,7 +281,7 @@ struct AuthProviderRow {
         onTap: () => this.onSocial('github')
       })
       AuthProviderButton({
-        label: '手机号',
+        label: appString(AppString.AuthPhone, this.store.language),
         icon: $r('app.media.phone'),
         iconStyle: AuthIconStyle.Monochrome,
         isEnabled: this.store.authProviders['phone'] === true,

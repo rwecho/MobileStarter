@@ -294,6 +294,21 @@ final class AppRepository {
     body: {'password': password, 'confirmation': 'DELETE'},
   );
 
+  Future<bool> registerPushToken(String token) async {
+    final data = await _request(
+      '/api/v1/push/register',
+      method: 'POST',
+      body: {'token': token},
+    );
+    return data['registered'] == true;
+  }
+
+  Future<void> unregisterPushToken(String token) => _request(
+    '/api/v1/push/unregister',
+    method: 'POST',
+    body: {'token': token},
+  );
+
   Future<void> signOut() async {
     try {
       await _request('/api/v1/auth/sign-out', method: 'POST');

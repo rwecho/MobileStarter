@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../l10n/generated/app_localizations.dart';
 import '../navigation/app_route.dart';
 import '../navigation/app_route_paths.dart';
 import '../theme/app_tokens.dart';
@@ -13,10 +14,11 @@ class AuthConsent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     // 点普通文字（"我已阅读并同意"/"与"）切换勾选；点链接（用户协议/隐私政策）跳转。
     return Semantics(
       container: true,
-      label: '登录与注册协议确认',
+      label: l10n.authConsentLabel,
       child: Center(
         child: Wrap(
           alignment: WrapAlignment.center,
@@ -28,20 +30,20 @@ class AuthConsent extends StatelessWidget {
             ),
             InkWell(
               onTap: () => onChanged(!value),
-              child: const Padding(
-                padding: EdgeInsets.symmetric(vertical: AppSpacing.x2),
-                child: Text('我已阅读并同意'),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: AppSpacing.x2),
+                child: Text(l10n.authConsentPrefix),
               ),
             ),
-            const _LegalLink(label: '用户协议', route: AppRoute.termsOfService),
+            _LegalLink(label: l10n.authTerms, route: AppRoute.termsOfService),
             InkWell(
               onTap: () => onChanged(!value),
-              child: const Padding(
-                padding: EdgeInsets.symmetric(vertical: AppSpacing.x2),
-                child: Text('与'),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: AppSpacing.x2),
+                child: Text(l10n.authConsentMiddle),
               ),
             ),
-            const _LegalLink(label: '隐私政策', route: AppRoute.privacyPolicy),
+            _LegalLink(label: l10n.authPrivacy, route: AppRoute.privacyPolicy),
           ],
         ),
       ),

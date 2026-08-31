@@ -109,6 +109,8 @@ export const apiClient = {
   }),
   signOut: () => request<{ signedOut: boolean }>('/api/v1/auth/sign-out', { method: 'POST' }),
   signOutAll: () => request<{ signedOut: boolean }>('/api/v1/auth/sign-out-all', { method: 'POST' }),
+  registerPushToken: (token: string) => requestAuth('/api/v1/push/register', { token }),
+  unregisterPushToken: (token: string) => requestAuth('/api/v1/push/unregister', { token }),
   requestPhoneCode: (phone: string) => request<{
     accepted: boolean;
     resendAfterSeconds: number;

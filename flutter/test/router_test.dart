@@ -5,6 +5,7 @@ import 'package:mobilestarter_flutter/app/app_scope.dart';
 import 'package:mobilestarter_flutter/navigation/app_route.dart';
 import 'package:mobilestarter_flutter/navigation/app_route_paths.dart';
 import 'package:mobilestarter_flutter/navigation/app_router_config.dart';
+import 'package:mobilestarter_flutter/l10n/generated/app_localizations.dart';
 import 'package:mobilestarter_flutter/telemetry/telemetry.dart';
 
 void main() {
@@ -30,7 +31,16 @@ void main() {
     addTearDown(controller.dispose);
     final router = buildAppRouter(controller);
     await tester.pumpWidget(
-      AppScope(controller: controller, child: MaterialApp.router(routerConfig: router)),
+      AppScope(
+        controller: controller,
+        // 组件文案走 gen_l10n；测试锁 zh-CN 断言中文 label。
+        child: MaterialApp.router(
+          routerConfig: router,
+          locale: const Locale('zh', 'CN'),
+          supportedLocales: AppLocalizations.supportedLocales,
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+        ),
+      ),
     );
     router.go(pathFor(AppRoute.profileEdit));
     await tester.pumpAndSettle();
@@ -51,7 +61,16 @@ void main() {
     addTearDown(controller.dispose);
     final router = buildAppRouter(controller);
     await tester.pumpWidget(
-      AppScope(controller: controller, child: MaterialApp.router(routerConfig: router)),
+      AppScope(
+        controller: controller,
+        // 组件文案走 gen_l10n；测试锁 zh-CN 断言中文 label。
+        child: MaterialApp.router(
+          routerConfig: router,
+          locale: const Locale('zh', 'CN'),
+          supportedLocales: AppLocalizations.supportedLocales,
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+        ),
+      ),
     );
     router.go(pathFor(AppRoute.legal));
     await tester.pumpAndSettle();

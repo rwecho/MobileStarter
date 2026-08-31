@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mobilestarter_flutter/app/app_repository.dart';
 import 'package:mobilestarter_flutter/app/app_scope.dart';
+import 'package:mobilestarter_flutter/l10n/generated/app_localizations.dart';
 import 'package:mobilestarter_flutter/navigation/app_route.dart';
 import 'package:mobilestarter_flutter/navigation/app_route_paths.dart';
 import 'package:mobilestarter_flutter/screens/auth_screens.dart';
@@ -85,7 +86,12 @@ Future<void> _pumpAuth(
   await tester.pumpWidget(
     AppScope(
       controller: controller,
-      child: MaterialApp.router(routerConfig: router),
+      child: MaterialApp.router(
+        routerConfig: router,
+        locale: const Locale('zh', 'CN'),
+        supportedLocales: AppLocalizations.supportedLocales,
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+      ),
     ),
   );
   await tester.pump();

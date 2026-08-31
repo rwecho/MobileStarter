@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import '../telemetry/telemetry.dart';
 
 import 'package:flutter/foundation.dart';
 
 import '../auth/social_auth.dart';
 import '../navigation/app_route.dart';
+import '../push/push_service.dart';
 import '../state/async_state.dart';
 import 'app_repository.dart';
 import 'runtime_models.dart';
@@ -242,6 +245,12 @@ final class AppController extends ChangeNotifier {
     final result = await _capture(operation);
     if (result == null) return false;
     _user = result.user;
+    // 推送基线：登录成功后注册令牌；失败静默降级（PushService 内上报）。
+    unawaited(PushService.start(
+      register: _repository.registerPushToken,
+      unregister: _repository.unregisterPushToken,
+      onForeground: queuePushMessage,
+    ));
     notifyListeners();
     return true;
   }
@@ -277,6 +286,7 @@ final class AppController extends ChangeNotifier {
 
   Future<void> _clearSession() async {
     _user = null;
+    unawaited(PushService.stop());
     sessions = const [];
     notifications = const [];
     orders = const [];
@@ -291,6 +301,19 @@ final class AppController extends ChangeNotifier {
     if (state is Failure<void>) return state.message;
     if (state is Offline<void>) return '网络不可用，请检查连接后重试';
     return null;
+  }
+
+  final List<String> _pushMessages = <String>[];
+
+  /// 推送前台消息入队；根组件在帧回调里消费后以 toast 呈现。
+  void queuePushMessage(String message) {
+    _pushMessages.add(message);
+    notifyListeners();
+  }
+
+  String? consumePushMessage() {
+    if (_pushMessages.isEmpty) return null;
+    return _pushMessages.removeAt(0);
   }
 
   @override

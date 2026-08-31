@@ -69,8 +69,8 @@ function Assert-SourceContains {
   }
 }
 
-Assert-SourceContains 'flutter/lib/app/app_controller_navigation.dart' `
-  '_pendingRoute\s*\?\?\s*AppRoute\.home' `
+Assert-SourceContains 'flutter/lib/screens/auth_screens.dart' `
+  'consumeAuthRedirectTarget\(\)\s*\?\?\s*AppRoute\.home' `
   'ordinary authentication must land on home'
 Assert-SourceContains 'react-native/src/state/AppStore.tsx' `
   "pendingRoute\s*\?\?\s*'home'" `
@@ -89,7 +89,10 @@ Assert-SourceContains 'server/src/server/payment-providers.ts' `
   'production must reject mock payment'
 
 if ($errors.Count -gt 0) {
-  $errors | ForEach-Object { Write-Error $_ }
+  # 一次性列出全部违规。不能用 Write-Error 逐条报：ErrorActionPreference=Stop
+  # 下首条即中止脚本，后续违规全部被藏住（曾致 7 个超限文件在 CI 潜伏两周）。
+  $errors | ForEach-Object { Write-Host "::error::$_" }
+  Write-Host "Architecture checks failed with $($errors.Count) violation(s)."
   exit 1
 }
 

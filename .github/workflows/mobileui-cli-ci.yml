@@ -26,6 +26,7 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
+          flutter-version: "3.44.6"
           cache: true
       - run: dart format --output=none --set-exit-if-changed tool/mobileui
       - run: dart analyze tool/mobileui

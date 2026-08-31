@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'helpers.dart';
+
 import '../lib/create_command.dart';
 import '../lib/doctor_command.dart';
 import '../lib/feature_command.dart';
@@ -11,7 +13,7 @@ Future<void> main() async {
   final templateRoot = Directory.current.parent.parent;
   final sandbox = Directory.systemTemp.createTempSync('mobileui-cli-test-');
   try {
-    _expect(TemplateCommand(templateRoot).run(['list']) == 0, 'list templates');
+    expectTrue(TemplateCommand(templateRoot).run(['list']) == 0, 'list templates');
     for (final profile in const [
       'flutter',
       'react-native',
@@ -49,25 +51,25 @@ Future<void> _verifyProfile(
     '--app-id',
     'example-${profile.replaceAll('-', '')}',
   ]);
-  _expect(exit == 0, '$profile create must succeed');
-  final project = Directory(_join(sandbox.path, name));
-  _expect(
+  expectTrue(exit == 0, '$profile create must succeed');
+  final project = Directory(joinPath(sandbox.path, name));
+  expectTrue(
     DoctorCommand().run(['--project', project.path]) == 0,
     '$profile doctor must succeed',
   );
-  _expect(
+  expectTrue(
     FeatureCommand().run(['add', 'achievements', '--project', project.path]) ==
         0,
     '$profile feature add must succeed',
   );
-  _expect(
+  expectTrue(
     UpdateCommand().run(['--check', '--project', project.path]) == 0,
     'local source update check must be informational',
   );
   final manifest = _manifest(project);
   final profiles = (manifest['profiles'] as List<Object?>).whereType<String>();
   final expectedCount = profile == 'all' ? 3 : 1;
-  _expect(profiles.length == expectedCount, '$profile manifest profile count');
+  expectTrue(profiles.length == expectedCount, '$profile manifest profile count');
   _verifyBehavioralBaseline(project, profiles);
 }
 
@@ -89,30 +91,30 @@ Future<void> _verifyCombinedProfiles(
     '--app-id',
     'example-combined',
   ]);
-  _expect(exit == 0, 'combined create must succeed');
-  final project = Directory(_join(sandbox.path, name));
-  _expect(
-    Directory(_join(project.path, 'server', 'src', 'app')).existsSync(),
+  expectTrue(exit == 0, 'combined create must succeed');
+  final project = Directory(joinPath(sandbox.path, name));
+  expectTrue(
+    Directory(joinPath(project.path, 'server', 'src', 'app')).existsSync(),
     'combined create must copy server source tree',
   );
-  _expect(
+  expectTrue(
     File(
-      _join(project.path, '.github', 'workflows', 'server-ci.yml'),
+      joinPath(project.path, '.github', 'workflows', 'server-ci.yml'),
     ).existsSync(),
     'combined create must copy server CI workflow',
   );
   final publishWorkflow = File(
-    _join(project.path, '.github', 'workflows', 'server-publish.yml'),
+    joinPath(project.path, '.github', 'workflows', 'server-publish.yml'),
   );
-  _expect(
+  expectTrue(
     publishWorkflow.existsSync(),
     'combined create must copy publish workflow',
   );
-  _expect(
+  expectTrue(
     !publishWorkflow.readAsStringSync().contains('zhongbei-auth'),
     'server publish image must not keep the template image name',
   );
-  _expect(
+  expectTrue(
     publishWorkflow.readAsStringSync().contains('/app_combined'),
     'server publish image must follow the generated package name',
   );
@@ -120,54 +122,54 @@ Future<void> _verifyCombinedProfiles(
     'server/src/app/.well-known/apple-app-site-association/route.ts',
     'server/src/app/.well-known/assetlinks.json/route.ts',
   ]) {
-    _expectFileNotContains(
+    expectFileNotContains(
       project,
       route,
       'com.mobileui.mobilestarter',
       'deep-link route must not keep the template app id ($route)',
     );
-    _expectFileNotContains(
+    expectFileNotContains(
       project,
       route,
       'com.mobileui.mobileui_flutter',
       'deep-link route must not keep the template package ($route)',
     );
-    _expectFileContains(
+    expectFileContains(
       project,
       route,
       'example-combined',
       'deep-link route must follow the product app id ($route)',
     );
   }
-  _expect(
-    !Directory(_join(project.path, 'server', 'node_modules')).existsSync(),
+  expectTrue(
+    !Directory(joinPath(project.path, 'server', 'node_modules')).existsSync(),
     'server node_modules must not be copied',
   );
-  _expect(
+  expectTrue(
     DoctorCommand().run(['--project', project.path]) == 0,
     'combined doctor must succeed',
   );
-  _expect(
+  expectTrue(
     FeatureCommand().run(['add', 'achievements', '--project', project.path]) ==
         0,
     'combined feature add must cover every profile',
   );
-  _expect(
+  expectTrue(
     Directory(
-      _join(project.path, 'react-native', 'src', 'features', 'achievements'),
+      joinPath(project.path, 'react-native', 'src', 'features', 'achievements'),
     ).listSync().isNotEmpty,
     'combined feature must land in react-native',
   );
-  _expect(
+  expectTrue(
     Directory(
-      _join(project.path, 'server', 'src', 'features', 'achievements'),
+      joinPath(project.path, 'server', 'src', 'features', 'achievements'),
     ).listSync().isNotEmpty,
     'combined feature must land in server',
   );
   final manifest = _manifest(project);
   final profiles = (manifest['profiles'] as List<Object?>).whereType<String>();
-  _expect(profiles.length == 2, 'combined manifest profile count');
-  _expect(
+  expectTrue(profiles.length == 2, 'combined manifest profile count');
+  expectTrue(
     (manifest['templateSource'] as Map<String, Object?>)['commit'] != null,
     'combined manifest must record template commit',
   );
@@ -175,7 +177,7 @@ Future<void> _verifyCombinedProfiles(
 
 void _verifyBehavioralBaseline(Directory project, Iterable<String> profiles) {
   if (profiles.contains('flutter')) {
-    _expectFileContains(
+    expectFileContains(
       project,
       'flutter/lib/navigation/app_router_config.dart',
       'pathFor(AppRoute.home)',
@@ -183,13 +185,13 @@ void _verifyBehavioralBaseline(Directory project, Iterable<String> profiles) {
     );
   }
   if (profiles.contains('react-native')) {
-    _expectFileContains(
+    expectFileContains(
       project,
       'react-native/src/state/AppStore.tsx',
       "pendingRoute ?? 'home'",
       'React Native ordinary login must land on home',
     );
-    _expectFileNotContains(
+    expectFileNotContains(
       project,
       '.github/workflows/react-native-publish.yml',
       'com.mobileui.mobilestarter',
@@ -197,7 +199,7 @@ void _verifyBehavioralBaseline(Directory project, Iterable<String> profiles) {
     );
   }
   if (profiles.contains('arkts')) {
-    _expectFileContains(
+    expectFileContains(
       project,
       'arkts/entry/src/main/ets/state/AppStore.ets',
       'pendingRoute ?? AppRoute.Home',
@@ -206,40 +208,18 @@ void _verifyBehavioralBaseline(Directory project, Iterable<String> profiles) {
   }
 }
 
-void _expectFileContains(
-  Directory project,
-  String relativePath,
-  String expected,
-  String message,
-) {
-  final path = relativePath.split('/');
-  final file = File([project.path, ...path].join(Platform.pathSeparator));
-  _expect(file.readAsStringSync().contains(expected), message);
-}
-
-void _expectFileNotContains(
-  Directory project,
-  String relativePath,
-  String forbidden,
-  String message,
-) {
-  final path = relativePath.split('/');
-  final file = File([project.path, ...path].join(Platform.pathSeparator));
-  _expect(!file.readAsStringSync().contains(forbidden), message);
-}
-
 Future<void> _verifyGitHubSource(
   Directory templateRoot,
   Directory sandbox,
 ) async {
-  final remote = Directory(_join(sandbox.path, 'template-remote'));
-  _copyFixture(templateRoot, remote);
-  _git(remote, ['init', '--quiet']);
-  _git(remote, ['config', 'user.email', 'mobileui@example.invalid']);
-  _git(remote, ['config', 'user.name', 'MobileUI Test']);
-  _git(remote, ['add', '.']);
-  _git(remote, ['commit', '--quiet', '-m', 'template']);
-  _git(remote, ['branch', '-M', 'main']);
+  final remote = Directory(joinPath(sandbox.path, 'template-remote'));
+  copyFixture(templateRoot, remote);
+  gitRun(remote, ['init', '--quiet']);
+  gitRun(remote, ['config', 'user.email', 'mobileui@example.invalid']);
+  gitRun(remote, ['config', 'user.name', 'MobileUI Test']);
+  gitRun(remote, ['add', '.']);
+  gitRun(remote, ['commit', '--quiet', '-m', 'template']);
+  gitRun(remote, ['branch', '-M', 'main']);
 
   final exit = await CreateCommand(templateRoot).run([
     'app-remote',
@@ -260,16 +240,16 @@ Future<void> _verifyGitHubSource(
     '--ref',
     'main',
   ]);
-  _expect(exit == 0, 'remote create must succeed');
-  final project = Directory(_join(sandbox.path, 'app-remote'));
-  _expect(
+  expectTrue(exit == 0, 'remote create must succeed');
+  final project = Directory(joinPath(sandbox.path, 'app-remote'));
+  expectTrue(
     UpdateCommand().run(['--check', '--project', project.path]) == 0,
     'remote project must initially be current',
   );
-  File(_join(remote.path, 'revision.txt')).writeAsStringSync('next\n');
-  _git(remote, ['add', '.']);
-  _git(remote, ['commit', '--quiet', '-m', 'next']);
-  _expect(
+  File(joinPath(remote.path, 'revision.txt')).writeAsStringSync('next\n');
+  gitRun(remote, ['add', '.']);
+  gitRun(remote, ['commit', '--quiet', '-m', 'next']);
+  expectTrue(
     UpdateCommand().run(['--check', '--project', project.path]) == 2,
     'remote update must be detected',
   );
@@ -295,83 +275,11 @@ Future<void> _verifyNonEmptyProtection(
   } catch (_) {
     protected = true;
   }
-  _expect(protected, 'create must protect a non-empty target');
+  expectTrue(protected, 'create must protect a non-empty target');
 }
 
 Map<String, Object?> _manifest(Directory project) {
-  final file = File(_join(project.path, '.mobileui', 'template.json'));
+  final file = File(joinPath(project.path, '.mobileui', 'template.json'));
   return jsonDecode(file.readAsStringSync()) as Map<String, Object?>;
 }
 
-void _copyFixture(Directory source, Directory target) {
-  target.createSync(recursive: true);
-  for (final name in const ['profiles', 'flutter', 'react-native', 'arkts']) {
-    _copyDirectory(
-      Directory(_join(source.path, name)),
-      Directory(_join(target.path, name)),
-    );
-  }
-  final workflows = Directory(_join(source.path, '.github', 'workflows'));
-  _copyDirectory(
-    workflows,
-    Directory(_join(target.path, '.github', 'workflows')),
-  );
-}
-
-void _copyDirectory(Directory source, Directory target) {
-  target.createSync(recursive: true);
-  for (final entity in source.listSync()) {
-    final name = entity.uri.pathSegments.where((part) => part.isNotEmpty).last;
-    if ({
-      '.git',
-      '.dart_tool',
-      'node_modules',
-      'node_modules.incomplete-20260729',
-      'build',
-      '.hvigor',
-      '.idea',
-      '.expo',
-      'dist',
-      'dist-final',
-      'dist-verify',
-      'Pods',
-    }.contains(name))
-      continue;
-    if (name.contains('.incomplete-')) continue;
-    final destination = _join(target.path, name);
-    if (entity is Directory) {
-      _copyDirectory(entity, Directory(destination));
-    } else if (entity is File && !name.endsWith('.log')) {
-      entity.copySync(destination);
-    }
-  }
-}
-
-void _git(Directory directory, List<String> arguments) {
-  final result = Process.runSync(
-    'git',
-    arguments,
-    workingDirectory: directory.path,
-  );
-  if (result.exitCode != 0) throw StateError(result.stderr.toString());
-}
-
-String _join(
-  String first,
-  String second, [
-  String? third,
-  String? fourth,
-  String? fifth,
-]) {
-  return [
-    first,
-    second,
-    third,
-    fourth,
-    fifth,
-  ].whereType<String>().join(Platform.pathSeparator);
-}
-
-void _expect(bool condition, String message) {
-  if (!condition) throw StateError(message);
-}

@@ -23,6 +23,12 @@ C:\f3445\bin\dart.bat run tool/mobileui/bin/mobileui.dart doctor `
 当前正式支持 `flutter` Profile。完整说明见
 [`docs/MOBILEUI_CLI.md`](docs/MOBILEUI_CLI.md)。
 
+生成之后换品牌（主题配色、闪屏内容、桌面图标、应用显示名、隐私政策等
+法务文档）按
+**[`docs/APP_CUSTOMIZATION_GUIDE.md`](docs/APP_CUSTOMIZATION_GUIDE.md)** 的
+三层模型（服务端运营配置 / 设计 token / 原生资产）操作，内含可配置内容
+总表、CLI 分工边界、密钥模型说明、落地 Checklist 与验收清单。
+
 MobileStarter 是一套可继承、可换肤、可替换业务模块的跨端移动应用起步项目，包含：
 
 - `server/` — Next.js App Router 后端与运营控制台

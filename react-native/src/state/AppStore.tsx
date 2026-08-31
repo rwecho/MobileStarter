@@ -22,10 +22,9 @@ import { DataActions, useDataActions } from './useDataActions';
 import {
   Credentials, SocialCredentials, useAccountActions,
 } from './useAccountActions';
-import { ConfirmState, ToastState, useFeedbackState } from './useAppShellState';
+import { ConfirmState, useFeedbackState } from './useAppShellState';
 import { navigationRef, navigateRoute } from '../navigation/navigationRef';
 type ToastTone = 'success' | 'info' | 'error';
-export type { ToastState } from './useAppShellState';
 
 // 购买流程的当前状态。success/failed 携带服务器确认后的订单（真实 order.status）。
 export type PurchaseState =
@@ -54,7 +53,6 @@ type AppContextValue = Readonly<{
   setPurchaseState: (state: PurchaseState) => void;
   pendingPlanId: string | null;
   setPendingPlanId: (planId: string | null) => void;
-  toast: ToastState | null;
   confirm: ConfirmState | null;
   lastAuthError: string | null;
   clearAuthError: () => void;

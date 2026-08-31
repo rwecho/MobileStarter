@@ -4,6 +4,7 @@ import '../app/app_scope.dart';
 import '../app/runtime_models.dart';
 import '../design_system/app_icon.dart';
 import '../design_system/components.dart';
+import '../design_system/feedback.dart';
 import '../state/async_state.dart';
 import '../theme/app_tokens.dart';
 
@@ -89,9 +90,7 @@ class _SessionsScreenState extends State<SessionsScreen> {
       return;
     }
     final message = controller.consumeError() ?? '撤销失败，请重试';
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+    showAppToast(context, message, error: true);
   }
 }
 

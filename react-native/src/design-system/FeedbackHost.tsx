@@ -1,31 +1,35 @@
 import React from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import Toast, { ToastConfig } from 'react-native-toast-message';
 import { useApp } from '../state/AppStore';
 import { usePreferences } from '../preferences/PreferencesProvider';
-import { colors, radii, spacing } from '../theme/tokens';
+import { colors, radii, spacing, ThemeColors } from '../theme/tokens';
 import { styles } from '../theme/styles';
 import { AppIcon } from './AppIcon';
 import { AppButton } from './components';
 
+// react-native-toast-message 的自定义卡片：沿用设计系统 token（表面色 + 描边 + 语义图标），
+// 由 FeedbackHost 全局唯一挂载，位置统一为顶部（与 ArkTS/Flutter 端一致）。
+function toastConfigFor(palette: ThemeColors): ToastConfig {
+  const card = (text: string, icon: 'alert' | 'check', tone: string) => (
+    <View style={[toastStyles.card, { backgroundColor: palette.surface, borderColor: palette.border }]}>
+      <AppIcon name={icon} color={tone} size={20} />
+      <Text style={styles.body}>{text}</Text>
+    </View>
+  );
+  return {
+    success: ({ text1 }) => card(text1 ?? '', 'check', colors.success),
+    info: ({ text1 }) => card(text1 ?? '', 'check', colors.info),
+    error: ({ text1 }) => card(text1 ?? '', 'alert', colors.error),
+  };
+}
+
 export function FeedbackHost() {
-  const { toast, confirm, closeConfirm } = useApp();
+  const { confirm, closeConfirm } = useApp();
   const { palette } = usePreferences();
-  const toastColor = toast?.tone === 'success'
-    ? colors.success
-    : toast?.tone === 'error'
-      ? colors.error
-      : colors.info;
   return (
     <>
-      {toast ? (
-        <View
-          accessibilityLiveRegion="polite"
-          style={[feedbackStyles.toast, { backgroundColor: palette.surface, borderColor: palette.border }]}
-        >
-          <AppIcon name={toast.tone === 'error' ? 'alert' : 'check'} color={toastColor} size={20} />
-          <Text style={styles.body}>{toast.message}</Text>
-        </View>
-      ) : null}
+      <Toast config={toastConfigFor(palette)} topOffset={spacing.x3} />
       <Modal visible={Boolean(confirm)} transparent animationType="fade">
         <Pressable style={feedbackStyles.scrim} onPress={closeConfirm}>
           <Pressable
@@ -59,22 +63,21 @@ export function FeedbackHost() {
   );
 }
 
-const feedbackStyles = StyleSheet.create({
-  toast: {
-    position: 'absolute',
-    left: spacing.x4,
-    right: spacing.x4,
-    bottom: spacing.x6,
+const toastStyles = StyleSheet.create({
+  card: {
+    alignSelf: 'stretch',
     minHeight: 52,
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.x3,
+    marginHorizontal: spacing.x4,
     borderRadius: radii.control,
     borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
     paddingHorizontal: spacing.x4,
   },
+});
+
+const feedbackStyles = StyleSheet.create({
   scrim: {
     flex: 1,
     alignItems: 'center',

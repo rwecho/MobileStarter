@@ -1,8 +1,8 @@
 import { useCallback, useMemo, useState } from 'react';
+import Toast from 'react-native-toast-message';
 import { AppRoute, RouteEntry } from '../navigation/routes';
 
 type ToastTone = 'success' | 'info' | 'error';
-export type ToastState = Readonly<{ id: number; message: string; tone: ToastTone }>;
 export type ConfirmState = Readonly<{
   title: string;
   message: string;
@@ -58,18 +58,15 @@ export function useNavigationState() {
 }
 
 export function useFeedbackState() {
-  const [toast, setToast] = useState<ToastState | null>(null);
   const [confirm, setConfirm] = useState<ConfirmState | null>(null);
   const showToast = useCallback((message: string, tone: ToastTone = 'info') => {
-    const id = Date.now();
-    setToast({ id, message, tone });
-    setTimeout(() => setToast((value) => value?.id === id ? null : value), 2400);
+    // 展示与动画交给 react-native-toast-message（顶部、全局唯一挂载于 FeedbackHost）。
+    Toast.show({ type: tone, text1: message, position: 'top', visibilityTime: 2400 });
   }, []);
   return useMemo(() => ({
-    toast,
     confirm,
     showToast,
     showConfirm: setConfirm,
     closeConfirm: () => setConfirm(null),
-  }), [confirm, showToast, toast]);
+  }), [confirm, showToast]);
 }

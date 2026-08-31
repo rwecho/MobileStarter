@@ -115,12 +115,6 @@ abstract final class AppTheme {
         foregroundColor: text,
         surfaceTintColor: Colors.transparent,
       ),
-      snackBarTheme: SnackBarThemeData(
-        backgroundColor: surfaceMuted,
-        contentTextStyle: TextStyle(color: text),
-        actionTextColor: isDark ? const Color(0xFFFFA0A0) : AppColors.brand,
-        behavior: SnackBarBehavior.floating,
-      ),
       textTheme: TextTheme(
         headlineMedium: TextStyle(
           color: text,

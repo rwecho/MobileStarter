@@ -8,18 +8,26 @@ import { apiClient } from './ApiClient'
 const urlCache: Record<string, string> = {}
 const inflight: Record<string, Promise<string | null> | string> = {}
 
-export async function resolveAssetUrl(objectKey: string): Promise<string | null> {
-  const cached = urlCache[objectKey]
+export async function resolveAssetUrl(rawValue: string): Promise<string | null> {
+  // 历史脏数据兼容：旧版本客户端把 opaque `s3://bucket/key` 直接存进了
+  // avatarUrl，剥掉 scheme 与 bucket 段还原 objectKey 再换取。
+  let objectKey = rawValue
+  if (objectKey.startsWith('s3://')) {
+    objectKey = objectKey.substring(5)
+    const slash = objectKey.indexOf('/')
+    if (slash > 0) objectKey = objectKey.substring(slash + 1)
+  }
+  const cached = urlCache[rawValue]
   if (cached !== undefined && cached.length > 0) return cached
   // 同 key 并发请求合并为一次（ArkTS 无 delete：完成后置空串即失效）。
-  const pending = inflight[objectKey]
+  const pending = inflight[rawValue]
   if (pending !== undefined && pending !== null) return pending
   const task = apiClient.resolveObjectUrl(objectKey).then((url: string | null): string | null => {
-    inflight[objectKey] = ''
-    if (url !== null) urlCache[objectKey] = url
+    inflight[rawValue] = ''
+    if (url !== null) urlCache[rawValue] = url
     return url
   })
-  inflight[objectKey] = task
+  inflight[rawValue] = task
   return task
 }
 

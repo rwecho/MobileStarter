@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { requireAuth } from '@/server/auth';
 import { ApiError, handleError, ok } from '@/server/http';
-import { resolveObjectUrl } from '@/server/storage';
+import { ownsObjectKey, resolveObjectUrl } from '@/server/storage';
 
 // Resolves a stored object reference (objectKey) into an access URL — a direct
 // public/CDN URL if S3_PUBLIC_BASE is configured, otherwise a short-lived
@@ -19,8 +19,7 @@ export async function GET(request: NextRequest) {
     if (!objectKey) {
       return handleError(new Error('缺少 key 参数'));
     }
-    const appPrefix = `${user.app_id.toLowerCase()}/`;
-    if (!objectKey.toLowerCase().startsWith(appPrefix)) {
+    if (!ownsObjectKey(user.app_id, objectKey)) {
       return handleError(new ApiError(403, 'FORBIDDEN', '无权访问该对象', false));
     }
     const result = await resolveObjectUrl({ appId: user.app_id, objectKey });

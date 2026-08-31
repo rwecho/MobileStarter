@@ -112,6 +112,16 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
     final url = await showAvatarEditorSheet(context, imageBytes: bytes);
     if (url != null && mounted) {
       setState(() => avatarUrl = url);
+      // 上传完成即自动保存资料（与 ArkTS 壳一致）——只改本地 state
+      // 需要再手动点「保存资料」，容易被当成"没保存"。
+      final controller = AppScope.of(context);
+      final ok = await controller.updateProfile(
+        displayName.text.trim(),
+        bio.text.trim(),
+        url,
+      );
+      if (!mounted) return;
+      showAppToast(context, ok ? '头像已更新' : '头像保存失败', error: !ok);
     }
   }
 

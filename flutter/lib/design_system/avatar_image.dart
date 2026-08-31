@@ -15,15 +15,23 @@ class AssetUrls {
 
   /// objectKey → 可显示 URL。http(s)/data: 直接透传；objectKey 换 presigned
   /// 并缓存（同一 key 会话内只请求一次）。失败返回 null（调用方显示占位）。
+  /// 历史脏数据兼容：早期版本把 opaque `s3://bucket/key` 存进了 avatarUrl，
+  /// 剥掉 scheme 与 bucket 段还原 objectKey 再换取。
   static Future<String?> resolve(BuildContext context, String value) async {
     if (value.isEmpty) return null;
     if (value.startsWith('http://') || value.startsWith('https://') ||
         value.startsWith('data:')) {
       return value;
     }
+    var objectKey = value;
+    if (objectKey.startsWith('s3://')) {
+      objectKey = objectKey.substring('s3://'.length);
+      final slash = objectKey.indexOf('/');
+      if (slash > 0) objectKey = objectKey.substring(slash + 1);
+    }
     final cached = _cache[value];
     if (cached != null && cached.isNotEmpty) return cached;
-    final url = await AppScope.of(context).resolveObjectUrl(value);
+    final url = await AppScope.of(context).resolveObjectUrl(objectKey);
     if (url != null) _cache[value] = url;
     return url;
   }

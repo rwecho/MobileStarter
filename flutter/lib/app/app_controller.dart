@@ -177,15 +177,17 @@ final class AppController extends ChangeNotifier {
     return true;
   }
 
-  /// 头像上传：JPEG bytes → presigned PUT 直传 OSS → 返回对象 URL。
-  /// 编辑 sheet 裁剪完成后调用；avatarUrl 存返回的 url（不再 base64）。
+  /// 头像上传：bytes → presigned PUT 直传 OSS → 返回持久化引用。
+  /// 未配 S3_PUBLIC_BASE 时 url 是 opaque `s3://bucket/key`，不可直接显示——
+  /// 存 objectKey（AvatarUrls/AssetUrls 显示前换 presigned）；有 PUBLIC_BASE
+  /// 时 url 即公网永久地址。
   Future<String?> uploadAvatar(Uint8List imageBytes) async {
     try {
       final userId = user?.id ?? 'anon';
       final path = 'avatars/$userId-${DateTime.now().millisecondsSinceEpoch}.jpg';
       final sign = await _repository.signUpload(path, 'image/png');
       await _repository.uploadToS3(sign.uploadUrl, imageBytes, 'image/png');
-      return sign.url;
+      return sign.url.startsWith('s3://') ? sign.objectKey : sign.url;
     } catch (_) {
       return null;
     }

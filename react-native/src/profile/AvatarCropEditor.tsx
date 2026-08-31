@@ -12,7 +12,6 @@ import { styles } from '../theme/styles';
 const cropSize = 280;
 const zoomStep = 0.25;
 const initialZoom = 1.25;
-const nudgeStep = 12;
 
 type Point = Readonly<{ x: number; y: number }>;
 
@@ -58,14 +57,6 @@ export function AvatarCropEditor({
     const nextOffset = clampOffset(offsetRef.current, cropGeometry(asset, value));
     offsetRef.current = nextOffset;
     setOffset(nextOffset);
-  };
-  const moveBy = (x: number, y: number) => {
-    const next = clampOffset({
-      x: offsetRef.current.x + x,
-      y: offsetRef.current.y + y,
-    }, geometryRef.current);
-    offsetRef.current = next;
-    setOffset(next);
   };
   const confirm = async () => {
     setProcessing(true);
@@ -120,12 +111,6 @@ export function AvatarCropEditor({
             <Text style={styles.caption}>{Math.round(zoom * 100)}%</Text>
             <ZoomButton label="放大头像" icon="plus" onPress={() => changeZoom(zoom + zoomStep)} />
           </View>
-          <View style={editorStyles.moveControls}>
-            <NudgeButton label="上移" onPress={() => moveBy(0, -nudgeStep)} />
-            <NudgeButton label="下移" onPress={() => moveBy(0, nudgeStep)} />
-            <NudgeButton label="左移" onPress={() => moveBy(-nudgeStep, 0)} />
-            <NudgeButton label="右移" onPress={() => moveBy(nudgeStep, 0)} />
-          </View>
           <View style={editorStyles.actions}>
             <AppButton label="取消" onPress={onCancel} variant="secondary" />
             <AppButton
@@ -137,22 +122,6 @@ export function AvatarCropEditor({
         </View>
       </View>
     </Modal>
-  );
-}
-
-function NudgeButton({
-  label,
-  onPress,
-}: Readonly<{ label: string; onPress: () => void }>) {
-  const { palette } = usePreferences();
-  return (
-    <Pressable
-      accessibilityRole="button"
-      onPress={onPress}
-      style={[editorStyles.nudgeButton, { backgroundColor: palette.surfaceMuted }]}
-    >
-      <Text style={styles.caption}>{label}</Text>
-    </Pressable>
   );
 }
 
@@ -232,15 +201,6 @@ const editorStyles = StyleSheet.create({
   image: { alignSelf: 'center' },
   nonInteractive: { pointerEvents: 'none' },
   zoomControls: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.x5 },
-  moveControls: { flexDirection: 'row', justifyContent: 'center', gap: spacing.x2 },
-  nudgeButton: {
-    minWidth: 56,
-    minHeight: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: radii.control,
-    backgroundColor: colors.surfaceMuted,
-  },
   zoomButton: {
     width: 48,
     height: 48,

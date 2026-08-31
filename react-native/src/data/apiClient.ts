@@ -39,7 +39,10 @@ async function uploadAvatarToStorage(jpegBase64: string, userId: string): Promis
     body: binary,
   });
   if (!put.ok) throw new Error(`对象存储上传失败 ${put.status}`);
-  return sign.url;
+  // 持久化引用：未配 S3_PUBLIC_BASE 时 url 是 opaque `s3://bucket/key`，不可
+  // 直接显示——存 objectKey（显示前经 /urls 换 presigned）；有 PUBLIC_BASE 时
+  // url 即公网永久地址。
+  return sign.url.startsWith('s3://') ? sign.objectKey : sign.url;
 }
 
 // objectKey → presigned GET URL（私有 bucket，24h）。通用资产显示前换取。
@@ -57,15 +60,23 @@ async function resolveObjectUrl(objectKey: string): Promise<string | null> {
 // 会话级缓存 + 并发合并（同一 objectKey 只请求一次；失败/过期 invalidate）。
 const assetUrlCache = new Map<string, string>();
 
-export async function resolveAssetUrl(objectKey: string): Promise<string | null> {
-  if (objectKey.startsWith('http://') || objectKey.startsWith('https://') ||
-      objectKey.startsWith('data:')) {
-    return objectKey;
+export async function resolveAssetUrl(rawValue: string): Promise<string | null> {
+  if (rawValue.startsWith('http://') || rawValue.startsWith('https://') ||
+      rawValue.startsWith('data:')) {
+    return rawValue;
   }
-  const cached = assetUrlCache.get(objectKey);
+  // 历史脏数据兼容：早期版本把 opaque `s3://bucket/key` 直接存进了 avatarUrl，
+  // 剥掉 scheme 与 bucket 段还原 objectKey 再换取。
+  let objectKey = rawValue;
+  if (objectKey.startsWith('s3://')) {
+    objectKey = objectKey.slice('s3://'.length);
+    const slash = objectKey.indexOf('/');
+    if (slash > 0) objectKey = objectKey.slice(slash + 1);
+  }
+  const cached = assetUrlCache.get(rawValue);
   if (cached) return cached;
   const url = await resolveObjectUrl(objectKey);
-  if (url) assetUrlCache.set(objectKey, url);
+  if (url) assetUrlCache.set(rawValue, url);
   return url;
 }
 

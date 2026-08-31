@@ -191,6 +191,11 @@ export function EditProfileScreen() {
           onConfirm={(value) => {
             setAvatarUrl(value);
             setCropAsset(null);
+            // 上传完成即自动保存资料（与 ArkTS 壳一致）——只改本地 state
+            // 需要再手动点「保存资料」，容易被当成"没保存"。
+            void updateProfile({ displayName, bio, avatarUrl: value }).then(ok => {
+              showToast(ok ? '头像已更新' : '头像保存失败', ok ? 'success' : 'error');
+            });
           }}
         />
       ) : null}

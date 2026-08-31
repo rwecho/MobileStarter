@@ -3,7 +3,9 @@ import 'package:go_router/go_router.dart';
 
 import '../app/app_scope.dart';
 import '../app/runtime_models.dart';
+import '../design_system/app_icon.dart';
 import '../design_system/components.dart';
+import '../theme/app_tokens.dart';
 import '../payment/payment_controller.dart';
 import '../payment/payment_scope.dart';
 import '../state/async_state.dart';
@@ -46,7 +48,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       appBar: AppBar(
         title: const Text('确认订阅'),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: const AppIcon(AppIconName.arrowLeft),
           onPressed: () => context.pop(),
         ),
       ),
@@ -113,7 +115,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         OrderStatus.success => Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Icon(Icons.check_circle, color: Colors.green, size: 48),
+            const AppIcon(AppIconName.check, color: AppColors.success, size: 48),
             const SizedBox(height: 8),
             Text('订阅成功（订单 ${data.id}）', textAlign: TextAlign.center),
             const SizedBox(height: 16),
@@ -123,7 +125,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         OrderStatus.failed => Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Icon(Icons.error, color: Colors.red, size: 48),
+            const AppIcon(AppIconName.alert, color: AppColors.error, size: 48),
             const SizedBox(height: 8),
             const Text('订阅验证失败，请重试。', textAlign: TextAlign.center),
             const SizedBox(height: 16),

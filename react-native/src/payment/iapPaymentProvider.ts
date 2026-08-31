@@ -10,11 +10,17 @@
 import type { PurchaseResult, StoreProduct, StoreProductMapping } from './paymentModels';
 import type { PaymentProvider } from './paymentProvider';
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let RNIap: any;
+// react-native-iap 的最小使用面：依赖未安装（expo prebuild 前）时懒加载失败，
+// provider 优雅降级。any 被架构检查禁止，这里显式声明用到的三个方法。
+interface RniapModule {
+  getProducts(options: { skus: string[] }): Promise<readonly unknown[]>;
+  requestPurchase(options: { sku: string }): Promise<unknown>;
+  getAvailablePurchases(): Promise<readonly unknown[]>;
+}
+let RNIap: RniapModule | null = null;
 try {
   // eslint-disable-next-line @typescript-eslint/no-var-requires
-  RNIap = require('react-native-iap');
+  RNIap = require('react-native-iap') as RniapModule;
 } catch {
   RNIap = null;
 }

@@ -8,7 +8,6 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
-import 'package:mobilestarter_flutter/app/app_controller.dart';
 import 'package:mobilestarter_flutter/app/app_repository.dart';
 import 'package:mobilestarter_flutter/app/app_scope.dart';
 import 'package:mobilestarter_flutter/navigation/app_route.dart';

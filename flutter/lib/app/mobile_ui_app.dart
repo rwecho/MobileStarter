@@ -15,7 +15,6 @@ import '../support/support_controller.dart';
 import '../support/support_repository.dart';
 import '../support/support_scope.dart';
 import '../theme/app_theme.dart';
-import 'app_controller.dart';
 import 'app_repository.dart';
 import 'app_scope.dart';
 

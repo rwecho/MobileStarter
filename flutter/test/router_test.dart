@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mobilestarter_flutter/app/app_controller.dart';
 import 'package:mobilestarter_flutter/app/app_repository.dart';
 import 'package:mobilestarter_flutter/app/app_scope.dart';
 import 'package:mobilestarter_flutter/navigation/app_route.dart';

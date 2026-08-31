@@ -66,6 +66,8 @@ class _AvatarEditorSheetState extends State<_AvatarEditorSheet> {
     final img = image;
     if (img == null || busy) return;
     setState(() => busy = true);
+    // 首个 await 之前取好 controller：跨 async gap 使用 context 会触发 lint。
+    final appController = AppScope.of(context);
     try {
       // InteractiveViewer 矩阵求逆：把方形视口的左上/右下映射回图片坐标。
       final Matrix4 inverted = Matrix4.copy(controller.value)..invert();
@@ -99,7 +101,6 @@ class _AvatarEditorSheetState extends State<_AvatarEditorSheet> {
       final cropped = await recorder.endRecording().toImage(512, 512);
       final data = await cropped.toByteData(format: ui.ImageByteFormat.png);
       if (data == null) throw StateError('裁剪失败');
-      final appController = AppScope.of(context);
       final url = await appController.uploadAvatar(
         data.buffer.asUint8List(),
       );

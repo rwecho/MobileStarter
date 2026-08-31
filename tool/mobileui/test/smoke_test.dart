@@ -104,7 +104,10 @@ Future<void> _verifyCombinedProfiles(
   final publishWorkflow = File(
     _join(project.path, '.github', 'workflows', 'server-publish.yml'),
   );
-  _expect(publishWorkflow.existsSync(), 'combined create must copy publish workflow');
+  _expect(
+    publishWorkflow.existsSync(),
+    'combined create must copy publish workflow',
+  );
   _expect(
     !publishWorkflow.readAsStringSync().contains('zhongbei-auth'),
     'server publish image must not keep the template image name',
@@ -145,12 +148,8 @@ Future<void> _verifyCombinedProfiles(
     'combined doctor must succeed',
   );
   _expect(
-    FeatureCommand().run([
-      'add',
-      'achievements',
-      '--project',
-      project.path,
-    ]) == 0,
+    FeatureCommand().run(['add', 'achievements', '--project', project.path]) ==
+        0,
     'combined feature add must cover every profile',
   );
   _expect(

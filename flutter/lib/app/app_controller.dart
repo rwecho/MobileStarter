@@ -1,5 +1,3 @@
-import 'dart:typed_data';
-
 import '../telemetry/telemetry.dart';
 
 import 'package:flutter/foundation.dart';
@@ -9,6 +7,8 @@ import '../navigation/app_route.dart';
 import '../state/async_state.dart';
 import 'app_repository.dart';
 import 'runtime_models.dart';
+
+part 'app_controller_data.dart';
 
 final class AppController extends ChangeNotifier {
   AppController(this._repository) {
@@ -236,87 +236,6 @@ final class AppController extends ChangeNotifier {
     // the router redirect, which sends a signed-out user on a protected route
     // back to sign-in (remembering the target via setAuthRedirectTarget).
     notifyListeners();
-  }
-
-  Future<bool> loadSessions() async {
-    final result = await _capture(_repository.sessions);
-    if (result == null) return false;
-    sessions = result;
-    notifyListeners();
-    return true;
-  }
-
-  Future<bool> revokeSession(String id) async {
-    final success = await _perform(() => _repository.revokeSession(id));
-    if (!success) return false;
-    sessions = sessions
-        .where((session) => session.id != id)
-        .toList(growable: false);
-    notifyListeners();
-    return true;
-  }
-
-  Future<bool> loadNotifications() async {
-    final result = await _capture(_repository.notifications);
-    if (result == null) return false;
-    notifications = result;
-    notifyListeners();
-    return true;
-  }
-
-  Future<bool> markNotificationsRead() async {
-    final success = await _perform(_repository.markNotificationsRead);
-    if (success) await loadNotifications();
-    return success;
-  }
-
-  Future<bool> markNotificationRead(String id) async {
-    final success = await _perform(() => _repository.markNotificationRead(id));
-    if (success) await loadNotifications();
-    return success;
-  }
-
-  Future<bool> deleteNotification(String id) async {
-    final success = await _perform(() => _repository.deleteNotification(id));
-    if (success) {
-      notifications = notifications
-          .where((item) => item.id != id)
-          .toList(growable: false);
-      notifyListeners();
-    }
-    return success;
-  }
-
-  Future<bool> loadOrders() async {
-    final result = await _capture(_repository.orders);
-    if (result == null) return false;
-    orders = result;
-    notifyListeners();
-    return true;
-  }
-
-  Future<bool> loadUsage() async {
-    final result = await _capture(_repository.usage);
-    if (result == null) return false;
-    usage = result;
-    notifyListeners();
-    return true;
-  }
-
-  Future<bool> loadCoupons() async {
-    final result = await _capture(_repository.coupons);
-    if (result == null) return false;
-    coupons = result;
-    notifyListeners();
-    return true;
-  }
-
-  Future<bool> loadReferral() async {
-    final result = await _capture(_repository.referral);
-    if (result == null) return false;
-    referral = result;
-    notifyListeners();
-    return true;
   }
 
   Future<bool> _authenticate(Future<AuthResult> Function() operation) async {

@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:video_player/video_player.dart';
-import '../app/app_controller.dart';
 import '../app/app_scope.dart';
 import '../app/runtime_models.dart';
 import '../design_system/components.dart';

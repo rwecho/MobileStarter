@@ -101,7 +101,20 @@ async function seedDefaultConfig() {
   `).run(randomUUID(), DEFAULT_APP_ID, defaultConfig.version, document, timestamp);
 }
 
+// 测试账号播种开关：生产环境永不播种（安全——test@test.local/Test1234 是
+// 公开约定的弱凭证），非生产默认开启，可用 MOBILEUI_SEED_TEST_ACCOUNT=0 显式关闭。
+export function shouldSeedTestAccount(
+  env: string | undefined,
+  flag: string | undefined,
+): boolean {
+  if (env === 'production') return false;
+  return flag !== '0';
+}
+
 async function ensureAppTestAccount(appId: string) {
+  if (!shouldSeedTestAccount(process.env.NODE_ENV, process.env.MOBILEUI_SEED_TEST_ACCOUNT)) {
+    return;
+  }
   const timestamp = nowIso();
   const exists = await database.prepare(
     'SELECT id FROM users WHERE app_id = ? AND email = ?',

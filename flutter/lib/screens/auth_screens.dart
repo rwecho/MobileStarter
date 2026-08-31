@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import '../app/app_controller.dart';
 import '../app/app_scope.dart';
 import '../design_system/components.dart';
 import '../design_system/feedback.dart';

@@ -4,9 +4,9 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import type { RootParamList } from './navigationRef';
 
 import { AuthScreen, AuthMode } from '../screens/AuthScreens';
-import { HomeScreen } from '../screens/HomeScreen';
 import { OnboardingScreen, SplashScreen } from '../screens/LaunchScreens';
-import { EditProfileScreen, ProfileScreen } from '../screens/ProfileScreens';
+import { EditProfileScreen } from '../screens/ProfileScreens';
+import { AppTabs } from './AppTabs';
 import { MembershipScreen } from '../screens/MembershipScreen';
 import { CheckoutScreen } from '../screens/CheckoutScreen';
 import { CouponsScreen, InviteScreen, StatisticsScreen } from '../screens/ProfileUtilityScreens';
@@ -73,7 +73,8 @@ export function RootNavigator() {
     >
       <Stack.Screen name="launch.splash" component={SplashScreen} />
       <Stack.Screen name="launch.onboarding" component={OnboardingScreen} />
-      <Stack.Screen name="home" component={HomeScreen} />
+      {/* tabs 壳：home / profile.home 两个常驻 tab，对齐 Flutter/ArkTS 的壳结构。 */}
+      <Stack.Screen name="tabs" component={AppTabs} />
 
       <Stack.Screen name="auth.signIn" component={AuthRoute} />
       <Stack.Screen name="auth.signUp" component={AuthRoute} />
@@ -82,7 +83,6 @@ export function RootNavigator() {
       <Stack.Screen name="auth.verifyEmail" component={AuthRoute} />
       <Stack.Screen name="auth.resetPassword" component={AuthRoute} />
 
-      <Stack.Screen name="profile.home" component={ProfileScreen} />
       <Stack.Screen name="profile.edit" component={EditProfileScreen} />
       <Stack.Screen name="profile.statistics" component={StatisticsScreen} />
       <Stack.Screen name="profile.invite" component={InviteScreen} />

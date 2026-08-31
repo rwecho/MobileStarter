@@ -41,7 +41,3 @@ export type AppRoute =
   | 'notifications.center'
   | 'states.gallery';
 
-export type RouteEntry = Readonly<{
-  key: string;
-  name: AppRoute;
-}>;

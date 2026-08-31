@@ -4,15 +4,14 @@ import {
   ApiEnvelope,
   ApiErrorBody,
   AuthPayload,
-  CreateTicketInput,
   DeleteAccountInput,
-  FeedbackInput,
   PhoneCodeInput,
   PhoneVerifyInput,
   PurchaseReceipt,
   SignInInput,
   SignUpInput
 } from '../domain/Models'
+import { CreateTicketInput, FeedbackInput } from '../domain/SupportModels'
 
 const API_BASE: string = 'https://auth.zhongbei.tech'
 const APP_ID: string = 'mobileui'
@@ -290,4 +289,29 @@ export function specificErrorMessage(
     }
   }
   return messages.length > 0 ? messages.join('；') : fallback
+}
+
+// 直传到 OSS presigned URL（不经 API base；二进制 PUT）。
+// 从 ApiClient.ets 拆出：纯 http 操作，不依赖 transport 实例。
+export function uploadToS3(uploadUrl: string, data: ArrayBuffer, contentType: string): Promise<void> {
+  const client = http.createHttp()
+  const headers: Record<string, string> = { 'Content-Type': contentType }
+  return client.request(uploadUrl, {
+    method: http.RequestMethod.PUT,
+    header: headers,
+    extraData: data,
+    expectDataType: http.HttpDataType.STRING,
+    connectTimeout: 10000,
+    readTimeout: 30000
+  }).then((response: http.HttpResponse) => {
+    client.destroy()
+    if (response.responseCode < 200 || response.responseCode >= 300) {
+      throw new ApiFailure('UPLOAD_FAILED', `对象存储上传失败 ${response.responseCode}`,
+        response.responseCode, false)
+    }
+  }).catch((error: Error) => {
+    client.destroy()
+    if (error instanceof ApiFailure) throw error
+    throw new ApiFailure('UPLOAD_FAILED', error.message ?? '上传失败', 0, false)
+  })
 }

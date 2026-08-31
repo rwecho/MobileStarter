@@ -4,60 +4,52 @@ import { AppColors } from '../theme/AppTokens'
 import { ConfigurationConstant } from '@kit.AbilityKit'
 import { apiClient, ApiFailure } from '../data/ApiClient'
 import { localStore } from '../data/LocalStore'
-import { AppUser, AuthPayload, OrderStatus, OrderView, PurchaseStatus, RuntimeConfig }
-  from '../domain/Models'
+import { AppUser, OrderView, PurchaseStatus, RuntimeConfig } from '../domain/Models'
 import { RemoteDataStore } from './RemoteDataStore'
-import { MockPaymentProvider } from '../payment/MockPaymentProvider'
-import { HMSIapProvider } from '../payment/HMSIapProvider'
-import { PaymentProvider } from '../payment/PaymentProvider'
-import { AppRoute, routeName, routeByName } from '../navigation/AppRoute'
 import { telemetry, TelemetryConfig } from '../telemetry/Telemetry'
 import { AppTelemetrySink } from '../telemetry/AppTelemetrySink'
-import { guardRoute } from '../navigation/RouteGuard'
+import { AppRoute, routeName } from '../navigation/AppRoute'
 import { initAppStrings } from '../localization/AppStrings'
+import {
+  backAction,
+  navigateByNameAction,
+  navigateAction,
+  openEntryByNameAction,
+  replaceAllAction,
+  replaceTopAction
+} from './AppNavActions'
+import {
+  requestPasswordResetAction,
+  requestPhoneCodeAction,
+  resetPasswordAction,
+  signInAction,
+  signOutAction,
+  signOutAllAction,
+  signUpAction,
+  socialSignInAction,
+  verifyEmailAction,
+  verifyPasswordResetAction,
+  verifyPhoneCodeAction,
+  handleSessionExpiredAction
+} from './AppAuthActions'
+import {
+  changePasswordAction,
+  createTicketAction,
+  deleteAccountAction,
+  replyTicketAction,
+  saveSettingAction,
+  submitFeedbackAction,
+  updateProfileAction,
+  cacheUserPreferences
+} from './AppAccountActions'
+import { purchaseAction, startCheckoutAction } from './AppPaymentActions'
 
+// 应用状态仓库。方法体按域拆分到 App*Actions / AppRouteTable（CI 350 行硬上限；
+// ArkTS 无 partial class，动作是收 store 的自由函数，这里只留字段、引导与薄委托）。
+// 原 private 成员（context/initialized/queuedEntry*/applyPreferences/showApiError）
+// 因动作模块需访问而去私有化——ArkTS 无包内私有，勿在 state/ 动作模块之外调用。
 @Observed
 export class AppStore {
-  // Resolves the route names carried by notification deep links back to the
-  // enum. ArkTS forbids dynamic enum indexing, so this is an explicit map.
-  static readonly ROUTE_BY_NAME: Record<string, AppRoute> = {
-    'Logo': AppRoute.Logo, 'Promo': AppRoute.Promo, 'Onboarding': AppRoute.Onboarding,
-    'Home': AppRoute.Home, 'SignIn': AppRoute.SignIn, 'SignUp': AppRoute.SignUp,
-    'PhoneSignIn': AppRoute.PhoneSignIn, 'ForgotPassword': AppRoute.ForgotPassword,
-    'VerifyEmail': AppRoute.VerifyEmail, 'ResetPassword': AppRoute.ResetPassword,
-    'Profile': AppRoute.Profile, 'ProfileEdit': AppRoute.ProfileEdit,
-    'Statistics': AppRoute.Statistics, 'Invite': AppRoute.Invite, 'Coupons': AppRoute.Coupons,
-    'Membership': AppRoute.Membership, 'MembershipPlans': AppRoute.MembershipPlans,
-    'Checkout': AppRoute.Checkout, 'Orders': AppRoute.Orders, 'Settings': AppRoute.Settings,
-    'AccountSecurity': AppRoute.AccountSecurity, 'Devices': AppRoute.Devices,
-    'NotificationSettings': AppRoute.NotificationSettings, 'Privacy': AppRoute.Privacy,
-    'General': AppRoute.General, 'Appearance': AppRoute.Appearance, 'Language': AppRoute.Language,
-    'TextSize': AppRoute.TextSize, 'Storage': AppRoute.Storage, 'Permissions': AppRoute.Permissions,
-    'HelpFeedback': AppRoute.HelpFeedback, 'Legal': AppRoute.Legal,
-    'TermsOfService': AppRoute.TermsOfService, 'PrivacyPolicy': AppRoute.PrivacyPolicy,
-    'About': AppRoute.About,
-    'DeleteAccount': AppRoute.DeleteAccount, 'NotificationCenter': AppRoute.NotificationCenter,
-    'StateGallery': AppRoute.StateGallery, 'SupportTicket': AppRoute.SupportTicket,
-    'NewSupportTicket': AppRoute.NewSupportTicket, 'ProductFeedback': AppRoute.ProductFeedback,
-    'notifications.center': AppRoute.NotificationCenter, 'profile.home': AppRoute.Profile,
-    'profile.edit': AppRoute.ProfileEdit, 'profile.statistics': AppRoute.Statistics,
-    'profile.invite': AppRoute.Invite, 'profile.coupons': AppRoute.Coupons,
-    'membership.home': AppRoute.Membership,
-    'membership.plans': AppRoute.MembershipPlans, 'orders.list': AppRoute.Orders,
-    'membership.checkout': AppRoute.Checkout, 'membership.orders': AppRoute.Orders,
-    'settings.home': AppRoute.Settings, 'settings.accountSecurity': AppRoute.AccountSecurity,
-    'settings.devices': AppRoute.Devices, 'settings.notifications': AppRoute.NotificationSettings,
-    'settings.privacy': AppRoute.Privacy, 'settings.general': AppRoute.General,
-    'settings.appearance': AppRoute.Appearance, 'settings.language': AppRoute.Language,
-    'settings.textSize': AppRoute.TextSize, 'settings.storage': AppRoute.Storage,
-    'settings.permissions': AppRoute.Permissions,
-    'settings.helpFeedback': AppRoute.HelpFeedback, 'settings.legal': AppRoute.Legal,
-    'settings.termsOfService': AppRoute.TermsOfService,
-    'settings.privacyPolicy': AppRoute.PrivacyPolicy,
-    'settings.about': AppRoute.About, 'support.home': AppRoute.HelpFeedback,
-    'support.newTicket': AppRoute.NewSupportTicket
-  }
-
   navStack: NavPathStack = new NavPathStack()
   currentRoute: AppRoute = AppRoute.Logo
   // 底部 tab：0=首页, 1=我的。首页/我的 常驻在一个 'tabs' NavDestination 里用
@@ -94,10 +86,10 @@ export class AppStore {
   // the production HMS IAP provider instead of the dev mock.
   useHmsIap: boolean = false
   remote: RemoteDataStore = new RemoteDataStore()
-  private context: common.UIAbilityContext | null = null
-  private initialized: boolean = false
-  private queuedEntryName: string | null = null
-  private queuedEntryCold: boolean = false
+  context: common.UIAbilityContext | null = null
+  initialized: boolean = false
+  queuedEntryName: string | null = null
+  queuedEntryCold: boolean = false
 
   constructor() {
     // Seed the nav stack with the splash route so Navigation renders SplashPage
@@ -127,7 +119,7 @@ export class AppStore {
       localStore.saveToken(token)
       localStore.saveRefreshToken(refreshToken)
     })
-    apiClient.setSessionExpiredCallback(() => { this.handleSessionExpired() })
+    apiClient.setSessionExpiredCallback(() => { handleSessionExpiredAction(this) })
     // 磁盘快照注入 + 启动恢复（必须在 configureTelemetry 之前，issue #22）。
     telemetry.setPersistence(
       (): string | null => localStore.readTelemetryQueue(),
@@ -143,7 +135,7 @@ export class AppStore {
       this.signedIn = payload.user !== null
       this.online = true
       localStore.saveConfig(payload.config)
-      this.cacheUserPreferences()
+      cacheUserPreferences(this)
     } catch (error) {
       this.online = false
       this.showToast('当前使用离线配置', true)
@@ -160,24 +152,13 @@ export class AppStore {
     }
   }
 
-  private configureTelemetry(): void {
+  configureTelemetry(): void {
     const config = new TelemetryConfig()
     config.configVersion = this.config?.version ?? 0
     telemetry.configure(config, new AppTelemetrySink())
   }
 
-  private cacheUserPreferences(): void {
-    const settings = this.user?.settings
-    if (settings === undefined) return
-    const theme = settings['theme']
-    const language = settings['language']
-    const textScale = settings['textScale']
-    if (typeof theme === 'string') localStore.savePreference('theme', theme)
-    if (typeof language === 'string') localStore.savePreference('language', language)
-    if (typeof textScale === 'number') localStore.savePreference('textScale', textScale)
-  }
-
-  private applyPreferences(): void {
+  applyPreferences(): void {
     if (this.context === null) return
     const theme = localStore.readTheme()
     const language = localStore.readLanguage() === 'en-US' ? 'en-US' : 'zh-CN'
@@ -206,47 +187,17 @@ export class AppStore {
   }
 
   navigate(route: AppRoute): void {
-    const decision = guardRoute(route, this.signedIn, this.config)
-    if (decision.pending !== null) this.pendingRoute = decision.pending
-    if (decision.unavailable) this.showToast('当前 App 未启用此功能')
-    this.navStack.pushPath({ name: routeName(decision.route) })
-    this.currentRoute = decision.route
-    telemetry.screen(decision.route.toString())
+    navigateAction(this, route)
   }
 
   // Resolves an in-app route name (from a notification deep link) back to the
   // enum and navigates; external URLs and unknown names are ignored.
   navigateByName(name: string | null): void {
-    if (name === null || name.length === 0 || name.includes('://')) return
-    const route = AppStore.ROUTE_BY_NAME[name]
-    if (route === undefined) return
-    this.navigate(route)
+    navigateByNameAction(this, name)
   }
 
   openEntryByName(name: string | null, cold: boolean): void {
-    if (name === null || name.length === 0 || name.includes('://')) return
-    if (!this.initialized) {
-      this.queuedEntryName = name
-      this.queuedEntryCold = cold
-      return
-    }
-    const target = AppStore.ROUTE_BY_NAME[name]
-    if (target === undefined) return
-    const decision = guardRoute(target, this.signedIn, this.config)
-    if (decision.pending !== null) this.pendingRoute = decision.pending
-    if (decision.unavailable) this.showToast('当前 App 未启用此功能')
-    if (cold) {
-      // Cold start: reset to the tab shell (Home) + push the target if deep.
-      this.navStack.clear()
-      this.navStack.pushPath({ name: AppStore.TAB_NAME })
-      if (decision.route !== AppRoute.Home && decision.route !== AppRoute.Profile) {
-        this.navStack.pushPath({ name: routeName(decision.route) })
-      }
-    } else if (this.currentRoute !== decision.route) {
-      this.navStack.pushPath({ name: routeName(decision.route) })
-    }
-    this.currentRoute = decision.route
-    telemetry.screen(decision.route.toString())
+    openEntryByNameAction(this, name, cold)
   }
 
   resume(): void {
@@ -256,47 +207,12 @@ export class AppStore {
   // 底部 tab 的 NavDestination 名称：首页/我的 常驻其中，用 Tabs 保活。
   static readonly TAB_NAME: string = 'tabs'
 
-  // 切到底部 tab（Home=0 / Profile=1）：清栈后 push tabs 容器（Tabs 保活，
-  // 切换无翻页转场）。子页面/登录/闪屏仍走 navStack push。
-  private resetToTabs(index: number): void {
-    this.currentTab = index
-    this.navStack.clear()
-    this.navStack.pushPath({ name: AppStore.TAB_NAME })
-    this.currentRoute = index === 0 ? AppRoute.Home : AppRoute.Profile
-    telemetry.screen(this.currentRoute.toString())
-  }
-
-  private isTabRoute(route: AppRoute): boolean {
-    return route === AppRoute.Home || route === AppRoute.Profile
-  }
-
   replaceAll(route: AppRoute): void {
-    const decision = guardRoute(route, this.signedIn, this.config)
-    if (decision.pending !== null) this.pendingRoute = decision.pending
-    if (decision.unavailable) this.showToast('当前 App 未启用此功能')
-    if (this.isTabRoute(decision.route)) {
-      this.resetToTabs(decision.route === AppRoute.Home ? 0 : 1)
-      return
-    }
-    this.navStack.clear()
-    this.navStack.pushPath({ name: routeName(decision.route) })
-    this.currentRoute = decision.route
-    telemetry.screen(decision.route.toString())
+    replaceAllAction(this, route)
   }
 
   replaceTop(route: AppRoute): void {
-    const decision = guardRoute(route, this.signedIn, this.config)
-    if (decision.pending !== null) this.pendingRoute = decision.pending
-    if (decision.unavailable) this.showToast('当前 App 未启用此功能')
-    if (this.isTabRoute(decision.route)) {
-      // 认证完成/登出后回到 tab 壳（Home tab）。
-      this.resetToTabs(decision.route === AppRoute.Home ? 0 : 1)
-      return
-    }
-    this.navStack.pop()
-    this.navStack.pushPath({ name: routeName(decision.route) })
-    this.currentRoute = decision.route
-    telemetry.screen(decision.route.toString())
+    replaceTopAction(this, route)
   }
 
   completeAuthentication(): void {
@@ -306,322 +222,95 @@ export class AppStore {
   }
 
   back(): void {
-    if (!this.canGoBack) {
-      return
-    }
-    this.navStack.pop()
-    const names = this.navStack.getAllPathName()
-    const top = names.length > 0 ? names[names.length - 1] : ''
-    if (top === AppStore.TAB_NAME) {
-      // 从子页面返回 tab 壳：当前 tab 由 currentTab 决定（Tabs 保活）。
-      this.currentRoute = this.currentTab === 0 ? AppRoute.Home : AppRoute.Profile
-    } else {
-      this.currentRoute = routeByName(top) ?? AppRoute.Home
-    }
-    telemetry.screen(this.currentRoute.toString())
+    backAction(this)
   }
 
-  async signIn(email: string, password: string): Promise<boolean> {
-    return this.authenticate(() => apiClient.signIn(email, password))
+  signIn(email: string, password: string): Promise<boolean> {
+    return signInAction(this, email, password)
   }
 
-  async signUp(email: string, password: string, username: string, consentVersion: string):
+  signUp(email: string, password: string, username: string, consentVersion: string):
     Promise<boolean> {
-    return this.authenticate(() => apiClient.signUp(email, password, username, consentVersion))
+    return signUpAction(this, email, password, username, consentVersion)
   }
 
-  async verifyEmail(code: string): Promise<boolean> {
-    if (this.user === null || this.user.email === null) return false
-    try {
-      const verified = await apiClient.verifyEmail(this.user.email, code)
-      if (verified) this.user.emailVerified = true
-      return verified
-    } catch (error) {
-      this.showApiError(error)
-      return false
-    }
+  verifyEmail(code: string): Promise<boolean> {
+    return verifyEmailAction(this, code)
   }
 
-  async requestPhoneCode(phone: string): Promise<boolean> {
-    return this.performBooleanRequest(() => apiClient.requestPhoneCode(phone))
+  requestPhoneCode(phone: string): Promise<boolean> {
+    return requestPhoneCodeAction(this, phone)
   }
 
-  async verifyPhoneCode(phone: string, code: string): Promise<boolean> {
-    return this.authenticate(() => apiClient.verifyPhoneCode(phone, code))
+  verifyPhoneCode(phone: string, code: string): Promise<boolean> {
+    return verifyPhoneCodeAction(this, phone, code)
   }
 
-  async socialSignIn(
-    provider: string,
-    idToken: string,
-    authorizationCode: string,
-    redirectUri: string,
-    codeVerifier: string
+  socialSignIn(
+    provider: string, idToken: string, authorizationCode: string,
+    redirectUri: string, codeVerifier: string
   ): Promise<boolean> {
-    return this.authenticate(() => apiClient.socialSignIn(
-      provider, idToken, authorizationCode, redirectUri, codeVerifier
-    ))
+    return socialSignInAction(this, provider, idToken, authorizationCode, redirectUri, codeVerifier)
   }
 
-  async requestPasswordReset(email: string): Promise<boolean> {
-    return this.performBooleanRequest(async () => {
-      const accepted = await apiClient.requestPasswordReset(email)
-      if (accepted) this.recoveryEmail = email
-      return accepted
-    })
+  requestPasswordReset(email: string): Promise<boolean> {
+    return requestPasswordResetAction(this, email)
   }
 
-  async verifyPasswordReset(code: string): Promise<boolean> {
-    return this.performBooleanRequest(async () => {
-      this.resetToken = await apiClient.verifyPasswordReset(this.recoveryEmail, code)
-      return this.resetToken.length > 0
-    })
+  verifyPasswordReset(code: string): Promise<boolean> {
+    return verifyPasswordResetAction(this, code)
   }
 
-  async resetPassword(newPassword: string): Promise<boolean> {
-    return this.performBooleanRequest(async () => {
-      const changed = await apiClient.resetPassword(this.resetToken, newPassword)
-      if (changed) {
-        this.recoveryEmail = ''
-        this.resetToken = ''
-      }
-      return changed
-    })
+  resetPassword(newPassword: string): Promise<boolean> {
+    return resetPasswordAction(this, newPassword)
   }
 
-  private async performBooleanRequest(operation: () => Promise<boolean>): Promise<boolean> {
-    if (this.busy) return false
-    this.busy = true
-    try {
-      return await operation()
-    } catch (error) {
-      this.showApiError(error)
-      return false
-    } finally {
-      this.busy = false
-    }
+  signOut(): Promise<void> {
+    return signOutAction(this)
   }
 
-  async signOut(): Promise<void> {
-    try {
-      await apiClient.signOut()
-    } catch (error) {
-      this.online = false
-    }
-    this.clearLocalSession()
-    this.signedIn = false
-    this.user = null
+  signOutAll(): Promise<void> {
+    return signOutAllAction(this)
   }
 
-  async signOutAll(): Promise<void> {
-    try {
-      await apiClient.signOutAll()
-    } catch (error) {
-      this.online = false
-    }
-    this.clearLocalSession()
-    this.signedIn = false
-    this.user = null
+  saveSetting(key: string, value: string | number | boolean): Promise<boolean> {
+    return saveSettingAction(this, key, value)
   }
 
-  private clearLocalSession(): void {
-    localStore.saveToken('')
-    localStore.saveRefreshToken('')
-    apiClient.setToken('')
-    apiClient.setRefreshToken('')
+  deleteAccount(password: string): Promise<boolean> {
+    return deleteAccountAction(this, password)
   }
 
-  private handleSessionExpired(): void {
-    this.clearLocalSession()
-    this.signedIn = false
-    this.user = null
-    this.replaceAll(AppRoute.SignIn)
+  changePassword(currentPassword: string, newPassword: string): Promise<boolean> {
+    return changePasswordAction(this, currentPassword, newPassword)
   }
 
-  async saveSetting(key: string, value: string | number | boolean): Promise<boolean> {
-    if (!this.signedIn || this.busy) {
-      return false
-    }
-    this.busy = true
-    const patch: Record<string, string | number | boolean> = {}
-    patch[key] = value
-    if (typeof value !== 'boolean') localStore.savePreference(key, value)
-    if (this.user !== null) {
-      this.user.settings[key] = value
-    }
-    this.applyPreferences()
-    try {
-      const settings = await apiClient.saveSettings(patch)
-      if (this.user !== null) {
-        this.user.settings = settings
-      }
-      this.cacheUserPreferences()
-      this.applyPreferences()
-      this.online = true
-      this.showToast('设置已同步到服务端')
-      return true
-    } catch (error) {
-      this.showApiError(error)
-      return false
-    } finally {
-      this.busy = false
-    }
+  updateProfile(displayName: string, bio: string, avatarUrl: string | null): Promise<boolean> {
+    return updateProfileAction(this, displayName, bio, avatarUrl)
   }
 
-  async deleteAccount(password: string): Promise<boolean> {
-    if (!this.signedIn || this.busy) {
-      return false
-    }
-    this.busy = true
-    try {
-      if (!await apiClient.deleteAccount(password)) {
-        return false
-      }
-      this.clearLocalSession()
-      this.signedIn = false
-      this.user = null
-      this.showToast('账号已永久删除')
-      return true
-    } catch (error) {
-      this.showApiError(error)
-      return false
-    } finally {
-      this.busy = false
-    }
-  }
-
-  async changePassword(currentPassword: string, newPassword: string): Promise<boolean> {
-    if (!this.signedIn || this.busy) return false
-    this.busy = true
-    try {
-      if (!await apiClient.changePassword(currentPassword, newPassword)) return false
-      this.clearLocalSession()
-      this.signedIn = false
-      this.user = null
-      this.showToast('密码已修改，请重新登录')
-      return true
-    } catch (error) {
-      this.showApiError(error)
-      return false
-    } finally {
-      this.busy = false
-    }
-  }
-
-  async updateProfile(displayName: string, bio: string, avatarUrl: string | null): Promise<boolean> {
-    if (!this.signedIn || this.busy) return false
-    this.busy = true
-    try {
-      this.user = await apiClient.updateProfile(displayName, bio, avatarUrl)
-      this.showToast('个人资料已同步到服务端')
-      return true
-    } catch (error) {
-      this.showApiError(error)
-      return false
-    } finally {
-      this.busy = false
-    }
-  }
-
-  async submitFeedback(
-    title: string,
-    body: string,
-    category: string = 'suggestion',
-    rating: number = 5
+  submitFeedback(
+    title: string, body: string, category: string = 'suggestion', rating: number = 5
   ): Promise<boolean> {
-    if (this.busy) return false
-    this.busy = true
-    try {
-      const submitted = await apiClient.submitFeedback(title, body, category, rating)
-      if (submitted) this.showToast('意见反馈已提交')
-      return submitted
-    } catch (error) {
-      this.showApiError(error)
-      return false
-    } finally {
-      this.busy = false
-    }
+    return submitFeedbackAction(this, title, body, category, rating)
   }
 
-  async createTicket(
+  createTicket(
     category: string, severity: string, subject: string, message: string
   ): Promise<boolean> {
-    if (this.busy) return false
-    this.busy = true
-    try {
-      const created = await apiClient.createTicket({ category, severity, subject, message })
-      await this.remote.openTicket(created.id)
-      this.navigate(AppRoute.SupportTicket)
-      this.showToast('工单已提交')
-      return true
-    } catch (error) {
-      this.showApiError(error)
-      return false
-    } finally {
-      this.busy = false
-    }
+    return createTicketAction(this, category, severity, subject, message)
   }
 
-  async replyTicket(message: string): Promise<boolean> {
-    const detail = this.remote.ticketDetailState.data
-    if (detail === undefined || this.busy) return false
-    this.busy = true
-    try {
-      const sent = await apiClient.reply(detail.id, message)
-      this.remote.appendReply(sent)
-      return true
-    } catch (error) {
-      this.showApiError(error)
-      return false
-    } finally {
-      this.busy = false
-    }
+  replyTicket(message: string): Promise<boolean> {
+    return replyTicketAction(this, message)
   }
 
-  async purchase(planId: string): Promise<boolean> {
-    this.purchaseStatus = PurchaseStatus.Loading
-    this.purchaseOrder = null
-    this.purchaseMessage = ''
-    try {
-      const idempotencyKey: string =
-        `ark-${Date.now()}-${Math.random().toString(36).slice(2)}`
-      const order = await apiClient.createOrder(planId, idempotencyKey)
-      // Production uses HMS IAP (server-authoritative). Dev/previewer falls back
-      // to mock — flip `useHmsIap` to true on a device with HMS Core + AGC config.
-      const provider: PaymentProvider = this.useHmsIap && this.context !== null
-        ? new HMSIapProvider(this.context)
-        : new MockPaymentProvider()
-      const result = await provider.purchase(order.storeProductId)
-      const verified = await apiClient.verifyPurchase(order.orderId, result.receipt)
-      this.purchaseOrder = verified
-      this.purchaseStatus =
-        verified.status === OrderStatus.Success ? PurchaseStatus.Success : PurchaseStatus.Failed
-      if (verified.status === OrderStatus.Success) {
-        // Best-effort membership refresh: re-bootstrap so the user tier reflects
-        // the purchase. `initialize` needs the UIAbilityContext captured at boot.
-        const context = this.context
-        try {
-          if (context !== null) { await this.initialize(context) }
-        } catch (e) { /* best-effort membership refresh */ }
-      }
-      return verified.status === OrderStatus.Success
-    } catch (error) {
-      if (error instanceof ApiFailure && error.status === 401) {
-        this.purchaseStatus = PurchaseStatus.Unauthorized
-      } else if (error instanceof ApiFailure) {
-        // server returned an error envelope (non-2xx)
-        this.purchaseStatus = PurchaseStatus.Error
-        this.purchaseMessage = error.message
-      } else {
-        // non-ApiFailure = transport/network failure (timeout/DNS) → offline
-        this.purchaseStatus = PurchaseStatus.Offline
-      }
-      return false
-    }
+  purchase(planId: string): Promise<boolean> {
+    return purchaseAction(this, planId)
   }
 
   startCheckout(planId: string): void {
-    this.purchaseStatus = PurchaseStatus.Idle
-    this.pendingPlanId = planId
+    startCheckoutAction(this, planId)
   }
 
   // 原生 toast（系统级）：顶部展示、文字用主色（错误用语义红）。
@@ -643,41 +332,7 @@ export class AppStore {
     })
   }
 
-  private async authenticate(
-    operation: () => Promise<AuthPayload>
-  ): Promise<boolean> {
-    if (this.busy) {
-      return false
-    }
-    this.busy = true
-    try {
-      const payload = await operation()
-      localStore.saveToken(payload.token)
-      apiClient.setToken(payload.token)
-      localStore.saveRefreshToken(payload.refreshToken)
-      apiClient.setRefreshToken(payload.refreshToken)
-      this.user = payload.user
-      this.signedIn = true
-      this.online = true
-      this.lastAuthError = ''
-      return true
-    } catch (error) {
-      this.lastAuthError = this.authErrorMessage(error)
-      return false
-    } finally {
-      this.busy = false
-    }
-  }
-
-  private authErrorMessage(error: Error): string {
-    if (error instanceof ApiFailure) {
-      return error.message
-    }
-    this.online = false
-    return '网络连接失败，请稍后重试'
-  }
-
-  private showApiError(error: Error): void {
+  showApiError(error: Error): void {
     // 错误统一出口：用户可见的 API 错误必须进遥测（此前只 toast，
     // catch 分支的错误永远查不到）。
     telemetry.report(error)
@@ -688,5 +343,4 @@ export class AppStore {
     this.online = false
     this.showToast('网络连接失败，请稍后重试', true)
   }
-
 }

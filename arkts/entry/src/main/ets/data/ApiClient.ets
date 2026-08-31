@@ -15,9 +15,7 @@ import {
   BootstrapPayload,
   CouponView,
   CreateOrderResult,
-  CreateTicketInput,
   DeleteAccountInput,
-  FeedbackInput,
   HelpArticle,
   MembershipCurrent,
   NotificationView,
@@ -37,6 +35,35 @@ import {
   SupportMessage,
   UsageSummary
 } from '../domain/Models'
+import {
+  createTicket,
+  help,
+  reply,
+  resolveObjectUrl,
+  signUpload,
+  submitFeedback,
+  ticket,
+  tickets
+} from './ApiStorageSupport'
+import { uploadToS3 } from './ApiTransport'
+import { CreateTicketInput } from '../domain/SupportModels'
+import {
+  changePassword,
+  requestPasswordReset,
+  requestPhoneCode,
+  resendEmailVerification,
+  resetPassword,
+  saveSettings,
+  signIn,
+  signOut,
+  signOutAll,
+  signUp,
+  socialSignIn,
+  updateProfile,
+  verifyEmail,
+  verifyPasswordReset,
+  verifyPhoneCode
+} from './ApiAuthEndpoints'
 
 export { ApiFailure } from './ApiTransport'
 
@@ -76,72 +103,36 @@ export class ApiClient {
   }
 
   signIn(identifier: string, password: string): Promise<AuthPayload> {
-    const input: SignInInput = { identifier, password, deviceName: 'HarmonyOS · MobileUI' }
-    return this.request<AuthPayload>('/api/v1/auth/sign-in', http.RequestMethod.POST, input)
+    return signIn(this.transport, identifier, password)
   }
 
   signUp(email: string, password: string, username: string, consentVersion: string):
     Promise<AuthPayload> {
-    const input: SignUpInput = {
-      email,
-      password,
-      username,
-      consentVersion,
-      deviceName: 'HarmonyOS · MobileUI'
-    }
-    return this.request<AuthPayload>('/api/v1/auth/sign-up', http.RequestMethod.POST, input)
+    return signUp(this.transport, email, password, username, consentVersion)
   }
 
   verifyEmail(email: string, code: string): Promise<boolean> {
-    return this.request<Record<string, boolean>>(
-      '/api/v1/auth/verify-email',
-      http.RequestMethod.POST,
-      { email, code }
-    ).then(result => result['verified'] === true)
+    return verifyEmail(this.transport, email, code)
   }
 
   resendEmailVerification(email: string): Promise<boolean> {
-    return this.request<Record<string, boolean>>(
-      '/api/v1/auth/verify-email/resend',
-      http.RequestMethod.POST,
-      { email }
-    ).then(result => result['accepted'] === true)
+    return resendEmailVerification(this.transport, email)
   }
 
   signOut(): Promise<boolean> {
-    return this.request<Record<string, boolean>>(
-      '/api/v1/auth/sign-out',
-      http.RequestMethod.POST
-    ).then(result => result['signedOut'] === true)
+    return signOut(this.transport)
   }
 
   signOutAll(): Promise<boolean> {
-    return this.request<Record<string, boolean>>(
-      '/api/v1/auth/sign-out-all',
-      http.RequestMethod.POST
-    ).then(result => result['signedOut'] === true)
+    return signOutAll(this.transport)
   }
 
   requestPhoneCode(phone: string): Promise<boolean> {
-    const input: PhoneCodeInput = { phone }
-    return this.request<Record<string, boolean>>(
-      '/api/v1/auth/phone/request',
-      http.RequestMethod.POST,
-      input
-    ).then(result => result['accepted'] === true)
+    return requestPhoneCode(this.transport, phone)
   }
 
   verifyPhoneCode(phone: string, code: string): Promise<AuthPayload> {
-    const input: PhoneVerifyInput = {
-      phone,
-      code,
-      deviceName: 'HarmonyOS · MobileUI'
-    }
-    return this.request<AuthPayload>(
-      '/api/v1/auth/phone/verify',
-      http.RequestMethod.POST,
-      input
-    )
+    return verifyPhoneCode(this.transport, phone, code)
   }
 
   socialSignIn(
@@ -151,68 +142,32 @@ export class ApiClient {
     redirectUri: string,
     codeVerifier: string
   ): Promise<AuthPayload> {
-    const body: SocialSignInInput = {
-      provider,
-      deviceName: 'HarmonyOS · MobileUI'
-    }
-    if (idToken.length > 0) body.idToken = idToken
-    if (authorizationCode.length > 0) body.authorizationCode = authorizationCode
-    if (redirectUri.length > 0) body.redirectUri = redirectUri
-    if (codeVerifier.length > 0) body.codeVerifier = codeVerifier
-    return this.request<AuthPayload>(
-      '/api/v1/auth/social', http.RequestMethod.POST, body
-    )
+    return socialSignIn(this.transport, provider, idToken, authorizationCode, redirectUri, codeVerifier)
   }
 
   requestPasswordReset(email: string): Promise<boolean> {
-    return this.request<Record<string, string | number | boolean>>(
-      '/api/v1/auth/password/forgot', http.RequestMethod.POST, { email }
-    ).then(result => result['accepted'] === true)
+    return requestPasswordReset(this.transport, email)
   }
 
   verifyPasswordReset(email: string, code: string): Promise<string> {
-    return this.request<Record<string, string | number>>(
-      '/api/v1/auth/password/verify', http.RequestMethod.POST, { email, code }
-    ).then(result => String(result['resetToken'] ?? ''))
+    return verifyPasswordReset(this.transport, email, code)
   }
 
   resetPassword(resetToken: string, newPassword: string): Promise<boolean> {
-    return this.request<Record<string, boolean>>(
-      '/api/v1/auth/password/reset', http.RequestMethod.POST,
-      { resetToken, newPassword }
-    ).then(result => result['changed'] === true)
+    return resetPassword(this.transport, resetToken, newPassword)
   }
 
   saveSettings(patch: Record<string, string | number | boolean>):
     Promise<Record<string, string | number | boolean>> {
-    return this.request<Record<string, string | number | boolean>>(
-      '/api/v1/me/settings',
-      http.RequestMethod.PUT,
-      patch
-    )
+    return saveSettings(this.transport, patch)
   }
 
   changePassword(currentPassword: string, newPassword: string): Promise<boolean> {
-    return this.request<Record<string, boolean>>(
-      '/api/v1/me/change-password',
-      http.RequestMethod.POST,
-      { currentPassword, newPassword }
-    ).then(result => result['changed'] === true)
+    return changePassword(this.transport, currentPassword, newPassword)
   }
 
   updateProfile(displayName: string, bio: string, avatarUrl: string | null): Promise<AppUser> {
-    // 空串统一转 null（服务端 schema 拒绝 ''，未设置头像就是 null）。
-    const normalizedAvatar = avatarUrl !== null && avatarUrl.length === 0 ? null : avatarUrl
-    const body: ProfileUpdateBody = {
-      displayName,
-      bio,
-      avatarUrl: normalizedAvatar
-    }
-    return this.request<AppUser>(
-      '/api/v1/me/profile',
-      http.RequestMethod.PUT,
-      body
-    )
+    return updateProfile(this.transport, displayName, bio, avatarUrl)
   }
 
   sessions(): Promise<SessionView[]> {
@@ -265,49 +220,17 @@ export class ApiClient {
   }
 
   // ── S3 storage (BaaS) ───────────────────────────────────────────────────
-  // 申请上传：server 用 app_id + environment 选 bucket/key，返回 presigned PUT URL。
+  // 实现在 ApiStorageSupport.ets / ApiTransport.ets（350 行拆分），此处薄委托。
   signUpload(path: string, contentType: string): Promise<SignUploadResult> {
-    return this.request<SignUploadResult>(
-      '/api/v1/storage/uploads', http.RequestMethod.POST, { path, contentType }
-    )
+    return signUpload(this.transport, path, contentType)
   }
 
-  // objectKey → 短时效 presigned GET URL（私有 bucket；每次显示前换取）。
-  // 返回 null 表示对象不存在/无权（调用方回退占位头像）。
-  async resolveObjectUrl(objectKey: string): Promise<string | null> {
-    try {
-      const result = await this.request<Record<string, string>>(
-        `/api/v1/storage/urls?key=${encodeURIComponent(objectKey)}`,
-        http.RequestMethod.GET
-      )
-      return result['url'] ?? null
-    } catch {
-      return null
-    }
+  resolveObjectUrl(objectKey: string): Promise<string | null> {
+    return resolveObjectUrl(this.transport, objectKey)
   }
 
-  // 直传到 OSS presigned URL（不经 API base；二进制 PUT）。
   uploadToS3(uploadUrl: string, data: ArrayBuffer, contentType: string): Promise<void> {
-    const client = http.createHttp()
-    const headers: Record<string, string> = { 'Content-Type': contentType }
-    return client.request(uploadUrl, {
-      method: http.RequestMethod.PUT,
-      header: headers,
-      extraData: data,
-      expectDataType: http.HttpDataType.STRING,
-      connectTimeout: 10000,
-      readTimeout: 30000
-    }).then((response: http.HttpResponse) => {
-      client.destroy()
-      if (response.responseCode < 200 || response.responseCode >= 300) {
-        throw new ApiFailure('UPLOAD_FAILED', `对象存储上传失败 ${response.responseCode}`,
-          response.responseCode, false)
-      }
-    }).catch((error: Error) => {
-      client.destroy()
-      if (error instanceof ApiFailure) throw error
-      throw new ApiFailure('UPLOAD_FAILED', error.message ?? '上传失败', 0, false)
-    })
+    return uploadToS3(uploadUrl, data, contentType)
   }
 
   membershipCurrent(): Promise<MembershipCurrent> {
@@ -342,46 +265,34 @@ export class ApiClient {
     ).then(result => result['deleted'] === true)
   }
 
+  // ── 客服支持（实现在 ApiStorageSupport.ets）───────────────────────────────
   submitFeedback(
     title: string,
     body: string,
     category: string = 'suggestion',
     rating: number = 5
   ): Promise<boolean> {
-    const input: FeedbackInput = { category, title, body, rating }
-    return this.request<Record<string, string | number>>(
-      '/api/v1/support/feedback',
-      http.RequestMethod.POST,
-      input
-    ).then(result => String(result['id'] ?? '').length > 0)
+    return submitFeedback(this.transport, title, body, category, rating)
   }
 
   help(): Promise<HelpArticle[]> {
-    return this.request<HelpArticle[]>('/api/v1/support/help', http.RequestMethod.GET)
+    return help(this.transport)
   }
 
   tickets(): Promise<SupportTicket[]> {
-    return this.request<SupportTicket[]>('/api/v1/support/tickets', http.RequestMethod.GET)
+    return tickets(this.transport)
   }
 
   ticket(id: string): Promise<SupportTicketDetail> {
-    return this.request<SupportTicketDetail>(
-      `/api/v1/support/tickets/${id}`, http.RequestMethod.GET
-    )
+    return ticket(this.transport, id)
   }
 
   createTicket(input: CreateTicketInput): Promise<SupportTicket> {
-    return this.request<SupportTicket>(
-      '/api/v1/support/tickets', http.RequestMethod.POST, input
-    )
+    return createTicket(this.transport, input)
   }
 
   reply(ticketId: string, message: string): Promise<SupportMessage> {
-    return this.request<SupportMessage>(
-      `/api/v1/support/tickets/${ticketId}/messages`,
-      http.RequestMethod.POST,
-      { message }
-    )
+    return reply(this.transport, ticketId, message)
   }
 
   usage(): Promise<UsageSummary> {

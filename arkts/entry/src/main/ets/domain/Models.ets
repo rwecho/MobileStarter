@@ -168,20 +168,6 @@ export interface SupportTicketDetail extends SupportTicket {
   messages: SupportMessage[]
 }
 
-export interface ProductFeedback {
-  id: string
-  category: string
-  title: string
-  body: string
-  rating: number | null
-  status: string
-  market: string
-  dataRegion: string
-  queueId: string
-  createdAt: string
-  updatedAt: string
-}
-
 export interface AppUser {
   id: string
   // 可空：手机号/华为登录账号未绑定邮箱；hasEmail=false 时 UI 不应展示 email。
@@ -257,20 +243,6 @@ export interface PhoneCodeInput {
 export interface PhoneVerifyInput extends PhoneCodeInput {
   code: string
   deviceName: string
-}
-
-export interface FeedbackInput {
-  category: string
-  title: string
-  body: string
-  rating: number
-}
-
-export interface CreateTicketInput {
-  category: string
-  severity: string
-  subject: string
-  message: string
 }
 
 export interface StoreProductMapping {

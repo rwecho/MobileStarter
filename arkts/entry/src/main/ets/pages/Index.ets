@@ -10,9 +10,9 @@ import { CouponsPage, InvitePage, StatisticsPage } from './ProfileDataPages'
 import { OrdersPage, SessionsPage } from './AccountDataPages'
 import { NotificationPage } from './NotificationPage'
 import {
-  AboutPage, AccountSecurityPage, ChoicePreferencePage,
-  LegalDocumentPage, LegalPage, ProfileEditPage
+  AccountSecurityPage, ChoicePreferencePage, ProfileEditPage
 } from './SettingsActionPages'
+import { AboutPage, LegalDocumentPage, LegalPage } from './SettingsLegalPages'
 import { AppTabShell } from './AppTabShell'
 import { OnboardingPage, SplashPage } from './LaunchPages'
 import { CheckoutPage } from './CheckoutPage'

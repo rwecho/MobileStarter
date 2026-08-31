@@ -1,3 +1,6 @@
+# 全仓源码架构检查（行数硬限 / emoji / TS any / 图标字体 / SVG viewBox / 关键行为标记）。
+# TODO(长期)：按栈分片——各 CI 用 -Root 只查自己的目录，并给纯类型/表驱动文件
+# 加目录级例外；领域抽象由业务变化驱动，不由行数驱动（2026-08-31 拆分复盘结论）。
 param(
   [string]$Root = (Split-Path -Parent $PSScriptRoot)
 )

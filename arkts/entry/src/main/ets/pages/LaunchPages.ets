@@ -4,18 +4,13 @@ import { AppButton } from '../design_system/Components'
 import { AppColors, AppSpacing } from '../theme/AppTokens'
 import { SplashConfig } from '../domain/Models'
 
-// ── Splash page ──────────────────────────────────────────────────────────
-// 统一三端启动体验：原生 logo → 品牌闪屏 → home。闪屏仅在「在线且有 splash 配置」
-// 时展示（全屏媒体 + 右上角胶囊跳过 + 倒计时）；离线或未配置 → 直接进首页。
-//
-// 阶段：
-//  1. loading：logo + appName + tagline + 加载指示 + "加载中…"
-//     只等磁盘（store.localReady），不等网络（8s 兜底防 fetch 挂死）。
-//     AGC 冷启动时延 ≤1100ms：系统启动页自带 ~200ms 渐隐已覆盖品牌停顿，
-//     App 内不再强制 1s logo 展示（issue #24）。
-//  2. localReady 后判断：无缓存闪屏配置 → 不等网络直接进首页（bootstrap 后台
-//     继续完成，UI 响应式更新）；有缓存闪屏 → 等 bootstrap 拉最新后：
-//     splash==null 或 离线 → 直进首页；在线且有 splash → 品牌闪屏 → home
+// ── 启动门（原品牌闪屏入口）─────────────────────────────────────────────
+// 本屏只是 bootstrap 等待门：原生 logo → （极短 loading）→ 分流落地。
+// **默认关掉品牌闪屏**：无 config.splash 时 bootstrap 一完成立即分流——
+// 已登录 → Home，未登录 → SignIn（认证页即落地页）。分流依赖登录态，
+// 而 user 只在 bootstrap 后可知，故不做"不等网络直进首页"的快速路径
+//（8s 兜底防 fetch 挂死）。仅当配置了 config.splash 且在线时才展示
+// 品牌闪屏活动（可选项）。
 
 const MAX_SPLASH_WAIT_MS: number = 8000
 
@@ -34,8 +29,8 @@ export struct SplashPage {
 
   aboutToAppear(): void {
     // fetch 无显式超时，最长等待兜底，避免一直卡在 loading
-    this.maxTimer = setTimeout(() => this.goHome(), MAX_SPLASH_WAIT_MS)
-    this.maybeAdvance() // localReady 可能已就绪（磁盘读取早于页面挂载）
+    this.maxTimer = setTimeout(() => this.enterApp(), MAX_SPLASH_WAIT_MS)
+    this.maybeAdvance() // bootstrap 可能已完成（早于页面挂载）
   }
 
   aboutToDisappear(): void {
@@ -49,15 +44,10 @@ export struct SplashPage {
 
   maybeAdvance(): void {
     if (this.advancing || this.countdown !== -1) return
-    if (!this.store.localReady) return // 磁盘缓存配置未读完：等 @Watch 触发（毫秒级）
+    if (!this.store.bootstrapped) return // 分流需知登录态：等 bootstrap（8s 兜底）
     const splash = this.store.config?.splash ?? null
-    if (splash === null && !this.store.bootstrapped) {
-      this.goHome() // 无缓存闪屏配置：不等网络直接进首页，bootstrap 后台继续
-      return
-    }
-    if (!this.store.bootstrapped) return // 有缓存闪屏 → 等 bootstrap 拉最新（8s 兜底）
     if (splash === null || !this.store.online) {
-      this.goHome() // 未配置闪屏或离线 → 直接进首页
+      this.enterApp() // 默认：未配置闪屏或离线 → 直接落地（Home / 认证页）
       return
     }
     this.advancing = true
@@ -71,30 +61,29 @@ export struct SplashPage {
     this.countdownTimer = setInterval(() => {
       if (this.countdown <= 1) {
         clearInterval(this.countdownTimer)
-        this.goHome()
+        this.enterApp()
         return
       }
       this.countdown--
     }, 1000)
   }
 
-  goHome(): void {
+  enterApp(): void {
     if (this.done) return
     this.done = true
-    this.store.replaceAll(AppRoute.Home)
+    const target = this.store.signedIn ? AppRoute.Home : AppRoute.SignIn
+    this.store.replaceAll(target)
   }
 
   build() {
     if (this.countdown === -1) {
-      // 阶段 loading：logo + appName + tagline + 加载指示 + "加载中…"
+      // 阶段 loading：logo + appName + 转圈。bootstrap 通常几百 ms，
+      // 完成即分流，默认体验无闪屏。
       Column({ space: AppSpacing.x3 }) {
         Image($r('app.media.logo')).width(48).height(48)
         Text(this.store.config?.brand.appName ?? 'MobileUI')
           .fontSize(28).fontWeight(FontWeight.Bold)
-        Text(this.store.config?.brand.tagline ?? '')
-          .fontColor(AppColors.textSecondary).fontSize(14)
         LoadingProgress().width(24).height(24).color(AppColors.brand)
-        Text('加载中…').fontColor(AppColors.brand).fontSize(14)
       }
       .width('100%').height('100%')
       .justifyContent(FlexAlign.Center)
@@ -108,7 +97,7 @@ export struct SplashPage {
             SkipCapsule({
               countdown: Math.max(this.countdown, 0),
               canSkip: this.splashConfig.skippable !== false,
-              onSkip: () => { this.goHome() }
+              onSkip: () => { this.enterApp() }
             })
           }
           .padding(AppSpacing.x3)

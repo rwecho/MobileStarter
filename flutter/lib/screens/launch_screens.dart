@@ -11,18 +11,13 @@ import '../navigation/app_route.dart';
 import '../navigation/app_route_paths.dart';
 import '../theme/app_tokens.dart';
 
-// ── Splash screen ─────────────────────────────────────────────────────────
-// 统一三端启动体验：原生 logo → 品牌闪屏 → home。闪屏仅在「在线且有 splash 配置」
-// 时展示（全屏媒体 + 右上角胶囊跳过 + 倒计时）；离线或未配置 → 直接进首页。
-//
-// 阶段：
-//  1. loading：logo + appName + tagline + 加载指示 + "加载中…"
-//     只等磁盘（controller.localReady），不等网络（8s 兜底防 fetch 挂死）。
-//     AGC 冷启动时延 ≤1100ms：原生启动页渐隐已覆盖品牌停顿，App 内不再
-//     强制 1s logo 展示（issue #24）。
-//  2. localReady 后判断：无缓存闪屏配置 → 不等网络直接进首页（bootstrap 后台
-//     继续完成）；有缓存闪屏 → 等 bootstrap 拉最新后：splash==null 或 离线 →
-//     直进首页；在线且有 splash → 预加载媒体 → 品牌闪屏 → home
+// ── 启动门（原品牌闪屏入口）──────────────────────────────────────────────
+// 本屏只是 bootstrap 等待门：原生 logo → （极短 loading）→ 分流落地。
+// **默认关掉品牌闪屏**：无 config.splash 时 bootstrap 一完成立即分流——
+// 已登录 → home，未登录 → signIn（认证页即落地页）。分流依赖登录态，
+// 而 user 只在 bootstrap 后可知，故不做"不等网络直进首页"的快速路径
+//（8s 兜底防 fetch 挂死）。仅当配置了 config.splash 且在线时才展示
+// 品牌闪屏活动（可选项）。
 
 const Duration _kMaxSplashWait = Duration(seconds: 8);
 
@@ -46,7 +41,7 @@ class _SplashScreenState extends State<SplashScreen> {
   void initState() {
     super.initState();
     // fetch 无显式超时，最长等待兜底，避免一直卡在 loading
-    _maxTimer = Timer(_kMaxSplashWait, _goHome);
+    _maxTimer = Timer(_kMaxSplashWait, _enterApp);
   }
 
   @override
@@ -56,7 +51,7 @@ class _SplashScreenState extends State<SplashScreen> {
     if (!_listening) {
       _controller.addListener(_onChanged);
       _listening = true;
-      // 挂载时 localReady 可能已就绪（磁盘读取早于页面挂载）：首帧后再推进
+      // 挂载时 bootstrap 可能已完成（早于页面挂载）：首帧后再推进
       WidgetsBinding.instance.addPostFrameCallback((_) => _maybeAdvance());
     }
   }
@@ -68,15 +63,10 @@ class _SplashScreenState extends State<SplashScreen> {
 
   void _maybeAdvance() {
     if (_advancing || _countdown != null) return; // 已进入闪屏或正在推进
-    if (!_controller.localReady) return; // 磁盘缓存配置未读完：等 listener 触发
+    if (!_controller.bootstrapped) return; // 分流需知登录态：等 bootstrap（8s 兜底）
     final splash = _controller.config?.splash;
-    if (splash == null && !_controller.bootstrapped) {
-      _goHome(); // 无缓存闪屏配置：不等网络直接进首页，bootstrap 后台继续
-      return;
-    }
-    if (!_controller.bootstrapped) return; // 有缓存闪屏 → 等 bootstrap 拉最新
     if (splash == null || !_controller.online) {
-      _goHome(); // 未配置闪屏或离线 → 直接进首页
+      _enterApp(); // 默认：未配置闪屏或离线 → 直接落地（home / 认证页）
       return;
     }
     _advancing = true;
@@ -97,17 +87,18 @@ class _SplashScreenState extends State<SplashScreen> {
       if (!mounted) return;
       if ((_countdown ?? 0) <= 1) {
         _countdownTimer?.cancel();
-        _goHome();
+        _enterApp();
         return;
       }
       setState(() => _countdown = _countdown! - 1);
     });
   }
 
-  void _goHome() {
+  void _enterApp() {
     if (_done || !mounted) return;
     _done = true;
-    context.go(pathFor(AppRoute.home));
+    final target = _controller.signedIn ? AppRoute.home : AppRoute.signIn;
+    context.go(pathFor(target));
   }
 
   @override
@@ -126,7 +117,8 @@ class _SplashScreenState extends State<SplashScreen> {
         final config = _controller.config;
         final background = Theme.of(context).colorScheme.surface;
         if (_countdown == null) {
-          // 阶段 loading：logo + appName + tagline + 加载指示 + "加载中…"
+          // 阶段 loading：logo + appName + 转圈。bootstrap 通常几百 ms，
+          // 不设最短展示时间——完成即分流，默认体验无闪屏。
           return Scaffold(
             backgroundColor: background,
             body: Center(
@@ -142,14 +134,6 @@ class _SplashScreenState extends State<SplashScreen> {
                       fontWeight: FontWeight.w700,
                     ),
                   ),
-                  const SizedBox(height: AppSpacing.x1),
-                  Text(
-                    config?.tagline ?? '',
-                    style: const TextStyle(
-                      color: AppColors.secondaryText,
-                      fontSize: 14,
-                    ),
-                  ),
                   const SizedBox(height: AppSpacing.x5),
                   const SizedBox(
                     width: 24,
@@ -158,11 +142,6 @@ class _SplashScreenState extends State<SplashScreen> {
                       strokeWidth: 2,
                       color: AppColors.brand,
                     ),
-                  ),
-                  const SizedBox(height: AppSpacing.x2),
-                  const Text(
-                    '加载中…',
-                    style: TextStyle(color: AppColors.brand, fontSize: 14),
                   ),
                 ],
               ),
@@ -191,7 +170,7 @@ class _SplashScreenState extends State<SplashScreen> {
                       child: SplashSkipCapsule(
                         countdown: _countdown ?? 0,
                         canSkip: canSkip,
-                        onSkip: _goHome,
+                        onSkip: _enterApp,
                       ),
                     ),
                   ),

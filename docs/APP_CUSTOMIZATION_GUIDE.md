@@ -91,7 +91,7 @@ brand: {
   tagline: string,      // 标语（≤100 字符）
   primaryColor: string, // #RRGGBB，客户端品牌点缀色
 },
-splash: {               // 品牌闪屏活动；null = 不展示闪屏，直接进首页
+splash: {               // 品牌闪屏活动；null = 默认关闭（按登录态落地 首页/认证页）
   id, title,            // 标题（≤80）
   description,          // 描述（≤200）
   badge,                // 角标文案（≤30）
@@ -111,7 +111,9 @@ splash: {               // 品牌闪屏活动；null = 不展示闪屏，直接�
   （客户端按 version 判断刷新）。
 
 客户端消费路径：`GET /api/v1/bootstrap` → `config.brand` / `config.splash`。
-三端闪屏页（`react-native/src/screens/LaunchScreens.tsx`、
+品牌闪屏**默认关闭**（`splash: null`）：三端启动门在 bootstrap 完成后按登录态
+分流——已登录进首页，未登录落地认证页。仅当配置了 `config.splash` 且在线时
+才展示品牌闪屏活动；三端闪屏页（`react-native/src/screens/LaunchScreens.tsx`、
 `flutter/lib/screens/launch_screens.dart`、`arkts/.../pages/LaunchPages.ets`）
 只负责渲染这份配置——**改闪屏内容不碰任何客户端代码**。
 
@@ -280,8 +282,10 @@ HarmonyOS 的启动窗口完全由 `module.json5` 的 `startWindow*` 声明，
 5. **域名关联**：`app.json` 的 `associatedDomains`（applinks）与 Android
    `intentFilters` 指向 `auth.zhongbei.tech`；自建 BaaS 域名时两处 +
    服务端都要换，属于身份层，先跑 CLI 再核对本项。
-6. **两层闪屏**：原生启动屏（L3，静态 logo）与品牌闪屏（L1，服务端活动配置）
-   是两个东西；只改其一会出现"开屏新 logo、进 App 旧活动"的割裂。
+6. **两层闪屏**：原生启动屏（L3，静态 logo，常显）与品牌闪屏（L1，服务端
+   活动配置，**默认关闭**）是两个东西。启用 `config.splash` 活动时，只改原生
+   会出现"开屏新 logo、进 App 旧活动"的割裂；不配置则只有原生启动屏，
+   启动后按登录态直接落地。
 7. **RN 法务双源**：应用内"协议与政策"页读内置副本，注册 consent 读服务端
    `config.legal` 的 revision——只改服务端会出现"应用内旧条款、注册记录新
    版本号"的错位。

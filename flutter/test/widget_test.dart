@@ -54,6 +54,11 @@ void main() {
           path: pathFor(AppRoute.home),
           builder: (context, state) => const Scaffold(body: Text('home-page')),
         ),
+        GoRoute(
+          path: pathFor(AppRoute.signIn),
+          builder: (context, state) =>
+              const Scaffold(body: Text('sign-in-page')),
+        ),
       ],
     );
     await tester.pumpWidget(
@@ -62,9 +67,9 @@ void main() {
         child: MaterialApp.router(routerConfig: router),
       ),
     );
-    // Loading phase shows brand + spinner.
+    // Loading phase shows brand only（16ff1e9 起去掉"加载中…"提示文案，
+    // 极短 loading 门：logo + 转圈即分流）。
     expect(find.text('MobileStarter'), findsOneWidget);
-    expect(find.text('加载中…'), findsOneWidget);
 
     // issue #24 已去掉 1s 最短展示：bootstrap 在 initialize()（runAsync）中已
     // 先行完成，localReady 后 _maybeAdvance 于首帧 post-frame 回调进入倒计时；
@@ -77,10 +82,11 @@ void main() {
     // Anchored to the top of the screen (SafeArea + Align topRight).
     expect(tester.getTopLeft(capsule).dy, lessThan(150));
 
-    // Skipping advances to home (go_router navigates to the home route).
+    // Skipping advances by login state (16ff1e9 启动门分流): mock bootstrap
+    // 返回 user: null → 未登录 → 落地认证页 signIn（不再是 home）。
     await tester.tap(capsule);
     await tester.pumpAndSettle();
-    expect(find.text('home-page'), findsOneWidget);
+    expect(find.text('sign-in-page'), findsOneWidget);
   });
 }
 

@@ -15,6 +15,27 @@ export function storeKeyForPlatform(platform: ClientPlatform): StoreKey | undefi
   return undefined;
 }
 
+/**
+ * 兼容旧 schema：老配置用 `provider: 'huawei'` 表示 hms 渠道，
+ * 其余渠道名（mock/apple/google/wechat/alipay）原样透传。
+ */
+export function legacyProvider(id: string): PaymentProviderId {
+  if (id === 'huawei') return 'hms';
+  return id as PaymentProviderId;
+}
+
+/**
+ * 兼容旧 schema：storeProductMapping 的值可能是字符串（新 schema）
+ * 或数组（旧 schema，多个区域/币种商品 id，取首个）。返回给客户端做购买的商品 id。
+ */
+export function planStoreProductId(mapping: unknown, storeKey: StoreKey): string | undefined {
+  if (mapping === null || typeof mapping !== 'object') return undefined;
+  const value = (mapping as Record<string, unknown>)[storeKey];
+  if (typeof value === 'string') return value;
+  if (Array.isArray(value)) return typeof value[0] === 'string' ? value[0] : undefined;
+  return undefined;
+}
+
 export type VerifyResult = Readonly<{
   ok: boolean;
   storeTransactionId?: string;

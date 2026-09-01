@@ -8,13 +8,15 @@ import {
   completeOrder, failOrder, findOrder, findOrderById, findOrderByReceiptHash,
   insertPendingOrder, listOrders, markProcessing, upsertSubscription, type OrderView,
 } from './order-repository';
-import { paymentProvider, storeKeyForPlatform } from './payment-providers';
+import { legacyProvider, paymentProvider, planStoreProductId, storeKeyForPlatform } from './payment-providers';
 
 type Plan = RuntimeConfig['plans'][number];
 
 function planExpiry(plan: Plan): string | null {
-  if (plan.interval === 'lifetime' || plan.interval === 'one_time') return null;
-  const days = plan.interval === 'month' ? 30 : 365;
+  const interval = String(plan.interval);
+  if (interval === 'lifetime' || interval === 'one_time') return null;
+  // 兼容旧 schema：interval 可能是 'monthly'（旧）或 'month'（新），'yearly'/'year' 同。
+  const days = (interval === 'month' || interval === 'monthly') ? 30 : 365;
   return new Date(Date.now() + days * 86400_000).toISOString();
 }
 
@@ -25,8 +27,10 @@ function resolvePlan(config: RuntimeConfig, planId: string): Plan {
 }
 
 function findPlanByProductId(config: RuntimeConfig, productId: string): Plan {
+  // 兼容旧 schema：storeProductMapping 值可能是字符串或数组，先展平再匹配。
   const plan = config.plans.find((p) =>
-    p.storeProductMapping && Object.values(p.storeProductMapping).includes(productId));
+    p.storeProductMapping &&
+    Object.values(p.storeProductMapping).flat(Infinity).includes(productId));
   if (!plan) throw new ApiError(404, 'PRODUCT_NOT_MAPPED', '找不到商品对应的方案');
   return plan;
 }
@@ -49,7 +53,7 @@ export async function createOrder(input: CreateOrderInput): Promise<{
   const plan = resolvePlan(input.config, input.planId);
   const storeKey = storeKeyForPlatform(input.platform);
   if (!storeKey) throw new ApiError(404, 'PRODUCT_NOT_MAPPED', '当前平台不支持商店内购');
-  const storeProductId = plan.storeProductMapping?.[storeKey];
+  const storeProductId = planStoreProductId(plan.storeProductMapping, storeKey);
   if (!storeProductId) throw new ApiError(404, 'PRODUCT_NOT_MAPPED', `方案未配置 ${storeKey} 商品 ID`);
   const existing = await findOrder(input.userId, input.idempotencyKey);
   if (existing) return { orderId: existing.id, storeProductId, status: 'pending' };
@@ -99,7 +103,7 @@ export async function verifyPurchase(input: VerifyInput): Promise<OrderView> {
     await markProcessing(orderId);
   }
 
-  const provider = paymentProvider(plan.provider, input.environment);
+  const provider = paymentProvider(legacyProvider(plan.provider), input.environment);
   const result = await provider.verifyReceipt({
     appId: input.appId, userId: input.userId, orderId, receipt: input.receipt,
   });

@@ -6,7 +6,7 @@ type ApiError = { status: number; code: string };
 const { database } = await import('../src/server/database.ts');
 const { defaultConfig } = await import('../src/domain/config.ts');
 const { runtimeConfigSchema, verifyPurchaseSchema, restorePurchasesSchema } = await import('../src/server/schemas.ts');
-const { paymentProvider, storeKeyForPlatform } = await import('../src/server/payment-providers.ts');
+const { paymentProvider, storeKeyForPlatform, legacyProvider, planStoreProductId } = await import('../src/server/payment-providers.ts');
 const { issueEntitlements, revokeEntitlementsForOrder, listActiveEntitlements } = await import('../src/server/entitlement-service.ts');
 const {
   insertPendingOrder, completeOrder, findOrderById, findOrderByReceiptHash,
@@ -56,6 +56,20 @@ function configWith(mappedPlan = true) {
       storeProductMapping: mappedPlan
         ? { apple: 'com.x.pro', google: 'pro_g', hms: 'pro_h' }
         : { google: 'pro_g' },
+    }],
+  };
+}
+
+// 旧 schema（线上 runtime_configs 实际形态）：interval=monthly/yearly、provider=huawei、
+// storeProductMapping.hms 为数组。createOrder/verifyPurchase 应双兼容。
+function configWithLegacy(options: { provider?: string; interval?: string; hms?: unknown } = {}): any {
+  const { provider = 'huawei', interval = 'monthly', hms = ['pro_monthly_6'] } = options;
+  return {
+    ...defaultConfig,
+    plans: [{
+      id: 'pro-monthly', tierId: 'pro', name: 'Pro 月付', interval,
+      priceMinor: 600, currency: 'CNY', provider,
+      storeProductMapping: { hms },
     }],
   };
 }
@@ -262,6 +276,70 @@ test('verifyPurchase 失败 → order failed，不发权益', async () => {
   const r = await verifyPurchase({ appId: 'app1', environment: 'development', userId, orderId, receipt: { fail: true }, platform: 'ios', config: configWith() });
   assert.equal(r.status, 'failed');
   assert.equal((await listActiveEntitlements(userId, 'app1')).length, 0);
+});
+
+test('legacyProvider / planStoreProductId 兼容旧 schema', () => {
+  assert.equal(legacyProvider('huawei'), 'hms');
+  assert.equal(legacyProvider('mock'), 'mock');
+  assert.equal(legacyProvider('apple'), 'apple');
+  assert.equal(planStoreProductId({ hms: ['pro_monthly_6', 'pro_monthly_7'] }, 'hms'), 'pro_monthly_6');
+  assert.equal(planStoreProductId({ hms: 'pro_h' }, 'hms'), 'pro_h');
+  assert.equal(planStoreProductId({}, 'hms'), undefined);
+  assert.equal(planStoreProductId(undefined, 'hms'), undefined);
+});
+
+test('createOrder 兼容旧 schema：storeProductMapping.hms 为数组 → 返回字符串商品 id', async () => {
+  const userId = await makeUser('app1');
+  const r = await createOrder({
+    userId, idempotencyKey: 'legacy-1', planId: 'pro-monthly',
+    platform: 'harmonyos', config: configWithLegacy(),
+  });
+  assert.equal(typeof r.storeProductId, 'string');
+  assert.equal(r.storeProductId, 'pro_monthly_6');
+});
+
+test('verifyPurchase 兼容旧 schema：provider huawei → hms 适配器，不抛 PAYMENT_PROVIDER_UNSUPPORTED', async () => {
+  const userId = await makeUser('app1');
+  const cfg = configWithLegacy();
+  const { orderId } = await createOrder({
+    userId, idempotencyKey: 'legacy-2', planId: 'pro-monthly',
+    platform: 'harmonyos', config: cfg,
+  });
+  // receipt 无 purchaseToken → hms 适配器形状校验短路 ok:false → 订单 failed，
+  // 而非旧行为 paymentProvider('huawei') 直接抛"不支持的支付渠道"。
+  const r = await verifyPurchase({
+    appId: 'app1', environment: 'development', userId, orderId,
+    receipt: {}, platform: 'harmonyos', config: cfg,
+  });
+  assert.equal(r.status, 'failed');
+});
+
+test('verifyPurchase 兼容旧 schema：interval monthly → 到期日约 30 天', async () => {
+  const userId = await makeUser('app1');
+  const cfg = configWithLegacy({ provider: 'mock', interval: 'monthly', hms: 'pro_h' });
+  const { orderId } = await createOrder({
+    userId, idempotencyKey: 'legacy-3', planId: 'pro-monthly',
+    platform: 'harmonyos', config: cfg,
+  });
+  const r = await verifyPurchase({
+    appId: 'app1', environment: 'development', userId, orderId,
+    receipt: { productId: 'pro_h' }, platform: 'harmonyos', config: cfg,
+  });
+  assert.equal(r.status, 'success');
+  const days = (new Date(r.expiresAt ?? '').getTime() - Date.now()) / 86400_000;
+  assert.ok(days > 29 && days < 31, `到期日应约 30 天，实际 ${days.toFixed(2)} 天`);
+});
+
+test('hms 适配器兼容对象 receipt（{purchaseToken}）', async () => {
+  const hms = await paymentProvider('hms', 'production');
+  // 无 token → 形状校验短路，直接 ok:false（不抛）
+  const empty = await hms.verifyReceipt({ appId: 'a', userId: 'u', receipt: {} });
+  assert.equal(empty.ok, false);
+  // 有 purchaseToken 对象 → 通过形状校验、走到环境变量检查（CI 未配 HMS_* 抛 503）
+  await assert.rejects(
+    () => hms.verifyReceipt({ appId: 'a', userId: 'u', receipt: { purchaseToken: 'tok' } }),
+    (err: ApiError) => err.status === 503 && err.code === 'PAYMENT_PROVIDER_NOT_CONFIGURED',
+  );
 });
 
 test('restorePurchases 按 productId 反查并补发（orderId 缺省）', async () => {

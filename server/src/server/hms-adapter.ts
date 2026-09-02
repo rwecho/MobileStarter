@@ -68,14 +68,9 @@ export class HMSAdapter implements PaymentAdapter {
   async verifyReceipt(input: Readonly<{
     appId: string; userId: string; orderId?: string; receipt: unknown;
   }>): Promise<VerifyResult> {
-    // 兼容旧 schema：客户端可能直接发裸 purchaseToken 字符串，或 { purchaseToken } 对象。
-    const raw = input.receipt as unknown;
-    const purchaseToken = typeof raw === 'string'
-      ? raw
-      : (raw !== null && typeof raw === 'object')
-        ? (raw as { purchaseToken?: unknown }).purchaseToken
-        : undefined;
-    if (typeof purchaseToken !== 'string' || purchaseToken.length === 0) return { ok: false };
+    if (typeof input.receipt !== 'string') return { ok: false };
+    const purchaseToken = input.receipt;
+    if (!purchaseToken) return { ok: false };
 
     this.checkConfig();
     const appId = process.env.HMS_APP_ID!;

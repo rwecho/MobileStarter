@@ -6,7 +6,7 @@ type ApiError = { status: number; code: string };
 const { database } = await import('../src/server/database.ts');
 const { defaultConfig } = await import('../src/domain/config.ts');
 const { runtimeConfigSchema, verifyPurchaseSchema, restorePurchasesSchema } = await import('../src/server/schemas.ts');
-const { paymentProvider, storeKeyForPlatform, legacyProvider, planStoreProductId } = await import('../src/server/payment-providers.ts');
+const { paymentProvider, paymentProviderForPlatform, storeKeyForPlatform } = await import('../src/server/payment-providers.ts');
 const { issueEntitlements, revokeEntitlementsForOrder, listActiveEntitlements } = await import('../src/server/entitlement-service.ts');
 const {
   insertPendingOrder, completeOrder, findOrderById, findOrderByReceiptHash,
@@ -43,7 +43,7 @@ async function makeOrder(orderId: string, userId: string): Promise<string> {
   await database.prepare(
     `INSERT INTO orders(id, user_id, plan_id, tier_id, idempotency_key, status, amount_minor, currency, provider, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-  ).run(orderId, userId, 'pro-monthly', 'pro', `k-${orderId}`, 'success', 1800, 'CNY', 'mock', ts);
+  ).run(orderId, userId, 'pro-monthly', 'plus', `k-${orderId}`, 'success', 1800, 'CNY', 'mock', ts);
   return orderId;
 }
 
@@ -56,20 +56,6 @@ function configWith(mappedPlan = true) {
       storeProductMapping: mappedPlan
         ? { apple: 'com.x.pro', google: 'pro_g', hms: 'pro_h' }
         : { google: 'pro_g' },
-    }],
-  };
-}
-
-// 旧 schema（线上 runtime_configs 实际形态）：interval=monthly/yearly、provider=huawei、
-// storeProductMapping.hms 为数组。createOrder/verifyPurchase 应双兼容。
-function configWithLegacy(options: { provider?: string; interval?: string; hms?: unknown } = {}): any {
-  const { provider = 'huawei', interval = 'monthly', hms = ['pro_monthly_6'] } = options;
-  return {
-    ...defaultConfig,
-    plans: [{
-      id: 'pro-monthly', tierId: 'pro', name: 'Pro 月付', interval,
-      priceMinor: 600, currency: 'CNY', provider,
-      storeProductMapping: { hms },
     }],
   };
 }
@@ -182,6 +168,48 @@ test('issueEntitlements 按 tier 发放权益且幂等', async () => {
   assert.deepEqual(keys, ['cloud.100gb', 'export.hd', 'templates.pro']);
 });
 
+test('过期权益不再下发：expires_at 过去时被排除并惰性翻 inactive', async () => {
+  const userId = await makeUser('app1');
+  const orderId = `o-exp-${process.pid}-${Math.random().toString(36).slice(2, 8)}`;
+  await makeOrder(orderId, userId);
+  const tier = defaultConfig.tiers.find((t) => t.id === 'pro')!;
+  const past = new Date(Date.now() - 3_600_000).toISOString();
+  await issueEntitlements({ userId, appId: 'app1', orderId, tier, expiresAt: past });
+  const keys = (await listActiveEntitlements(userId, 'app1')).map((e) => e.entitlement_key);
+  assert.deepEqual(keys, [], '过期权益不得出现在激活列表');
+  const inactive = await database.prepare(
+    `SELECT COUNT(*)::int AS n FROM user_entitlements WHERE user_id = ? AND active = 0`,
+  ).get(userId) as { n: number };
+  assert.ok(inactive.n >= 1, '惰性清扫已把过期行翻 inactive');
+});
+
+test('续订 webhook：renew 按新到期重发权益 + 延长订单行，重放去重', async () => {
+  const userId = await makeUser('app1');
+  const orderId = `o-renew-${process.pid}-${Math.random().toString(36).slice(2, 8)}`;
+  await makeOrder(orderId, userId);
+  const tier = defaultConfig.tiers.find((t) => t.id === 'pro')!;
+  const past = new Date(Date.now() - 60_000).toISOString();
+  await issueEntitlements({ userId, appId: 'app1', orderId, tier, expiresAt: past });
+  assert.equal((await listActiveEntitlements(userId, 'app1')).length, 0, '续订前已过期不可见');
+
+  const future = new Date(Date.now() + 30 * 86_400_000).toISOString();
+  const eventId = `sko-renew-${process.pid}-${Math.random().toString(36).slice(2, 8)}`;
+  const body = Buffer.from(JSON.stringify({ eventId, kind: 'renew', orderId, expiresAt: future }));
+  const first = await applyWebhook('mock', body, {});
+  assert.equal(first.applied, true);
+  assert.equal(first.deduplicated, undefined);
+
+  const keys = (await listActiveEntitlements(userId, 'app1')).map((e) => e.entitlement_key).sort();
+  assert.deepEqual(keys, ['cloud.100gb', 'export.hd', 'templates.pro']);
+  const stored = await findOrderById(orderId);
+  assert.equal(stored!.expiresAt, future);
+
+  for (let i = 0; i < 5; i++) {
+    const replay = await applyWebhook('mock', body, {});
+    assert.equal(replay.deduplicated, true);
+  }
+});
+
 test('revokeEntitlementsForOrder 撤销该订单权益', async () => {
   const userId = await makeUser('app1');
   await makeOrder('o2', userId);
@@ -278,70 +306,6 @@ test('verifyPurchase 失败 → order failed，不发权益', async () => {
   assert.equal((await listActiveEntitlements(userId, 'app1')).length, 0);
 });
 
-test('legacyProvider / planStoreProductId 兼容旧 schema', () => {
-  assert.equal(legacyProvider('huawei'), 'hms');
-  assert.equal(legacyProvider('mock'), 'mock');
-  assert.equal(legacyProvider('apple'), 'apple');
-  assert.equal(planStoreProductId({ hms: ['pro_monthly_6', 'pro_monthly_7'] }, 'hms'), 'pro_monthly_6');
-  assert.equal(planStoreProductId({ hms: 'pro_h' }, 'hms'), 'pro_h');
-  assert.equal(planStoreProductId({}, 'hms'), undefined);
-  assert.equal(planStoreProductId(undefined, 'hms'), undefined);
-});
-
-test('createOrder 兼容旧 schema：storeProductMapping.hms 为数组 → 返回字符串商品 id', async () => {
-  const userId = await makeUser('app1');
-  const r = await createOrder({
-    userId, idempotencyKey: 'legacy-1', planId: 'pro-monthly',
-    platform: 'harmonyos', config: configWithLegacy(),
-  });
-  assert.equal(typeof r.storeProductId, 'string');
-  assert.equal(r.storeProductId, 'pro_monthly_6');
-});
-
-test('verifyPurchase 兼容旧 schema：provider huawei → hms 适配器，不抛 PAYMENT_PROVIDER_UNSUPPORTED', async () => {
-  const userId = await makeUser('app1');
-  const cfg = configWithLegacy();
-  const { orderId } = await createOrder({
-    userId, idempotencyKey: 'legacy-2', planId: 'pro-monthly',
-    platform: 'harmonyos', config: cfg,
-  });
-  // receipt 无 purchaseToken → hms 适配器形状校验短路 ok:false → 订单 failed，
-  // 而非旧行为 paymentProvider('huawei') 直接抛"不支持的支付渠道"。
-  const r = await verifyPurchase({
-    appId: 'app1', environment: 'development', userId, orderId,
-    receipt: {}, platform: 'harmonyos', config: cfg,
-  });
-  assert.equal(r.status, 'failed');
-});
-
-test('verifyPurchase 兼容旧 schema：interval monthly → 到期日约 30 天', async () => {
-  const userId = await makeUser('app1');
-  const cfg = configWithLegacy({ provider: 'mock', interval: 'monthly', hms: 'pro_h' });
-  const { orderId } = await createOrder({
-    userId, idempotencyKey: 'legacy-3', planId: 'pro-monthly',
-    platform: 'harmonyos', config: cfg,
-  });
-  const r = await verifyPurchase({
-    appId: 'app1', environment: 'development', userId, orderId,
-    receipt: { productId: 'pro_h' }, platform: 'harmonyos', config: cfg,
-  });
-  assert.equal(r.status, 'success');
-  const days = (new Date(r.expiresAt ?? '').getTime() - Date.now()) / 86400_000;
-  assert.ok(days > 29 && days < 31, `到期日应约 30 天，实际 ${days.toFixed(2)} 天`);
-});
-
-test('hms 适配器兼容对象 receipt（{purchaseToken}）', async () => {
-  const hms = await paymentProvider('hms', 'production');
-  // 无 token → 形状校验短路，直接 ok:false（不抛）
-  const empty = await hms.verifyReceipt({ appId: 'a', userId: 'u', receipt: {} });
-  assert.equal(empty.ok, false);
-  // 有 purchaseToken 对象 → 通过形状校验、走到环境变量检查（CI 未配 HMS_* 抛 503）
-  await assert.rejects(
-    () => hms.verifyReceipt({ appId: 'a', userId: 'u', receipt: { purchaseToken: 'tok' } }),
-    (err: ApiError) => err.status === 503 && err.code === 'PAYMENT_PROVIDER_NOT_CONFIGURED',
-  );
-});
-
 test('restorePurchases 按 productId 反查并补发（orderId 缺省）', async () => {
   const userId = await makeUser('app1');
   await restorePurchases({ appId: 'app1', environment: 'development', userId, receipts: [{ productId: 'com.x.pro' }], platform: 'ios', config: configWith() });
@@ -398,6 +362,28 @@ test('非 mock 渠道 webhook 在 P-1 返回 401（验签骨架）', async () =>
     () => applyWebhook('apple', Buffer.from('{}'), {}),
     (err: ApiError) => err.status === 401 && err.code === 'WEBHOOK_SIGNATURE_INVALID',
   );
+});
+
+test('验证适配器按上报平台动态路由（provider 仅作业务启用标识）', () => {
+  // mock 启用：恒 mock（生产环境拒绝由 paymentProvider 兜底）
+  assert.equal(paymentProviderForPlatform('mock', 'ios', 'development').id, 'mock');
+  assert.throws(
+    () => paymentProviderForPlatform('mock', 'ios', 'production'),
+    (err: ApiError) => err.status === 503 && err.code === 'MOCK_PAYMENT_FORBIDDEN',
+  );
+  // 原生启用（'store' 及历史值）：按平台分流真实适配器，而非读单值
+  assert.equal(paymentProviderForPlatform('store', 'ios', 'development').id, 'apple');
+  assert.equal(paymentProviderForPlatform('store', 'android', 'development').id, 'google');
+  assert.equal(paymentProviderForPlatform('store', 'harmonyos', 'development').id, 'hms');
+  assert.equal(paymentProviderForPlatform('apple', 'android', 'development').id, 'google');
+  assert.equal(paymentProviderForPlatform('google', 'ios', 'development').id, 'apple');
+  // 原生启用但平台未上报/不支持：400
+  assert.throws(
+    () => paymentProviderForPlatform('store', 'web', 'development'),
+    (err: ApiError) => err.status === 400 && err.code === 'PAYMENT_PROVIDER_UNSUPPORTED',
+  );
+  // 非商店标识（预留通道）维持按值取适配器原语义
+  assert.equal(paymentProviderForPlatform('wechat', 'ios', 'development').id, 'wechat');
 });
 
 test('契约快照导出 order/verify/restore/membership 的 JSON Schema', () => {

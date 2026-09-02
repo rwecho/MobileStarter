@@ -107,7 +107,9 @@ export function shouldSeedTestAccount(
   env: string | undefined,
   flag: string | undefined,
 ): boolean {
-  if (env === 'production') return false;
+  // 生产默认不播种（test@test.local/Test1234 是公开约定的弱凭证）；
+  // 审核人员需要生产测试账号时显式 MOBILEUI_SEED_TEST_ACCOUNT=1。
+  if (env === 'production') return flag === '1';
   return flag !== '0';
 }
 
@@ -278,8 +280,37 @@ function mergeRuntimeConfig(parsed: Partial<RuntimeConfig>): RuntimeConfig {
     },
     entitlements: parsed.entitlements ?? defaultConfig.entitlements,
     tiers: parsed.tiers ?? defaultConfig.tiers,
-    plans: parsed.plans ?? defaultConfig.plans,
+    plans: (parsed.plans ?? defaultConfig.plans).map(migrateLegacyPlan),
   };
+}
+
+/**
+ * 通用旧 schema 归一化（对 auth 服务上所有 app 生效，与业务无关）：
+ * 旧配置文档用 `interval: 'monthly'/'yearly'`、`provider: 'huawei'`、
+ * `storeProductMapping.<storeKey>: [商品id...]`（数组）；迁移为当前唯一 schema：
+ * `'month'/'year'`、`'hms'`、字符串商品 id。幂等：新 schema 文档返回原样。
+ * 读取时在 upgradeConfig 执行并落库，helper（legacyProvider/planStoreProductId）
+ * 仅作异常数据兜底，正常路径不再触发。
+ */
+function migrateLegacyPlan(plan: RuntimeConfig['plans'][number]): RuntimeConfig['plans'][number] {
+  const next: Record<string, unknown> = { ...(plan as RuntimeConfig['plans'][number]) };
+  const interval = next['interval'];
+  if (interval === 'monthly' || interval === 'yearly') {
+    next['interval'] = interval === 'monthly' ? 'month' : 'year';
+  }
+  if (next['provider'] === 'huawei') next['provider'] = 'hms';
+  const mapping = next['storeProductMapping'];
+  if (mapping !== null && mapping !== undefined && typeof mapping === 'object' && !Array.isArray(mapping)) {
+    const src = mapping as Record<string, unknown>;
+    const out: Record<string, string> = {};
+    for (const key of Object.keys(src)) {
+      const value = src[key];
+      if (typeof value === 'string') out[key] = value;
+      else if (Array.isArray(value) && typeof value[0] === 'string') out[key] = value[0];
+    }
+    next['storeProductMapping'] = out;
+  }
+  return next as RuntimeConfig['plans'][number];
 }
 
 export async function saveRuntimeConfig(

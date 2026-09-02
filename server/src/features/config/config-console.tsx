@@ -23,6 +23,7 @@ import { useTenant } from '@/features/tenant/tenant-context';
 import { PageHeader } from '@/features/console/page-header';
 import {
   AuthSection, BasicSection, BrandSection, FeaturesSection, SplashSection, TelemetrySection,
+  WebPresenceSection,
 } from './sections-simple';
 import {
   EntitlementsSection, LegalSection, PlansSection, SettingsPolicySection, SupportSection, TiersSection,
@@ -189,6 +190,7 @@ export function ConfigConsole() {
                   <TiersSection tiers={doc.tiers} onChange={(tiers) => update({ tiers })} entitlementKeys={doc.entitlements.map((e) => e.key)} />
                   <PlansSection plans={doc.plans} onChange={(plans) => update({ plans: plans as RuntimeConfig['plans'] })} tierIds={doc.tiers.map((t) => t.id)} />
                   <SupportSection support={doc.support} onChange={(support) => update({ support: support as RuntimeConfig['support'] })} />
+                  <WebPresenceSection webPresence={doc.webPresence} onChange={(webPresence) => update({ webPresence })} />
                   <LegalSection legal={doc.legal} onChange={(legal) => update({ legal: legal as RuntimeConfig['legal'] })} />
                   <SettingsPolicySection policy={doc.settingsPolicy} onChange={(settingsPolicy) => update({ settingsPolicy: settingsPolicy as RuntimeConfig['settingsPolicy'] })} />
                 </div>

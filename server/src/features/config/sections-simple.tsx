@@ -19,6 +19,7 @@ import {
   FIREBASE_MODE_OPTIONS,
   PLATFORM_OPTIONS,
 } from './config-enums';
+import type { WebPresence } from '@/domain/config';
 
 export function SectionCard({
   title,
@@ -76,6 +77,32 @@ export function BrandSection({
       <Field label="主题色" htmlFor="primaryColor" description="客户端主色调（按钮、强调态），十六进制颜色。">
         <ColorInput id="primaryColor" value={brand.primaryColor} onChange={(v) => onChange({ ...brand, primaryColor: v })} />
       </Field>
+    </SectionCard>
+  );
+}
+
+export function WebPresenceSection({
+  webPresence,
+  onChange,
+}: Readonly<{ webPresence: WebPresence; onChange: (next: WebPresence) => void }>) {
+  // 空输入框 ↔ null（未配置），非空原样保存
+  const toOptionalUrl = (value: string): string | null => {
+    const trimmed = value.trim();
+    return trimmed ? trimmed : null;
+  };
+  return (
+    <SectionCard title="对外链接" description="公开支持页（/support）与营销页（/marketing）的联系邮箱与商店链接，用于填写 App Store 的 Support / Marketing URL。">
+      <div className="grid gap-4 sm:grid-cols-3">
+        <Field label="客服邮箱" htmlFor="contactEmail" description="展示在公开支持页，必须有人收信（审核员会以此判断可联系性）。">
+          <TextInput id="contactEmail" value={webPresence.contactEmail} onChange={(v) => onChange({ ...webPresence, contactEmail: v })} />
+        </Field>
+        <Field label="App Store 链接" htmlFor="appStoreUrl" description="营销页下载按钮，未上架可留空。">
+          <TextInput id="appStoreUrl" value={webPresence.appStoreUrl ?? ''} onChange={(v) => onChange({ ...webPresence, appStoreUrl: toOptionalUrl(v) })} placeholder="https://apps.apple.com/app/id…" />
+        </Field>
+        <Field label="Google Play 链接" htmlFor="googlePlayUrl" description="营销页下载按钮，未上架可留空。">
+          <TextInput id="googlePlayUrl" value={webPresence.googlePlayUrl ?? ''} onChange={(v) => onChange({ ...webPresence, googlePlayUrl: toOptionalUrl(v) })} placeholder="https://play.google.com/store/apps/details?id=…" />
+        </Field>
+      </div>
     </SectionCard>
   );
 }

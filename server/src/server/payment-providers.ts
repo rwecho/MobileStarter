@@ -15,27 +15,6 @@ export function storeKeyForPlatform(platform: ClientPlatform): StoreKey | undefi
   return undefined;
 }
 
-/**
- * 兼容旧 schema：老配置用 `provider: 'huawei'` 表示 hms 渠道，
- * 其余渠道名（mock/apple/google/wechat/alipay）原样透传。
- */
-export function legacyProvider(id: string): PaymentProviderId {
-  if (id === 'huawei') return 'hms';
-  return id as PaymentProviderId;
-}
-
-/**
- * 兼容旧 schema：storeProductMapping 的值可能是字符串（新 schema）
- * 或数组（旧 schema，多个区域/币种商品 id，取首个）。返回给客户端做购买的商品 id。
- */
-export function planStoreProductId(mapping: unknown, storeKey: StoreKey): string | undefined {
-  if (mapping === null || typeof mapping !== 'object') return undefined;
-  const value = (mapping as Record<string, unknown>)[storeKey];
-  if (typeof value === 'string') return value;
-  if (Array.isArray(value)) return typeof value[0] === 'string' ? value[0] : undefined;
-  return undefined;
-}
-
 export type VerifyResult = Readonly<{
   ok: boolean;
   storeTransactionId?: string;
@@ -47,8 +26,10 @@ export type VerifyResult = Readonly<{
 export type WebhookEvent = Readonly<{
   provider: PaymentProviderId;
   eventId: string;
-  kind: 'renew' | 'refund';
+  kind: 'renew' | 'refund' | 'expire';
   orderId: string;
+  /** renew 时的新到期时刻（ISO）；缺失时续订退化为仅延长订单行 */
+  expiresAt?: string;
 }>;
 
 export interface PaymentAdapter {
@@ -69,7 +50,13 @@ const mockAdapter: PaymentAdapter = {
   async parseWebhook(rawBody) {
     const e = JSON.parse(rawBody.toString()) as Partial<WebhookEvent> & { eventId?: string };
     if (!e.eventId || !e.kind || !e.orderId) return null;
-    return { provider: 'mock', eventId: e.eventId, kind: e.kind, orderId: e.orderId };
+    return {
+      provider: 'mock',
+      eventId: e.eventId,
+      kind: e.kind,
+      orderId: e.orderId,
+      expiresAt: e.expiresAt,
+    };
   },
 };
 
@@ -101,4 +88,29 @@ export function paymentProvider(id: PaymentProviderId, environment: string): Pay
   const adapter = adapters.get(id);
   if (!adapter) throw new ApiError(400, 'PAYMENT_PROVIDER_UNSUPPORTED', '不支持的支付渠道');
   return adapter;
+}
+
+// ── 验证适配器的平台路由 ────────────────────────────────────────────────────
+// orders/skin_products.provider 是**业务启用标识**（'mock'=模拟支付；非 mock=
+// 原生商店 IAP，推荐写 'store'，兼容历史值 'apple'/'google'/'hms'），不再是
+// 验证适配器 id——真实适配器在 verify 时按客户端上报平台动态分流：
+// ios→apple、android→google、harmonyos→hms（票据形态本就分平台：iOS 字符串
+// JWS/transactionId，Android {productId, purchaseToken}）。
+const STORE_ENABLED = new Set(['store', 'apple', 'google', 'hms']);
+
+export function paymentProviderForPlatform(
+  enabled: string,
+  platform: ClientPlatform,
+  environment: string,
+): PaymentAdapter {
+  if (enabled === 'mock') return paymentProvider('mock', environment);
+  // 非商店标识（wechat/alipay 等预留通道）维持按值取适配器的原语义
+  if (!STORE_ENABLED.has(enabled)) {
+    return paymentProvider(enabled as PaymentProviderId, environment);
+  }
+  const storeKey = storeKeyForPlatform(platform);
+  if (!storeKey) {
+    throw new ApiError(400, 'PAYMENT_PROVIDER_UNSUPPORTED', '当前客户端平台不支持商店内购');
+  }
+  return paymentProvider(storeKey, environment);
 }

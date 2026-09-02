@@ -189,7 +189,8 @@ const planSchema = z.object({
   priceMinor: z.number().int().nonnegative(),
   currency: z.string().length(3),
   originalPriceMinor: z.number().int().positive().optional(),
-  provider: z.enum(['mock', 'apple', 'google', 'hms', 'wechat', 'alipay']),
+  // 'store' = 原生商店 IAP 启用标识（验证按客户端平台分流适配器）
+  provider: z.enum(['mock', 'store', 'apple', 'google', 'hms', 'wechat', 'alipay']),
   storeProductMapping: storeProductMappingSchema,
 });
 
@@ -202,6 +203,12 @@ export const restorePurchasesSchema = z.object({
   receipts: z.array(z.unknown()).min(1).max(50),
 });
 
+// 主题色值：#RRGGBB 十六进制或 rgba() 字符串（客户端原样应用，不做二次解析）
+const cssColorSchema = z.string().regex(
+  /^(#[0-9A-Fa-f]{6}|rgba\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*(?:0|1|0?\.\d+)\s*\))$/,
+  '颜色必须是 #RRGGBB 或 rgba(r,g,b,a)',
+);
+
 export const runtimeConfigSchema = z.object({
   schemaVersion: z.number().int().positive(),
   version: z.number().int().positive(),
@@ -210,6 +217,28 @@ export const runtimeConfigSchema = z.object({
     tagline: z.string().max(100),
     primaryColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/),
   }),
+  // 客户端语义色板：逐键可选（缺省键由服务端默认色板补齐）
+  theme: z.object({
+    background: cssColorSchema,
+    surface: cssColorSchema,
+    surfaceRaised: cssColorSchema,
+    surfaceMuted: cssColorSchema,
+    text: cssColorSchema,
+    textSecondary: cssColorSchema,
+    border: cssColorSchema,
+    brand: cssColorSchema,
+    brandPressed: cssColorSchema,
+    brandSoft: cssColorSchema,
+    success: cssColorSchema,
+    warning: cssColorSchema,
+    warningSoft: cssColorSchema,
+    error: cssColorSchema,
+    info: cssColorSchema,
+    membershipBronze: cssColorSchema,
+    membershipSilver: cssColorSchema,
+    membershipGold: cssColorSchema,
+    scrim: cssColorSchema,
+  }).partial().optional(),
   splash: z.object({
     id: z.string().min(1),
     title: z.string().min(1).max(80),

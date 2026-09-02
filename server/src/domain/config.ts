@@ -36,7 +36,8 @@ export type BillingPlan = Readonly<{
   priceMinor: number;
   currency: string;
   originalPriceMinor?: number;
-  provider: 'mock' | 'apple' | 'google' | 'hms' | 'wechat' | 'alipay';
+  /** 业务启用标识：'mock'=模拟支付；'store'=原生商店 IAP（验证按平台分流适配器） */
+  provider: 'mock' | 'store' | 'apple' | 'google' | 'hms' | 'wechat' | 'alipay';
   storeProductMapping?: StoreProductMapping;
 }>;
 
@@ -98,6 +99,8 @@ export type RuntimeConfig = Readonly<{
     tagline: string;
     primaryColor: string;
   }>;
+  /** 客户端颜色系统（auth 服务保存的整套语义色板；客户端以其覆盖内置 tokens）。 */
+  theme: ThemePalette;
   splash: SplashCampaign | null;
   cacheTtlSeconds: number;
   telemetry: Readonly<{
@@ -143,6 +146,28 @@ export const defaultConfig: RuntimeConfig = {
     appName: '终北统一认证',
     tagline: '把灵感变成作品',
     primaryColor: '#A84444',
+  },
+  // 默认中性暗色色板（模板基线；租户运营配置可整套覆盖——客户端以其覆盖内置 tokens）
+  theme: {
+    background: '#101318',
+    surface: '#151920',
+    surfaceRaised: '#1B2028',
+    surfaceMuted: '#0C0F13',
+    text: '#F2F3F5',
+    textSecondary: '#A8B0BC',
+    border: 'rgba(242,243,245,0.10)',
+    brand: '#A84444',
+    brandPressed: '#8F3A3A',
+    brandSoft: 'rgba(168,68,68,0.16)',
+    success: '#4F9E6F',
+    warning: '#C9973F',
+    warningSoft: 'rgba(201,151,63,0.16)',
+    error: '#C25B62',
+    info: '#5B8FD6',
+    membershipBronze: '#A97E5C',
+    membershipSilver: '#9AA4B2',
+    membershipGold: '#C9A45C',
+    scrim: 'rgba(8,10,14,0.88)',
   },
   splash: {
     id: 'summer-create',

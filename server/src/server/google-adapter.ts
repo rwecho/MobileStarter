@@ -69,9 +69,11 @@ export class GoogleAdapter implements PaymentAdapter {
         `${PLAY_API}/${packageName}/purchases/subscriptions/${productId}/tokens/${purchaseToken}`,
         { headers },
       );
+      let isSubscription = true;
 
       // 404 → not a subscription; try one-time product.
       if (response.status === 404) {
+        isSubscription = false;
         response = await fetch(
           `${PLAY_API}/${packageName}/purchases/products/${productId}/tokens/${purchaseToken}`,
           { headers },
@@ -90,6 +92,17 @@ export class GoogleAdapter implements PaymentAdapter {
       // For one-time products, purchaseState 0 = Purchased.
       if (purchaseState !== undefined && purchaseState !== 0) {
         return { ok: false };
+      }
+
+      // 购买确认：未 ack 的购买 3 天后会被 Google 自动退款。acknowledge 幂等
+      // （409/已 ack 视为成功）；ack 失败不否决验签结果，只尽力补 ack。
+      const acknowledgementState = purchase['acknowledgementState'] as number | undefined;
+      if (acknowledgementState === 0) {
+        const kind = isSubscription ? 'subscriptions' : 'products';
+        await fetch(
+          `${PLAY_API}/${packageName}/purchases/${kind}/${productId}/tokens/${purchaseToken}:acknowledge`,
+          { method: 'POST', headers, body: '{}' },
+        ).catch(() => undefined);
       }
 
       return {
@@ -142,14 +155,16 @@ export class GoogleAdapter implements PaymentAdapter {
     // RTDN subscriptionNotification types: 1=RECOVERED, 2=RENEWED, 3=CANCELED, 4=PURCHASED,
     //   5=ON_HOLD, 6=IN_GRACE, 7=RESTARTED, 8=REVOKED, 12=EXPIRED, 13=PRICE_CHANGE_CONFIRMED.
     // Voided purchase notification = refund.
-    let kind: 'refund' | 'renew' = 'renew';
+    let kind: 'refund' | 'renew' | 'expire' = 'renew';
     let purchaseToken = '';
+    let subscriptionId = '';
 
     if (voidedNotif) {
       kind = 'refund';
       purchaseToken = String(voidedNotif['purchaseToken'] ?? '');
     } else if (subNotif) {
       purchaseToken = String(subNotif['purchaseToken'] ?? '');
+      subscriptionId = String(subNotif['subscriptionId'] ?? '');
       const nt = Number(subNotif['notificationType'] ?? 0);
       // REVOKED(8), EXPIRED(12), CANCELED(3) → revoke/expire entitlement.
       if (nt === 3 || nt === 8 || nt === 12) kind = 'refund';
@@ -166,11 +181,32 @@ export class GoogleAdapter implements PaymentAdapter {
       orderId = order?.id ?? '';
     }
 
+    // 续订：RTDN 不带到期时刻 → 向 Play API 查询（尽力而为，失败则仅标记续订）
+    let expiresAt: string | undefined;
+    if (kind === 'renew' && purchaseToken && subscriptionId && orderId) {
+      try {
+        const token = await this.getAccessToken();
+        const packageName = process.env.GOOGLE_PACKAGE_NAME;
+        const res = await fetch(
+          `${PLAY_API}/${packageName}/purchases/subscriptions/${subscriptionId}/tokens/${purchaseToken}`,
+          { headers: { Authorization: `Bearer ${token}` } },
+        );
+        if (res.ok) {
+          const purchase = await res.json() as Record<string, unknown>;
+          const expiryMs = purchase['expiryTimeMillis'] as string | undefined;
+          if (expiryMs) expiresAt = new Date(Number(expiryMs)).toISOString();
+        }
+      } catch {
+        // 查询失败不否决续订事件
+      }
+    }
+
     return {
       provider: 'google',
       eventId: envelope.message?.messageId ?? '',
       kind,
       orderId,
+      expiresAt,
     };
   }
 }

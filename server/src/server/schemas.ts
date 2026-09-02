@@ -251,6 +251,11 @@ export const runtimeConfigSchema = z.object({
       body: z.string().min(1).max(3000),
     })).max(100),
   }),
+  webPresence: z.object({
+    contactEmail: z.email().max(200),
+    appStoreUrl: z.url().nullable(),
+    googlePlayUrl: z.url().nullable(),
+  }),
   auth: z.object({
     providers: z.array(z.object({
       id: z.enum(['password', 'phone', 'apple', 'google', 'github', 'huawei', 'wechat']),

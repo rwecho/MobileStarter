@@ -68,6 +68,28 @@ export type SupportConfig = Readonly<{
   }>>;
 }>;
 
+/**
+ * 对外公开网页（App Store Support / Marketing URL 指向的 /support、/marketing 页）
+ * 使用的联系与商店链接。contactEmail 会被审核员当作可联系性依据，必须有人收信。
+ */
+export type WebPresence = Readonly<{
+  contactEmail: string;
+  appStoreUrl: string | null;
+  googlePlayUrl: string | null;
+}>;
+
+/**
+ * 客户端语义色板键集（与客户端 ThemeColors 键集一一对应）。
+ * 值允许 #RRGGBB 十六进制或 rgba() 字符串——客户端直接原样应用。
+ */
+export type ThemeColorKey =
+  | 'background' | 'surface' | 'surfaceRaised' | 'surfaceMuted' | 'text' | 'textSecondary' | 'border'
+  | 'brand' | 'brandPressed' | 'brandSoft'
+  | 'success' | 'warning' | 'warningSoft' | 'error' | 'info'
+  | 'membershipBronze' | 'membershipSilver' | 'membershipGold' | 'scrim';
+
+export type ThemePalette = Readonly<Record<ThemeColorKey, string>>;
+
 export type RuntimeConfig = Readonly<{
   schemaVersion: number;
   version: number;
@@ -86,6 +108,7 @@ export type RuntimeConfig = Readonly<{
     crashlyticsEnabled: boolean;
   }>;
   support: SupportConfig;
+  webPresence: WebPresence;
   auth: Readonly<{
     providers: ReadonlyArray<Readonly<{
       id: 'password' | 'phone' | 'apple' | 'google' | 'github' | 'huawei' | 'wechat';
@@ -186,6 +209,11 @@ export const defaultConfig: RuntimeConfig = {
         body: 'Use a unique password and review signed-in devices regularly.',
       },
     ],
+  },
+  webPresence: {
+    contactEmail: 'rwecho@live.com',
+    appStoreUrl: null,
+    googlePlayUrl: null,
   },
   auth: {
     providers: [

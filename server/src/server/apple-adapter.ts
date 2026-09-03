@@ -12,7 +12,7 @@ import type {
 } from '@apple/app-store-server-library';
 import { ApiError } from './http';
 import { findOrderByStoreTransactionId } from './order-repository';
-import { paymentsForApp, appIdForAppleBundle } from './payment-apps';
+import { paymentsForApp, appIdForAppleBundle, soleAppleAppId } from './payment-apps';
 import type { ApplePaymentsConfig } from './payment-apps';
 import type {
   PaymentAdapter,
@@ -143,17 +143,23 @@ export class AppleAdapter implements PaymentAdapter {
    * Webhook 没有 x-app-id：先对 JWS **不验签**解码读出 bundleId 反查归属 app，
    * 再用该 app 的凭证做真实验证。路由读数据不构成信任边界——后续 verify
    * 才是；bundle 反查不到（未注册的 app）直接 401。
+   * TEST 测试通知没有 data.bundleId：仅当全注册表只有一个 apple app 时
+   * 启发式归到它（Apple 后台「发送测试通知」才能走通）。
    */
   private routeAppId(signedPayload: string): string {
     try {
       const payloadPart = signedPayload.split('.')[1] ?? '';
       const payload = JSON.parse(
         Buffer.from(payloadPart, 'base64url').toString('utf8'),
-      ) as { data?: { bundleId?: string }; summary?: { bundleId?: string } };
+      ) as { notificationType?: string; data?: { bundleId?: string }; summary?: { bundleId?: string } };
       const bundleId = payload.data?.bundleId ?? payload.summary?.bundleId ?? '';
       if (bundleId) {
         const appId = appIdForAppleBundle(bundleId);
         if (appId) return appId;
+      }
+      if ((payload.notificationType ?? '') === 'TEST') {
+        const sole = soleAppleAppId();
+        if (sole) return sole;
       }
     } catch {
       // 解码失败走统一 401

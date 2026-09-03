@@ -152,6 +152,18 @@ export function appIdForGooglePackage(packageName: string): string | undefined {
 }
 
 /**
+ * 全注册表只有一个 apple app 时返回它（含 env 兜底形态）；供 TEST 测试
+ * 通知的启发式路由——TEST 载荷没有 bundleId。
+ */
+export function soleAppleAppId(): string | undefined {
+  const entries = Object.entries(loadFileRegistry()).filter(([, pay]) => pay.apple);
+  const withApple = entries.map(([appId]) => appId);
+  if (withApple.length === 1) return withApple[0];
+  if (withApple.length === 0 && envAppleConfig()) return 'default';
+  return undefined;
+}
+
+/**
  * webhook 路由的兜底归属：反查不到时的处理交给调用方（默认 app 或拒绝）。
  * env 单 app 部署的 app_id 从 APPLE/GOOGLE 配置无法推知（历史上无此概念），
  * 用 'default' 占位——订单查找按 store_transaction_id 全局进行，'default'

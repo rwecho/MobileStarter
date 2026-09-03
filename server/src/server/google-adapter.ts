@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { GoogleAuth } from 'google-auth-library';
 import { ApiError } from './http';
 import { findOrderByStoreTransactionId } from './order-repository';
+import { paymentsForApp, appIdForGooglePackage } from './payment-apps';
 import type {
   PaymentAdapter,
   PaymentProviderId,
@@ -21,29 +22,32 @@ const SCOPE = 'https://www.googleapis.com/auth/androidpublisher';
  * extracts productId + expiryTimeMillis, and returns the result.
  *
  * RTDN (Real-time Developer Notifications) arrive via Google Pub/Sub push
- * to /webhooks/google; parseWebhook decodes the Pub/Sub envelope + maps
- * notificationType → WebhookEvent.
+ * to /webhooks/google; parseWebhook decodes the Pub/Sub envelope, routes by
+ * packageName → app credentials, and maps notificationType → WebhookEvent.
  */
 export class GoogleAdapter implements PaymentAdapter {
   readonly id: PaymentProviderId = 'google';
-  private auth: GoogleAuth | null = null;
+  /** 多 app：每个 auth app_id 一套 GoogleAuth（各绑各的服务账号 JSON） */
+  private auths = new Map<string, GoogleAuth>();
 
-  private initAuth(): GoogleAuth {
-    if (this.auth) return this.auth;
-    const keyFile = process.env.GOOGLE_SERVICE_ACCOUNT_FILE;
-    if (!keyFile) {
-      throw new ApiError(503, 'PAYMENT_PROVIDER_NOT_CONFIGURED', 'Google 支付尚未配置', true);
+  private initAuth(appId: string): GoogleAuth {
+    const cached = this.auths.get(appId);
+    if (cached) return cached;
+    const cred = paymentsForApp(appId).google;
+    if (!cred || !cred.serviceAccountFile) {
+      throw new ApiError(503, 'PAYMENT_PROVIDER_NOT_CONFIGURED', `Google 支付尚未配置（${appId}）`, true);
     }
-    const keyPath = join(process.cwd(), keyFile);
+    const keyPath = join(process.cwd(), cred.serviceAccountFile);
     if (!existsSync(keyPath)) {
-      throw new ApiError(503, 'PAYMENT_PROVIDER_NOT_CONFIGURED', `Google 服务账号文件不存在: ${keyFile}`, true);
+      throw new ApiError(503, 'PAYMENT_PROVIDER_NOT_CONFIGURED', `Google 服务账号文件不存在: ${cred.serviceAccountFile}`, true);
     }
-    this.auth = new GoogleAuth({ keyFile: keyPath, scopes: [SCOPE] });
-    return this.auth;
+    const auth = new GoogleAuth({ keyFile: keyPath, scopes: [SCOPE] });
+    this.auths.set(appId, auth);
+    return auth;
   }
 
-  private async getAccessToken(): Promise<string> {
-    const client = await this.initAuth().getClient();
+  private async getAccessToken(appId: string): Promise<string> {
+    const client = await this.initAuth(appId).getClient();
     const token = await client.getAccessToken();
     return token.token ?? '';
   }
@@ -57,11 +61,13 @@ export class GoogleAdapter implements PaymentAdapter {
     const { productId, purchaseToken } = input.receipt as { productId?: string; purchaseToken?: string };
     if (!productId || !purchaseToken) return { ok: false };
 
-    const packageName = process.env.GOOGLE_PACKAGE_NAME;
-    if (!packageName) return { ok: false };
+    const packageName = paymentsForApp(input.appId).google?.packageName;
+    if (!packageName) {
+      throw new ApiError(503, 'PAYMENT_PROVIDER_NOT_CONFIGURED', `Google 支付尚未配置（${input.appId}）`, true);
+    }
 
     try {
-      const token = await this.getAccessToken();
+      const token = await this.getAccessToken(input.appId);
       const headers = { Authorization: `Bearer ${token}` };
 
       // Try subscription verification first (month/year plans).
@@ -151,6 +157,18 @@ export class GoogleAdapter implements PaymentAdapter {
     const oneTimeNotif = notification['oneTimeProductNotification'] as Record<string, unknown> | undefined;
     const voidedNotif = notification['voidedPurchaseNotification'] as Record<string, unknown> | undefined;
 
+    // 多 app 路由：packageName → auth app_id；未注册的包直接拒绝
+    // （顺带构成一层伪造过滤——未知来源的通知进不了权益流程）。
+    const packageName = String(notification['packageName'] ?? '');
+    const routedAppId = appIdForGooglePackage(packageName);
+    if (!routedAppId) {
+      throw new ApiError(401, 'WEBHOOK_SIGNATURE_INVALID', `google webhook 未知 packageName: ${packageName}`, false);
+    }
+    const cred = paymentsForApp(routedAppId).google;
+    if (!cred) {
+      throw new ApiError(401, 'WEBHOOK_SIGNATURE_INVALID', `google webhook ${routedAppId} 未配置凭证`, false);
+    }
+
     // Map notification types to refund/renew.
     // RTDN subscriptionNotification types: 1=RECOVERED, 2=RENEWED, 3=CANCELED, 4=PURCHASED,
     //   5=ON_HOLD, 6=IN_GRACE, 7=RESTARTED, 8=REVOKED, 12=EXPIRED, 13=PRICE_CHANGE_CONFIRMED.
@@ -185,10 +203,9 @@ export class GoogleAdapter implements PaymentAdapter {
     let expiresAt: string | undefined;
     if (kind === 'renew' && purchaseToken && subscriptionId && orderId) {
       try {
-        const token = await this.getAccessToken();
-        const packageName = process.env.GOOGLE_PACKAGE_NAME;
+        const token = await this.getAccessToken(routedAppId);
         const res = await fetch(
-          `${PLAY_API}/${packageName}/purchases/subscriptions/${subscriptionId}/tokens/${purchaseToken}`,
+          `${PLAY_API}/${cred.packageName}/purchases/subscriptions/${subscriptionId}/tokens/${purchaseToken}`,
           { headers: { Authorization: `Bearer ${token}` } },
         );
         if (res.ok) {

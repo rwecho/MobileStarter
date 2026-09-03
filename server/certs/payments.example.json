@@ -1,0 +1,26 @@
+{
+  "apps": {
+    "loficompanion": {
+      "apple": {
+        "bundleId": "tech.zhongbei.loficompanion",
+        "appAppleId": 6807704215,
+        "issuerId": "3c721bed-bf99-4f67-891f-5ae3b78bc7ac",
+        "keyId": "3N5N2Z7JPT",
+        "privateKeyFile": "certs/AuthKey_3N5N2Z7JPT.p8",
+        "environment": "Production"
+      },
+      "google": {
+        "packageName": "tech.zhongbei.loficompanion",
+        "serviceAccountFile": "certs/play-upload-key.json"
+      }
+    },
+    "geekread": {
+      "hms": {
+        "clientId": "<AGConnect 客户端 ID>",
+        "clientSecret": "<AGConnect 客户端密钥>",
+        "appId": "<AGConnect 应用 ID>",
+        "ordersUrl": "https://orders-dre.iap.hicloud.com"
+      }
+    }
+  }
+}

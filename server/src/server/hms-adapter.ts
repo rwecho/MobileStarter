@@ -1,5 +1,7 @@
 import { ApiError } from './http';
 import { findOrderByStoreTransactionId } from './order-repository';
+import { paymentsForApp } from './payment-apps';
+import type { HmsPaymentsConfig } from './payment-apps';
 import type {
   PaymentAdapter,
   PaymentProviderId,
@@ -21,8 +23,8 @@ interface CachedToken {
  * The server gets an OAuth2 access token (client_id + client_secret),
  * then calls the HMS IAP order verification API to confirm the purchase.
  *
- * Config: HMS_CLIENT_ID, HMS_CLIENT_SECRET, HMS_APP_ID,
- * HMS_IAP_ORDERS_URL (region-specific, e.g. https://orders-dre.iap.hicloud.com).
+ * 凭证按 auth app_id 从支付注册表解析（certs/payments.json 或 HMS_* env 兜底）；
+ * OAuth token 缓存按 app_id 分键，多 app 并发互不串号。
  *
  * HMS notifications: HMS IAP uses either a configured notification URL
  * (push) or a pull API. parseWebhook parses the push format if configured;
@@ -30,38 +32,39 @@ interface CachedToken {
  */
 export class HMSAdapter implements PaymentAdapter {
   readonly id: PaymentProviderId = 'hms';
-  private cachedToken: CachedToken | null = null;
+  private cachedTokens = new Map<string, CachedToken>();
 
-  private checkConfig(): void {
-    if (!process.env.HMS_CLIENT_ID || !process.env.HMS_CLIENT_SECRET || !process.env.HMS_APP_ID) {
-      throw new ApiError(503, 'PAYMENT_PROVIDER_NOT_CONFIGURED', 'HMS 支付尚未配置', true);
+  private requireConfig(appId: string): HmsPaymentsConfig {
+    const cred = paymentsForApp(appId).hms;
+    if (!cred || !cred.clientId || !cred.clientSecret || !cred.appId) {
+      throw new ApiError(503, 'PAYMENT_PROVIDER_NOT_CONFIGURED', `HMS 支付尚未配置（${appId}）`, true);
     }
+    return cred;
   }
 
-  private async getAccessToken(): Promise<string> {
-    if (this.cachedToken && Date.now() < this.cachedToken.expiresAt - 60000) {
-      return this.cachedToken.token;
+  private async getAccessToken(appId: string, cred: HmsPaymentsConfig): Promise<string> {
+    const cached = this.cachedTokens.get(appId);
+    if (cached && Date.now() < cached.expiresAt - 60000) {
+      return cached.token;
     }
-    const clientId = process.env.HMS_CLIENT_ID!;
-    const clientSecret = process.env.HMS_CLIENT_SECRET!;
     const response = await fetch(HMS_TOKEN_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
         grant_type: 'client_credentials',
-        client_id: clientId,
-        client_secret: clientSecret,
+        client_id: cred.clientId,
+        client_secret: cred.clientSecret,
       }),
     });
     if (!response.ok) {
-      throw new ApiError(502, 'PAYMENT_PROVIDER_NOT_CONFIGURED', 'HMS OAuth2 token 获取失败', true);
+      throw new ApiError(502, 'PAYMENT_PROVIDER_NOT_CONFIGURED', `HMS OAuth2 token 获取失败（${appId}）`, true);
     }
     const data = await response.json() as { access_token?: string; expires_in?: number };
     if (!data.access_token) {
-      throw new ApiError(502, 'PAYMENT_PROVIDER_NOT_CONFIGURED', 'HMS OAuth2 无 access_token', true);
+      throw new ApiError(502, 'PAYMENT_PROVIDER_NOT_CONFIGURED', `HMS OAuth2 无 access_token（${appId}）`, true);
     }
     const expiresIn = (data.expires_in ?? 3600) * 1000;
-    this.cachedToken = { token: data.access_token, expiresAt: Date.now() + expiresIn };
+    this.cachedTokens.set(appId, { token: data.access_token, expiresAt: Date.now() + expiresIn });
     return data.access_token;
   }
 
@@ -72,14 +75,13 @@ export class HMSAdapter implements PaymentAdapter {
     const purchaseToken = input.receipt;
     if (!purchaseToken) return { ok: false };
 
-    this.checkConfig();
-    const appId = process.env.HMS_APP_ID!;
-    const ordersUrl = process.env.HMS_IAP_ORDERS_URL ?? 'https://orders-dre.iap.hicloud.com';
+    const cred = this.requireConfig(input.appId);
+    const ordersUrl = cred.ordersUrl ?? 'https://orders-dre.iap.hicloud.com';
 
     try {
-      const token = await this.getAccessToken();
+      const token = await this.getAccessToken(input.appId, cred);
       const response = await fetch(
-        `${ordersUrl}/applications/${appId}/purchases/tokens/verify`,
+        `${ordersUrl}/applications/${cred.appId}/purchases/tokens/verify`,
         {
           method: 'POST',
           headers: {
@@ -101,7 +103,7 @@ export class HMSAdapter implements PaymentAdapter {
       };
 
       // responseCode "0" = success; purchaseState 0 = purchased.
-      if (result.responseCode !== '0' && result.responseCode !== '0') {
+      if (result.responseCode !== '0') {
         return { ok: false };
       }
       const data = result.purchaseTokenData;

@@ -27,6 +27,9 @@ RUN addgroup --system --gid 1001 nodejs \
 
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+# 支付验签运行时资源：Apple 根 CA + ASC API .p8 / Play 服务账号 JSON
+# （路径由 APPLE_PRIVATE_KEY_FILE / GOOGLE_SERVICE_ACCOUNT_FILE 指向 certs/ 内文件）
+COPY --from=builder --chown=nextjs:nodejs /app/certs ./certs
 
 USER nextjs
 

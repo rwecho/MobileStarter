@@ -40,25 +40,40 @@ function resolveEnvironment(value: string | undefined): Environment {
 
 export class AppleAdapter implements PaymentAdapter {
   readonly id: PaymentProviderId = 'apple';
-  private verifier: SignedDataVerifier | null = null;
-  private apiClient: AppStoreServerAPIClient | null = null;
+  /** Per-environment caches (Production/Sandbox back each other up, see environments()). */
+  private verifiers = new Map<Environment, SignedDataVerifier>();
+  private apiClients = new Map<Environment, AppStoreServerAPIClient>();
 
-  private init(): SignedDataVerifier {
-    if (this.verifier) return this.verifier;
+  /**
+   * Primary env comes from APPLE_ENVIRONMENT; Production/Sandbox fall back to each other —
+   * real App Store purchases hit Production while TestFlight/sandbox transactions hit
+   * Sandbox. Pinning a single env makes verify always fail on the other side.
+   */
+  private environments(): readonly Environment[] {
+    const primary = resolveEnvironment(process.env.APPLE_ENVIRONMENT ?? 'Sandbox');
+    const fallback = primary === Environment.PRODUCTION
+      ? Environment.SANDBOX
+      : primary === Environment.SANDBOX ? Environment.PRODUCTION : null;
+    return fallback ? [primary, fallback] : [primary];
+  }
+
+  private init(env: Environment): SignedDataVerifier {
+    const cached = this.verifiers.get(env);
+    if (cached) return cached;
     const bundleId = process.env.APPLE_BUNDLE_ID;
     const appAppleId = process.env.APPLE_APP_APPLE_ID;
     if (!bundleId || !appAppleId) {
       throw new ApiError(503, 'PAYMENT_PROVIDER_NOT_CONFIGURED', 'Apple 支付尚未配置', true);
     }
-    const environment = resolveEnvironment(process.env.APPLE_ENVIRONMENT ?? 'Sandbox');
-    this.verifier = new SignedDataVerifier(
+    const verifier = new SignedDataVerifier(
       loadAppleRootCerts(),
       false,
-      environment,
+      env,
       bundleId,
       Number(appAppleId),
     );
-    return this.verifier;
+    this.verifiers.set(env, verifier);
+    return verifier;
   }
 
   /**
@@ -67,8 +82,9 @@ export class AppleAdapter implements PaymentAdapter {
    * This is the Apple-recommended pattern: the client sends a transactionId, the server
    * fetches the JWS from Apple and verifies it — never trusting client-sent data.
    */
-  private initApiClient(): AppStoreServerAPIClient {
-    if (this.apiClient) return this.apiClient;
+  private initApiClient(env: Environment): AppStoreServerAPIClient {
+    const cached = this.apiClients.get(env);
+    if (cached) return cached;
     const issuerId = process.env.APPLE_ISSUER_ID;
     const keyId = process.env.APPLE_KEY_ID;
     const bundleId = process.env.APPLE_BUNDLE_ID;
@@ -81,41 +97,46 @@ export class AppleAdapter implements PaymentAdapter {
       throw new ApiError(503, 'PAYMENT_PROVIDER_NOT_CONFIGURED', `Apple 私钥文件不存在: ${keyFile}`, true);
     }
     const signingKey = readFileSync(keyPath, 'utf8').trim();
-    const environment = resolveEnvironment(process.env.APPLE_ENVIRONMENT ?? 'Sandbox');
-    this.apiClient = new AppStoreServerAPIClient(signingKey, keyId, issuerId, bundleId, environment);
-    return this.apiClient;
+    const client = new AppStoreServerAPIClient(signingKey, keyId, issuerId, bundleId, env);
+    this.apiClients.set(env, client);
+    return client;
   }
 
   async verifyReceipt(input: Readonly<{
     appId: string; userId: string; orderId?: string; receipt: unknown;
   }>): Promise<VerifyResult> {
     if (typeof input.receipt !== 'string') return { ok: false };
-    try {
-      let jws: string;
-      if (input.receipt.startsWith('eyJ')) {
-        // Client sent a JWS directly (StoreKit 2 signed transaction, or test fixture).
-        // Verify it with Apple's root CA — no network call needed.
-        jws = input.receipt;
-      } else {
-        // Client sent a transactionId — Apple's recommended authoritative flow.
-        // Fetch the JWS from Apple's App Store Server API, then verify.
-        const response: TransactionInfoResponse =
-          await this.initApiClient().getTransactionInfo(input.receipt);
-        jws = response.signedTransactionInfo ?? '';
-        if (!jws) return { ok: false };
+    // Try env by env: primary failing (e.g. Production configured but the transaction
+    // came from a TestFlight sandbox purchase) falls through to the other env.
+    for (const env of this.environments()) {
+      try {
+        let jws: string;
+        if (input.receipt.startsWith('eyJ')) {
+          // Client sent a JWS directly (StoreKit 2 signed transaction, or test fixture).
+          // Verify it with Apple's root CA — no network call needed.
+          jws = input.receipt;
+        } else {
+          // Client sent a transactionId — Apple's recommended authoritative flow.
+          // Fetch the JWS from Apple's App Store Server API, then verify.
+          const response: TransactionInfoResponse =
+            await this.initApiClient(env).getTransactionInfo(input.receipt);
+          jws = response.signedTransactionInfo ?? '';
+          if (!jws) return { ok: false };
+        }
+        const tx: JWSTransactionDecodedPayload =
+          await this.init(env).verifyAndDecodeTransaction(jws);
+        const expiresMs = tx.expiresDate;
+        return {
+          ok: true,
+          storeTransactionId: tx.originalTransactionId ?? '',
+          productId: tx.productId ?? '',
+          expiresAt: expiresMs ? new Date(Number(expiresMs)).toISOString() : undefined,
+        };
+      } catch {
+        // Fall through to the next env; all-env failure means verification rejected.
       }
-      const tx: JWSTransactionDecodedPayload =
-        await this.init().verifyAndDecodeTransaction(jws);
-      const expiresMs = tx.expiresDate;
-      return {
-        ok: true,
-        storeTransactionId: tx.originalTransactionId ?? '',
-        productId: tx.productId ?? '',
-        expiresAt: expiresMs ? new Date(Number(expiresMs)).toISOString() : undefined,
-      };
-    } catch {
-      return { ok: false };
     }
+    return { ok: false };
   }
 
   async parseWebhook(
@@ -132,10 +153,17 @@ export class AppleAdapter implements PaymentAdapter {
     if (!signedPayload) {
       throw new ApiError(401, 'WEBHOOK_SIGNATURE_INVALID', 'apple webhook 无 signedPayload', false);
     }
-    let notif: ResponseBodyV2DecodedPayload;
-    try {
-      notif = await this.init().verifyAndDecodeNotification(signedPayload);
-    } catch {
+    let notif: ResponseBodyV2DecodedPayload | null = null;
+    // Webhook 可能注册在任一环境（TestFlight 沙盒通知/生产通知），逐环境验签
+    for (const env of this.environments()) {
+      try {
+        notif = await this.init(env).verifyAndDecodeNotification(signedPayload);
+        break;
+      } catch {
+        // 落下一环境
+      }
+    }
+    if (!notif) {
       throw new ApiError(401, 'WEBHOOK_SIGNATURE_INVALID', 'apple webhook 验签失败', false);
     }
     const notificationType = String(notif.notificationType ?? '');
@@ -151,7 +179,10 @@ export class AppleAdapter implements PaymentAdapter {
     let expiresAt: string | undefined;
     if (notif.data?.signedTransactionInfo) {
       try {
-        const tx = await this.init().verifyAndDecodeTransaction(notif.data.signedTransactionInfo);
+        const tx = await this.init(
+          // 通知自带 environment 声明（Production/Sandbox），按它选验签器
+          resolveEnvironment(notif.data.environment),
+        ).verifyAndDecodeTransaction(notif.data.signedTransactionInfo);
         originalTransactionId = tx.originalTransactionId ?? '';
         // JWS transaction 的 expiresDate 为毫秒 epoch（数字）
         const rawExpiry = (tx as { expiresDate?: number | string }).expiresDate;

@@ -38,6 +38,18 @@ export type HmsPaymentsConfig = Readonly<{
   appId: string;
   /** 区域订单服务，默认 https://orders-dre.iap.hicloud.com */
   ordersUrl?: string;
+  /** HarmonyOS NEXT 应用包名——webhook 反查路由 + 通知归属校验 */
+  packageName?: string;
+  /** HarmonyOS NEXT 服务端 API（订单/订阅状态查询、发货确认）JWT 签名私钥（AGC 下载的 .p8） */
+  privateKeyFile?: string;
+  /** JWT header.kid——AGC「配置密钥」页的密钥 ID */
+  keyId?: string;
+  /** JWT payload.iss——AGC「配置密钥」页的密钥颁发者 ID */
+  issuerId?: string;
+  /** 华为 CBG Root CA G2 根证书（PEM/DER）——通知 JWS 的 x5c 证书链锚点 */
+  rootCaFile?: string;
+  /** HarmonyOS NEXT 订单/订阅服务站点，默认 https://iap.cloud.huawei.com（中国站） */
+  serverApiUrl?: string;
 }>;
 
 export type AppPayments = Readonly<{
@@ -112,14 +124,24 @@ function envGoogleConfig(): GooglePaymentsConfig | undefined {
 }
 
 function envHmsConfig(): HmsPaymentsConfig | undefined {
-  if (!process.env.HMS_CLIENT_ID || !process.env.HMS_CLIENT_SECRET || !process.env.HMS_APP_ID) {
-    return undefined;
-  }
+  const appId = process.env.HMS_APP_ID;
+  if (!appId) return undefined;
+  // 两种形态任一即可：旧 Android HMS（OAuth2 client_credentials）或
+  // HarmonyOS NEXT 服务端 API（IAP 密钥 JWT ES256）。NEXT 形态不要求 clientId/Secret。
+  const legacyReady = process.env.HMS_CLIENT_ID && process.env.HMS_CLIENT_SECRET;
+  const nextReady = process.env.HMS_IAP_PRIVATE_KEY_FILE && process.env.HMS_IAP_KEY_ID;
+  if (!legacyReady && !nextReady) return undefined;
   return {
-    clientId: process.env.HMS_CLIENT_ID,
-    clientSecret: process.env.HMS_CLIENT_SECRET,
-    appId: process.env.HMS_APP_ID,
+    clientId: process.env.HMS_CLIENT_ID ?? '',
+    clientSecret: process.env.HMS_CLIENT_SECRET ?? '',
+    appId,
     ordersUrl: process.env.HMS_IAP_ORDERS_URL,
+    packageName: process.env.HMS_PACKAGE_NAME,
+    privateKeyFile: process.env.HMS_IAP_PRIVATE_KEY_FILE,
+    keyId: process.env.HMS_IAP_KEY_ID,
+    issuerId: process.env.HMS_IAP_ISSUER_ID,
+    rootCaFile: process.env.HMS_ROOT_CA_FILE,
+    serverApiUrl: process.env.HMS_IAP_SERVER_URL,
   };
 }
 
@@ -148,6 +170,15 @@ export function appIdForGooglePackage(packageName: string): string | undefined {
     if (pay.google?.packageName === packageName) return appId;
   }
   const env = envGoogleConfig();
+  return env?.packageName === packageName ? 'default' : undefined;
+}
+
+/** webhook 反查：HMS packageName → auth app_id（通知 JWS 解码后按归属路由凭证）。 */
+export function appIdForHmsPackage(packageName: string): string | undefined {
+  for (const [appId, pay] of Object.entries(loadFileRegistry())) {
+    if (pay.hms?.packageName === packageName) return appId;
+  }
+  const env = envHmsConfig();
   return env?.packageName === packageName ? 'default' : undefined;
 }
 

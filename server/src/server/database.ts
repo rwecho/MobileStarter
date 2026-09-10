@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { defaultConfig, type RuntimeConfig } from '@/domain/config';
 import { initializeCoreSchema } from './database-schema-core';
 import { initializeProductSchema } from './database-schema-product';
+import { ApiError } from './http';
 import { hashPassword } from './passwords';
 import { PostgresDatabase } from './postgres-database';
 import { DEFAULT_APP_ID } from './service-identity';
@@ -35,7 +36,7 @@ async function runBootstrap() {
     await initializeProductSchema(database);
     await applyIdempotentMigrations();
     await seedDefaultConfig();
-    // 存量 app 补种标准测试账户（幂等；新 app 在 seedConfigScope 内即时种）。
+    // 存量 app 补种标准测试账户（幂等；新 app 在 publishDraft 首版发布时种）。
     await backfillAppTestAccounts();
     await ensureBootstrapAdmin();
   });
@@ -113,7 +114,7 @@ export function shouldSeedTestAccount(
   return flag !== '0';
 }
 
-async function ensureAppTestAccount(appId: string) {
+export async function ensureAppTestAccount(appId: string) {
   if (!shouldSeedTestAccount(process.env.NODE_ENV, process.env.MOBILEUI_SEED_TEST_ACCOUNT)) {
     return;
   }
@@ -201,24 +202,23 @@ export async function getRuntimeConfig(
     ).get<{ document: string }>(appId)
     : undefined;
   if (!row) {
-    await seedConfigScope(appId, environment);
-    return defaultConfig;
+    // 未显式初始化的 app×环境一律拒绝（404），绝不静默播种模板配置——
+    // 那会让未配置环境披着默认品牌上线。新 app 经 Admin API PUT draft +
+    // publish 初始化；首版发布会补种标准测试账户（config-control.publishDraft）。
+    throw new ApiError(404, 'CONFIG_NOT_FOUND', `runtime config 未初始化：${appId}/${environment}`);
   }
   return await upgradeConfig(row.document, appId, environment);
 }
 
-async function seedConfigScope(appId: string, environment: string) {
-  await saveRuntimeConfig(defaultConfig, appId, environment);
-  await database.prepare(`
-    INSERT INTO config_revisions(
-      id, app_id, environment, version, document, action, actor, created_at
-    ) VALUES (?, ?, ?, ?, ?, 'seed', 'system', ?) ON CONFLICT DO NOTHING
-  `).run(
-    randomUUID(), appId, environment, defaultConfig.version,
-    JSON.stringify(defaultConfig), nowIso(),
-  );
-  // 每个 app 首次创建即 seed 标准测试账户（test / Test1234）。
-  await ensureAppTestAccount(appId);
+/** 仅读当前发布版本号（缺失算 0），供 publish/rollback 计算下一版本；不播种。 */
+export async function getRuntimeConfigVersion(
+  appId: string,
+  environment: string,
+): Promise<number> {
+  const row = await database.prepare(`
+    SELECT version FROM runtime_configs WHERE app_id = ? AND environment = ?
+  `).get<{ version: number }>(appId, environment);
+  return row?.version ?? 0;
 }
 
 async function upgradeConfig(

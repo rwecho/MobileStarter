@@ -2,8 +2,9 @@ import { RuntimeConfig } from '@/domain/config';
 import { createId } from './ids';
 import {
   database,
+  ensureAppTestAccount,
   getConfigDraft,
-  getRuntimeConfig,
+  getRuntimeConfigVersion,
   nowIso,
   saveRuntimeConfig,
 } from './database';
@@ -14,9 +15,15 @@ export type ConfigScope = Readonly<{ appId: string; environment: string }>;
 export async function publishDraft(scope: ConfigScope, actor: string) {
   const draft = await getConfigDraft(scope.appId, scope.environment);
   if (!draft) throw new ApiError(409, 'DRAFT_REQUIRED', '请先保存配置草稿');
-  const current = await getRuntimeConfig(scope.appId, scope.environment);
-  const published = { ...draft, version: current.version + 1 };
-  await commitRevision(scope, current.version, published, 'publish', actor, {});
+  // 版本号直读（缺失算 0）：getRuntimeConfig 对未初始化 scope 已改为抛错，
+  // publish 是新 scope 的唯一合法初始化通道，不能反过来依赖它。
+  const currentVersion = await getRuntimeConfigVersion(scope.appId, scope.environment);
+  const published = { ...draft, version: currentVersion + 1 };
+  await commitRevision(scope, currentVersion, published, 'publish', actor, {});
+  if (currentVersion === 0) {
+    // 首版发布 = scope 初始化：补种标准测试账户（原 getRuntimeConfig 懒播种语义）。
+    await ensureAppTestAccount(scope.appId);
+  }
   await database.prepare(
     'DELETE FROM config_drafts WHERE app_id = ? AND environment = ?',
   ).run(scope.appId, scope.environment);
@@ -29,12 +36,12 @@ export async function rollbackConfig(scope: ConfigScope, version: number, actor:
     WHERE app_id = ? AND environment = ? AND version = ?
   `).get(scope.appId, scope.environment, version) as { document: string } | undefined;
   if (!row) throw new ApiError(404, 'REVISION_NOT_FOUND', '配置版本不存在');
-  const current = await getRuntimeConfig(scope.appId, scope.environment);
+  const currentVersion = await getRuntimeConfigVersion(scope.appId, scope.environment);
   const restored = {
     ...JSON.parse(row.document) as RuntimeConfig,
-    version: current.version + 1,
+    version: currentVersion + 1,
   };
-  await commitRevision(scope, current.version, restored, 'rollback', actor, {
+  await commitRevision(scope, currentVersion, restored, 'rollback', actor, {
     restoredFromVersion: version,
   });
   return restored;

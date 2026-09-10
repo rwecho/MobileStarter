@@ -98,11 +98,18 @@ export async function verifyGoogle(
   try {
     ({ payload } = await jwtVerify(idToken, await resolveGoogleKeys(), verifyOptions));
   } catch (error) {
-    // kid 未命中（Google 轮换密钥）→ 刷一次远端重试；中转不可达则原样抛出
-    if ((error as { code?: string }).code !== 'JWKSNoMatchingKey' || !(await refreshGoogleJwks())) {
-      throw error;
+    // kid 未命中（Google 轮换密钥）→ 刷一次远端重试；仍失败（含签名错/过期/
+    // 格式坏）统一归 401，避免 jose 裸错误漏成 500 INTERNAL_ERROR
+    const isKidMiss = (error as { code?: string }).code === 'JWKSNoMatchingKey';
+    if (isKidMiss && (await refreshGoogleJwks())) {
+      try {
+        ({ payload } = await jwtVerify(idToken, await resolveGoogleKeys(), verifyOptions));
+      } catch {
+        throw new ApiError(401, 'ID_TOKEN_INVALID', '身份令牌校验失败');
+      }
+    } else {
+      throw new ApiError(401, 'ID_TOKEN_INVALID', '身份令牌校验失败');
     }
-    ({ payload } = await jwtVerify(idToken, await resolveGoogleKeys(), verifyOptions));
   }
   ensureNonce(payload.nonce, nonce);
   return {

@@ -1,12 +1,63 @@
 // 各 provider 的身份凭证校验（Apple/Google 走 OIDC JWKT，GitHub 走 OAuth 换
 // token 后读 profile，华为走 Account Kit 一键登录换手机号）。
 // 从 social-auth.ts 拆出以服从 CI 350 行硬上限；类型经 import type 回引无环。
-import { createRemoteJWKSet, jwtVerify } from 'jose';
+import { createLocalJWKSet, createRemoteJWKSet, jwtVerify } from 'jose';
+import type { JSONWebKeySet, JWTVerifyGetKey } from 'jose';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import path from 'node:path';
 import { ApiError } from './http';
 import type { SocialInput, SocialProfile } from './social-auth';
 
 const appleKeys = createRemoteJWKSet(new URL('https://appleid.apple.com/auth/keys'));
-const googleKeys = createRemoteJWKSet(new URL('https://www.googleapis.com/oauth2/v3/certs'));
+
+// Google JWKS：googleapis.com 自中国大陆服务器不可达，createRemoteJWKSet 首拉
+// 即挂且 jose 不支持自定义 fetch。改为「中转优先 → 磁盘缓存 → 镜像内 seed 兜
+// 底」：GOOGLE_JWKS_URL 可指向可信中转（如 CF Worker 反代 googleapis）；远端
+// 不可达时用缓存/seed 的 createLocalJWKSet 验签，Google 轮换密钥（kid 未命中）
+// 时再刷一次远端，刷不动则维持缓存（keys 极少轮换，够稳）。
+const GOOGLE_JWKS_URL = process.env.GOOGLE_JWKS_URL ?? 'https://www.googleapis.com/oauth2/v3/certs';
+const GOOGLE_JWKS_SEED = path.join(process.cwd(), 'certs/google-jwks-seed.json');
+const GOOGLE_JWKS_CACHE = path.join(process.cwd(), 'certs/google-jwks-cache.json');
+
+let googleKeys: JWTVerifyGetKey | null = null;
+
+function readCachedGoogleJwks(): JSONWebKeySet | null {
+  for (const file of [GOOGLE_JWKS_CACHE, GOOGLE_JWKS_SEED]) {
+    try {
+      const parsed = JSON.parse(readFileSync(file, 'utf8')) as JSONWebKeySet;
+      if (Array.isArray(parsed.keys) && parsed.keys.length > 0) return parsed;
+    } catch {
+      // 缺文件/坏 JSON 依次回落下一个来源
+    }
+  }
+  return null;
+}
+
+async function refreshGoogleJwks(): Promise<boolean> {
+  try {
+    const response = await fetch(GOOGLE_JWKS_URL, { signal: AbortSignal.timeout(4000) });
+    if (!response.ok) return false;
+    const jwks = (await response.json()) as JSONWebKeySet;
+    if (!Array.isArray(jwks.keys) || jwks.keys.length === 0) return false;
+    mkdirSync(path.dirname(GOOGLE_JWKS_CACHE), { recursive: true });
+    writeFileSync(GOOGLE_JWKS_CACHE, JSON.stringify(jwks));
+    googleKeys = createLocalJWKSet(jwks);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function resolveGoogleKeys(): Promise<JWTVerifyGetKey> {
+  if (googleKeys) return googleKeys;
+  if (await refreshGoogleJwks()) return googleKeys!;
+  const cached = readCachedGoogleJwks();
+  if (!cached) {
+    throw new ApiError(503, 'GOOGLE_JWKS_UNAVAILABLE', 'Google 登录公钥暂不可用');
+  }
+  googleKeys = createLocalJWKSet(cached);
+  return googleKeys;
+}
 
 function ensureNonce(actual: unknown, expected?: string) {
   if (expected && actual !== expected) {
@@ -39,10 +90,20 @@ export async function verifyGoogle(
   nonce?: string,
 ): Promise<SocialProfile> {
   if (!idToken) throw new ApiError(400, 'ID_TOKEN_REQUIRED', '缺少 Google 身份令牌');
-  const { payload } = await jwtVerify(idToken, googleKeys, {
+  const verifyOptions = {
     issuer: ['https://accounts.google.com', 'accounts.google.com'],
     audience: audiences,
-  });
+  };
+  let payload: Awaited<ReturnType<typeof jwtVerify>>['payload'];
+  try {
+    ({ payload } = await jwtVerify(idToken, await resolveGoogleKeys(), verifyOptions));
+  } catch (error) {
+    // kid 未命中（Google 轮换密钥）→ 刷一次远端重试；中转不可达则原样抛出
+    if ((error as { code?: string }).code !== 'JWKSNoMatchingKey' || !(await refreshGoogleJwks())) {
+      throw error;
+    }
+    ({ payload } = await jwtVerify(idToken, await resolveGoogleKeys(), verifyOptions));
+  }
   ensureNonce(payload.nonce, nonce);
   return {
     subject: String(payload.sub),

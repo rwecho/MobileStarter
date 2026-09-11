@@ -51,6 +51,7 @@ export async function verifyPubSubPush(
 ): Promise<void> {
   const token = (headers['authorization'] ?? '').replace(/^Bearer\s+/i, '');
   if (!token) {
+    console.warn('[google-webhook] 拒绝推送：缺少 OIDC token');
     throw new ApiError(401, 'WEBHOOK_SIGNATURE_INVALID', 'google webhook 缺少 OIDC token', false);
   }
   const audience = opts?.audience ?? process.env.GOOGLE_PUBSUB_AUDIENCE;
@@ -61,10 +62,14 @@ export async function verifyPubSubPush(
     const keys = opts?.jwks ?? await resolveGoogleKeys();
     const { payload } = await jwtVerify(token, keys, verifyOptions);
     if (serviceAccount && payload.email !== serviceAccount) {
+      console.warn('[google-webhook] 拒绝推送：OIDC email 不匹配', payload.email);
       throw new ApiError(401, 'WEBHOOK_SIGNATURE_INVALID', 'google webhook OIDC email 不匹配', false);
     }
   } catch (error) {
     if (error instanceof ApiError) throw error;
+    // 验签失败必须留痕：401 静默会引发 Pub/Sub 重试风暴且无从排查
+    console.warn('[google-webhook] OIDC 验证失败:',
+      (error as Error)?.name, (error as Error)?.message);
     if (error instanceof Error && error.name === 'JWKSTemporarilyUnavailableError') {
       throw new ApiError(503, 'WEBHOOK_VERIFY_UNAVAILABLE', 'google JWKS 暂不可用', true);
     }

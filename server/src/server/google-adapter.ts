@@ -159,8 +159,9 @@ export class GoogleAdapter implements PaymentAdapter {
         Buffer.from(data, 'base64').toString('utf8'),
       ) as Record<string, unknown>;
     } catch {
-      console.warn('[google-webhook] 拒绝推送：RTDN data 解码失败; raw 前缀:',
-        JSON.stringify(rawBody.toString('utf8', 0, 160)));
+      console.warn('[google-webhook] 拒绝推送：RTDN data 解码失败; data 长度:',
+        data.length, '; data 尾部:', JSON.stringify(data.slice(-48)),
+        '; 解码尾部:', JSON.stringify(Buffer.from(data, 'base64').toString('utf8').slice(-60)));
       throw new ApiError(401, 'WEBHOOK_SIGNATURE_INVALID', 'Google RTDN data 解码失败', false);
     }
 

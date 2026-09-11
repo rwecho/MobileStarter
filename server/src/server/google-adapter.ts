@@ -144,10 +144,12 @@ export class GoogleAdapter implements PaymentAdapter {
     try {
       envelope = JSON.parse(rawBody.toString()) as typeof envelope;
     } catch {
+      console.warn('[google-webhook] 拒绝推送：RTDN 格式无效');
       throw new ApiError(401, 'WEBHOOK_SIGNATURE_INVALID', 'Google RTDN 格式无效', false);
     }
     const data = envelope.message?.data;
     if (!data) {
+      console.warn('[google-webhook] 拒绝推送：RTDN 无 data');
       throw new ApiError(401, 'WEBHOOK_SIGNATURE_INVALID', 'Google RTDN 无 data', false);
     }
 
@@ -157,6 +159,7 @@ export class GoogleAdapter implements PaymentAdapter {
         Buffer.from(data, 'base64').toString('utf8'),
       ) as Record<string, unknown>;
     } catch {
+      console.warn('[google-webhook] 拒绝推送：RTDN data 解码失败');
       throw new ApiError(401, 'WEBHOOK_SIGNATURE_INVALID', 'Google RTDN data 解码失败', false);
     }
 
@@ -173,10 +176,12 @@ export class GoogleAdapter implements PaymentAdapter {
     const packageName = String(notification['packageName'] ?? '');
     const routedAppId = appIdForGooglePackage(packageName);
     if (!routedAppId) {
+      console.warn('[google-webhook] 拒绝推送：未知 packageName', packageName);
       throw new ApiError(401, 'WEBHOOK_SIGNATURE_INVALID', `google webhook 未知 packageName: ${packageName}`, false);
     }
     const cred = paymentsForApp(routedAppId).google;
     if (!cred) {
+      console.warn('[google-webhook] 拒绝推送：未配置凭证', routedAppId);
       throw new ApiError(401, 'WEBHOOK_SIGNATURE_INVALID', `google webhook ${routedAppId} 未配置凭证`, false);
     }
 

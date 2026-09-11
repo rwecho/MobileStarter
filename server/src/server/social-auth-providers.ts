@@ -48,7 +48,9 @@ async function refreshGoogleJwks(): Promise<boolean> {
   }
 }
 
-async function resolveGoogleKeys(): Promise<JWTVerifyGetKey> {
+/** Google OIDC 公钥解析（中转优先→磁盘缓存→seed 兜底）。登录与 Pub/Sub
+ *  webhook 鉴权共用同一条链路（公钥同源：oauth2/v3/certs）。 */
+export async function resolveGoogleKeys(): Promise<JWTVerifyGetKey> {
   if (googleKeys) return googleKeys;
   if (await refreshGoogleJwks()) return googleKeys!;
   const cached = readCachedGoogleJwks();

@@ -1,6 +1,6 @@
 import { database, nowIso, runTransaction } from './database';
 import { createId } from './ids';
-import type { MembershipTier } from '@/domain/config';
+import type { MembershipTier, RuntimeConfig } from '@/domain/config';
 
 export type EntitlementRow = Readonly<{
   id: string; user_id: string; app_id: string; entitlement_key: string;
@@ -44,6 +44,25 @@ export async function listActiveEntitlements(
     `SELECT * FROM user_entitlements
      WHERE user_id = ? AND app_id = ? AND active = 1 AND (expires_at IS NULL OR expires_at > ?)`,
   ).all(userId, appId, now) as readonly EntitlementRow[];
+}
+
+/**
+ * 从生效权益键集推导最高满足档位。权益表是唯一事实源（users.tier_id 只是
+ * 展示/运维参考，退款/到期后不清除）：/me/entitlement 与 /membership/current
+ * 在读时用本函数重推导，历史退款用户即时自愈，免数据回填。free（空
+ * entitlements）永不由权益推导；多档同时满足取 entitlements 数最多者。
+ */
+export function resolveTierIdFromEntitlementKeys(
+  config: RuntimeConfig, activeKeys: readonly string[],
+): string | null {
+  const owned = new Set(activeKeys);
+  let best: MembershipTier | null = null;
+  for (const tier of config.tiers) {
+    if (tier.entitlements.length === 0) continue;
+    if (!tier.entitlements.every((key) => owned.has(key))) continue;
+    if (!best || tier.entitlements.length > best.entitlements.length) best = tier;
+  }
+  return best?.id ?? null;
 }
 
 /**

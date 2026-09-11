@@ -1,7 +1,14 @@
 import { NextRequest } from 'next/server';
 import { requireAuth } from '@/server/auth';
+import { getClientContext } from '@/server/client-context';
+import { getRuntimeConfig } from '@/server/database';
 import { handleError, ok } from '@/server/http';
-import { ENTITLEMENT_TTL_SECONDS, signEntitlementToken } from '@/server/entitlement-token';
+import {
+  ENTITLEMENT_TTL_SECONDS, signEntitlementToken,
+} from '@/server/entitlement-token';
+import {
+  listActiveEntitlements, resolveTierIdFromEntitlementKeys,
+} from '@/server/entitlement-service';
 
 /**
  * POST /api/v1/me/entitlement
@@ -10,15 +17,21 @@ import { ENTITLEMENT_TTL_SECONDS, signEntitlementToken } from '@/server/entitlem
  * App-specific backends verify it (with the shared ENTITLEMENT_SIGNING_SECRET)
  * to grant Pro-tier quota. Free users receive `{ token: null }`.
  *
- * A user is considered Pro when their `tier_id` is set (assigned on a successful
- * paid order; cleared on refund/expiry by the order service).
+ * Tier is derived at read time from the active entitlement keys (the
+ * entitlements table is the single source of truth): a refunded/expired user
+ * stops minting tokens immediately, without any tier_id cleanup job.
+ * users.tier_id is display/ops metadata only.
  */
 export async function POST(request: NextRequest) {
   try {
     const { user } = await requireAuth(request);
-    const tierId = user.tier_id;
-    const isPro = tierId !== null && tierId.length > 0;
-    if (!isPro) {
+    const client = getClientContext(request);
+    const config = await getRuntimeConfig(user.app_id, client.environment);
+    const entitlements = await listActiveEntitlements(user.id, user.app_id);
+    const tierId = resolveTierIdFromEntitlementKeys(
+      config, entitlements.map((e) => e.entitlement_key),
+    );
+    if (tierId === null) {
       return ok({ token: null as string | null, expiresAt: null as number | null });
     }
     const exp = Math.floor(Date.now() / 1000) + ENTITLEMENT_TTL_SECONDS;

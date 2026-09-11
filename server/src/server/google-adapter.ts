@@ -4,6 +4,9 @@ import { GoogleAuth } from 'google-auth-library';
 import { ApiError } from './http';
 import { findOrderByStoreTransactionId } from './order-repository';
 import { paymentsForApp, appIdForGooglePackage } from './payment-apps';
+import {
+  pubsubAuthConfigured, verifyPubSubPush, warnPubsubAuthUnconfigured,
+} from './pubsub-auth';
 import type {
   PaymentAdapter,
   PaymentProviderId,
@@ -124,8 +127,17 @@ export class GoogleAdapter implements PaymentAdapter {
 
   async parseWebhook(
     rawBody: Buffer,
-    _headers: Readonly<Record<string, string>>,
+    headers: Readonly<Record<string, string>>,
   ): Promise<WebhookEvent | null> {
+    // 传输鉴权（与 Apple JWS / HMS x5c 验签对齐）：Pub/Sub push 附带的 OIDC
+    // JWT 在解析任何报文内容之前验证。env 未配置时灰度放行（先部署后配置
+    // 不破坏现有 push 订阅）。
+    if (pubsubAuthConfigured()) {
+      await verifyPubSubPush(headers);
+    } else {
+      warnPubsubAuthUnconfigured();
+    }
+
     // Google RTDN arrives as a Pub/Sub push: { message: { data, messageId }, subscription }
     // The `data` is base64-encoded JSON: DeveloperNotification.
     let envelope: { message?: { data?: string; messageId?: string } };
@@ -154,7 +166,6 @@ export class GoogleAdapter implements PaymentAdapter {
     //     oneTimeProductNotification: { notificationType, purchaseToken, sku },
     //     voidedPurchaseNotification: { purchaseToken, orderId, productType, refundState } }
     const subNotif = notification['subscriptionNotification'] as Record<string, unknown> | undefined;
-    const oneTimeNotif = notification['oneTimeProductNotification'] as Record<string, unknown> | undefined;
     const voidedNotif = notification['voidedPurchaseNotification'] as Record<string, unknown> | undefined;
 
     // 多 app 路由：packageName → auth app_id；未注册的包直接拒绝
@@ -169,11 +180,16 @@ export class GoogleAdapter implements PaymentAdapter {
       throw new ApiError(401, 'WEBHOOK_SIGNATURE_INVALID', `google webhook ${routedAppId} 未配置凭证`, false);
     }
 
-    // Map notification types to refund/renew.
+    // Map notification types to refund/renew/expire——显式映射、无默认值：
+    // 未识别的通知一律忽略（safe-by-default），绝不当作续订处理。
     // RTDN subscriptionNotification types: 1=RECOVERED, 2=RENEWED, 3=CANCELED, 4=PURCHASED,
     //   5=ON_HOLD, 6=IN_GRACE, 7=RESTARTED, 8=REVOKED, 12=EXPIRED, 13=PRICE_CHANGE_CONFIRMED.
     // Voided purchase notification = refund.
-    let kind: 'refund' | 'renew' | 'expire' = 'renew';
+    // CANCELED(3) 只是关掉后续续订，权益保留到到期（EXPIRED(12) 随后到达）；
+    // ON_HOLD(5) 冻结期挂起权益（RESTARTED(7)→renew 自动恢复）；IN_GRACE(6)
+    // 保持现状——旧版 Play API 此刻回传的是过去时 expiryTime，写 renew 会把
+    // renew_at 倒拨。
+    let kind: 'refund' | 'renew' | 'expire';
     let purchaseToken = '';
     let subscriptionId = '';
 
@@ -184,11 +200,12 @@ export class GoogleAdapter implements PaymentAdapter {
       purchaseToken = String(subNotif['purchaseToken'] ?? '');
       subscriptionId = String(subNotif['subscriptionId'] ?? '');
       const nt = Number(subNotif['notificationType'] ?? 0);
-      // REVOKED(8), EXPIRED(12), CANCELED(3) → revoke/expire entitlement.
-      if (nt === 3 || nt === 8 || nt === 12) kind = 'refund';
-    } else if (oneTimeNotif) {
-      purchaseToken = String(oneTimeNotif['purchaseToken'] ?? '');
+      if (nt === 1 || nt === 2 || nt === 4 || nt === 7) kind = 'renew';
+      else if (nt === 5 || nt === 12) kind = 'expire';
+      else if (nt === 8) kind = 'refund';
+      else return null; // 3 CANCELED / 6 IN_GRACE / 13+ 未识别：不改变权益
     } else {
+      // oneTimeProductNotification：会员订阅无一次性续订概念，忽略。
       return null;
     }
 

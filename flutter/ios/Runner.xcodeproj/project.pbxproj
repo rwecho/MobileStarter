@@ -497,7 +497,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = top.rwecho.cortexterminal;
+				PRODUCT_BUNDLE_IDENTIFIER = com.mobileui.mobileui_flutter;
     DEVELOPMENT_TEAM = 2VA9TC6SG4;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_OBJC_BRIDGING_HEADER = "Runner/Runner-Bridging-Header.h";
@@ -680,7 +680,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = top.rwecho.cortexterminal;
+				PRODUCT_BUNDLE_IDENTIFIER = com.mobileui.mobileui_flutter;
     DEVELOPMENT_TEAM = 2VA9TC6SG4;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_OBJC_BRIDGING_HEADER = "Runner/Runner-Bridging-Header.h";
@@ -703,7 +703,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = top.rwecho.cortexterminal;
+				PRODUCT_BUNDLE_IDENTIFIER = com.mobileui.mobileui_flutter;
     DEVELOPMENT_TEAM = 2VA9TC6SG4;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_OBJC_BRIDGING_HEADER = "Runner/Runner-Bridging-Header.h";

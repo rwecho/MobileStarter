@@ -47,13 +47,17 @@ final class IdentityRewriter {
   }
 
   Map<String, String> _flutterReplacements() => {
+    // 注意顺序：replaceAll 按插入顺序执行，长键必须排在短键之前，
+    // 否则裸 'mobileui_flutter' 会先把 'com.mobileui.mobileui_flutter'
+    // 破坏成 'com.mobileui.<packageName>'，精确规则永远匹配不到。
+    'package com.mobileui.mobileui_flutter': 'package $_nativePackage',
+    'com.mobileui.mobileuiFlutter': _nativePackage,
+    'com.mobileui.mobileui_flutter': _nativePackage,
+    'top.rwecho.cortexterminal': _nativePackage,
     'mobilestarter_flutter': manifest.packageName,
     'Reusable MobileStarter application template':
         '${manifest.displayName} mobile application',
     'mobileui_flutter': manifest.packageName,
-    'com.mobileui.mobileuiFlutter': _nativePackage,
-    'com.mobileui.mobileui_flutter': _nativePackage,
-    'package com.mobileui.mobileui_flutter': 'package $_nativePackage',
     'mobilestarter://oauth': '${manifest.appId}://oauth',
     "'mobilestarter'": "'${manifest.appId}'",
     '<string>mobilestarter</string>': '<string>${manifest.appId}</string>',
